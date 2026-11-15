@@ -274,6 +274,19 @@ impl Pos {
             return false;
         }
         if touching != 0 {
+            #[cfg(feature = "shadow")]
+            {
+                let old = crate::shadow::old_find_move_list(t, self, player, pieces, touching);
+                let mut new = Vec::new();
+                find_grow(t, self.cells[player], self.occupied(), pieces, touching, |m| {
+                    new.push(m);
+                    false
+                });
+                crate::shadow::hit(1);
+                if old != new {
+                    crate::shadow::fail("find_move touching", format!("pos {} player {} pieces {} touching {:032x} old {:?} new {:?}", self.to_text(), player, pieces, touching, old, new));
+                }
+            }
             // only placements that grow a snake: no new-snake anchors to compute
             return find_grow(t, self.cells[player], self.occupied(), pieces, touching, f);
         }
@@ -461,6 +474,37 @@ pub fn find_grow<F: FnMut(u16) -> bool>(t: &Tables, own: BB, occ: BB, pieces: u8
 /// snake and touch both the own cells `a` and the own cells `b`, largest pieces first, until f says yes.
 #[inline]
 pub fn find_grow_both<F: FnMut(u16) -> bool>(t: &Tables, own: BB, occ: BB, pieces: u8, a: BB, b: BB, mut f: F) -> bool {
+    #[cfg(feature = "shadow")]
+    {
+        // the old way: every placement find_move(touching a) offers, kept if its border meets b
+        let mut new = Vec::new();
+        find_grow_both_impl(t, own, occ, pieces, a, b, |m| {
+            new.push(m);
+            false
+        });
+        let mut old = Vec::new();
+        if a != 0 && pieces != 0 {
+            let mut p = Pos::initial();
+            p.cells[0] = own;
+            p.cells[1] = occ & !own;
+            p.left[0] = pieces;
+            p.recompute();
+            for m in crate::shadow::old_find_move_list(t, &p, 0, pieces, a) {
+                if t.placements[m as usize].border & b != 0 {
+                    old.push(m);
+                }
+            }
+        }
+        crate::shadow::hit(2);
+        if old != new {
+            crate::shadow::fail("find_grow_both", format!("own {:032x} occ {:032x} pieces {} a {:032x} b {:032x} old {:?} new {:?}", own, occ, pieces, a, b, old, new));
+        }
+    }
+    find_grow_both_impl(t, own, occ, pieces, a, b, |m| f(m))
+}
+
+#[inline]
+fn find_grow_both_impl<F: FnMut(u16) -> bool>(t: &Tables, own: BB, occ: BB, pieces: u8, a: BB, b: BB, mut f: F) -> bool {
     if pieces == 0 {
         return false;
     }
@@ -514,6 +558,20 @@ pub fn grow_anchors(o: &Orientation, g: &Gen) -> BB {
 /// `grow_anchors` among the anchors `among`.
 #[inline(always)]
 pub fn grow_anchors_in(o: &Orientation, g: &Gen, among: BB) -> BB {
+    let r = grow_anchors_in_impl(o, g, among);
+    #[cfg(feature = "shadow")]
+    {
+        crate::shadow::hit(0);
+        let old = crate::shadow::old_grow_anchors(o, g) & among;
+        if old != r {
+            crate::shadow::fail("grow_anchors_in", format!("piece {} own {:032x} next_own {:032x} among {:032x} old {:032x} new {:032x}", o.piece, g.own, g.next_own, among, old, r));
+        }
+    }
+    r
+}
+
+#[inline(always)]
+fn grow_anchors_in_impl(o: &Orientation, g: &Gen, among: BB) -> BB {
     let mut touch = g.next_own;
     for k in 1..o.size as usize {
         touch |= (g.next_own & o.win[k]) >> o.shift[k];

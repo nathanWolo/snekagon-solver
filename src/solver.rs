@@ -602,6 +602,15 @@ impl Solver {
         } else {
             upper_bound_cells_upto(t, &BoundCtx::new(pos, me), growable(pos, me) & !b.cells, opp_len)
         };
+        #[cfg(feature = "shadow")]
+        {
+            crate::shadow::hit(4);
+            let old = upper_bound_ex(t, pos, me, b.cells, None);
+            let class = |u: i32| if u < opp_len { -1 } else if u <= opp_len { 0 } else { 1 };
+            if class(old) != class(my_upper) {
+                crate::shadow::fail("try_threat", format!("pos {} move {} old {} new {} opp_len {}", pos.to_text(), m, old, my_upper, opp_len));
+            }
+        }
         let value = if my_upper < opp_len {
             -1
         } else if my_upper <= opp_len {
@@ -697,6 +706,27 @@ impl Solver {
             } else {
                 1
             };
+            #[cfg(feature = "shadow")]
+            if narrow {
+                // the f4e5efc computation: the exact bound of the covered clusters
+                crate::shadow::hit(5);
+                let mut upper = my_lower;
+                let mut covered: BB = 0;
+                for i in 0..mine.n {
+                    if mine.cells[i] & b.cells != 0 {
+                        covered |= mine.cells[i];
+                    } else if mine.upper[i] > upper {
+                        upper = mine.upper[i];
+                    }
+                }
+                if covered != 0 {
+                    upper = upper.max(upper_bound_cells(t, &ctx, covered & !b.cells, None));
+                }
+                let old_value = if upper < opp_len { -1 } else if upper <= opp_len { 0 } else { 1 };
+                if (old_value <= alpha) != (value <= alpha) || (value <= alpha && old_value != value) {
+                    crate::shadow::fail("scan_threats", format!("pos {} move {} alpha {} old {} new {} opp_len {}", pos.to_text(), m, alpha, upper, my_upper, opp_len));
+                }
+            }
             if value <= alpha {
                 let zone = threat_zone(pos, opp, b);
                 found[nf] = (count(zone), zone, value);
@@ -725,6 +755,26 @@ impl Solver {
         if self.cfg.witness {
             if self.wit[ply][player].proves(pos, player, need) || (ply > 0 && self.wit[ply - 1][player].proves(pos, player, need)) {
                 self.reach_reused += 1;
+                #[cfg(feature = "shadow")]
+                {
+                    let w = if self.wit[ply][player].proves(pos, player, need) { self.wit[ply][player] } else { self.wit[ply - 1][player] };
+                    let mut scratch = Witness::NONE;
+                    let mut work = self.cfg.reach_work;
+                    crate::shadow::hit(8);
+                    if !can_reach_touching_w(self.t, pos, player, need, &mut work, &mut scratch) {
+                        crate::shadow::WIT_DIFF_SAME_WORK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    crate::shadow::hit(9);
+                    let ok = if pos.left[player].count_ones() <= 2 {
+                        one_player_optimum(self.t, pos, player) >= need
+                    } else {
+                        let mut work = u32::MAX;
+                        can_reach_touching_w(self.t, pos, player, need, &mut work, &mut scratch)
+                    };
+                    if !ok || !crate::shadow::witness_replays(self.t, pos, player, &w) {
+                        crate::shadow::fail("witness", format!("pos {} player {} need {} ply {} wit len {} mask {:032x}", pos.to_text(), player, need, ply, w.len, w.mask));
+                    }
+                }
                 return true;
             }
         }

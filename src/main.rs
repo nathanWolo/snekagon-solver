@@ -6,6 +6,8 @@ mod pieces;
 mod pns;
 mod pos;
 mod prove;
+#[cfg(feature = "shadow")]
+mod shadow;
 mod solver;
 mod study;
 
@@ -271,6 +273,8 @@ fn prove_cmd(t: &Tables, o: &Opts) {
     println!("# positions {} nodes {} seconds {:.3} wrong {} unknown 0", n, total_nodes, total_us as f64 / 1e6, wrong);
     println!("# jobs {} stopped {} thread-seconds {:.1}", jobs, stopped, thread_s);
     if wrong > 0 {
+        #[cfg(feature = "shadow")]
+        shadow::report();
         std::process::exit(1);
     }
 }
@@ -350,6 +354,8 @@ fn bench(t: &Tables, o: &Opts) {
         writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
     }
     if wrong > 0 {
+        #[cfg(feature = "shadow")]
+        shadow::report();
         std::process::exit(1);
     }
 }
@@ -425,4 +431,6 @@ fn main() {
             println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-mul N --pn-ab LEVEL --pn-unit NODES --pn-width N --pn-model --pn-probe --pn-killers --pn-tt BITS --prefetch --tt-skip LEVEL --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
+    #[cfg(feature = "shadow")]
+    shadow::report();
 }

@@ -162,7 +162,22 @@ pub fn upper_bound_cells(t: &Tables, ctx: &BoundCtx, mut rest: BB, mut rec: Opti
 /// at most `limit`: the exact bound when it is, else some number above `limit` (as soon as a cluster
 /// is seen to exceed it, part-built: a cluster's bound only grows as regions and snakes join it).
 #[inline]
-pub fn upper_bound_cells_upto(t: &Tables, ctx: &BoundCtx, mut rest: BB, limit: i32) -> i32 {
+pub fn upper_bound_cells_upto(t: &Tables, ctx: &BoundCtx, rest: BB, limit: i32) -> i32 {
+    let r = upper_bound_cells_upto_impl(t, ctx, rest, limit);
+    #[cfg(feature = "shadow")]
+    {
+        crate::shadow::hit(3);
+        let exact = upper_bound_cells(t, ctx, rest, None);
+        let ok = if exact <= limit { r == exact } else { r > limit && r <= exact };
+        if !ok {
+            crate::shadow::fail("upper_bound_cells_upto", format!("rest {:032x} limit {} exact {} upto {} left {} lower {}", rest, limit, exact, r, ctx.left, ctx.lower));
+        }
+    }
+    r
+}
+
+#[inline]
+fn upper_bound_cells_upto_impl(t: &Tables, ctx: &BoundCtx, mut rest: BB, limit: i32) -> i32 {
     let lower = ctx.lower;
     let fill = &t.best_fill[ctx.left as usize];
     let joinable = ctx.left.count_ones() as usize + 1;
@@ -314,6 +329,44 @@ fn needs_empty(p: &Placement, own: BB) -> BB {
 /// `can_reach_touching`; when it answers yes from a sequence it found, the sequence goes to `wit`
 /// (otherwise `wit` is left alone). The answer is exactly that of `can_reach_touching`.
 pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32, wit: &mut Witness) -> bool {
+    #[cfg(feature = "shadow")]
+    let mut work_old = *work;
+    #[cfg(feature = "shadow")]
+    let old = crate::shadow::old_can_reach_touching(t, pos, player, target, &mut work_old);
+    #[cfg(feature = "shadow")]
+    let before = *wit;
+    let r = can_reach_touching_w_impl(t, pos, player, target, work, wit);
+    #[cfg(feature = "shadow")]
+    {
+        crate::shadow::hit(6);
+        crate::shadow::hit(7);
+        if old != r {
+            crate::shadow::fail("can_reach_touching", format!("pos {} player {} target {} old {} new {}", pos.to_text(), player, target, old, r));
+        }
+        if work_old != *work {
+            crate::shadow::fail("can_reach_touching work", format!("pos {} player {} target {} old left {} new left {}", pos.to_text(), player, target, work_old, *work));
+        }
+        // a recorded witness must replay here
+        let w = *wit;
+        if r && (w.own != before.own || w.mask != before.mask || w.left != before.left || w.len != before.len) {
+            crate::shadow::hit(10);
+            if w.len < target || w.own != pos.cells[player] || w.left != pos.left[player] || !crate::shadow::witness_replays(t, pos, player, &w) {
+                crate::shadow::fail("witness record", format!("pos {} player {} target {} len {} mask {:032x}", pos.to_text(), player, target, w.len, w.mask));
+            }
+        }
+        // a no for at most two pieces against every sequence
+        if !r && pos.left[player].count_ones() <= 2 {
+            crate::shadow::hit(11);
+            let opt = one_player_optimum(t, pos, player);
+            if opt >= target {
+                crate::shadow::fail("can_reach_touching no vs exhaustive", format!("pos {} player {} target {} optimum {}", pos.to_text(), player, target, opt));
+            }
+        }
+    }
+    r
+}
+
+fn can_reach_touching_w_impl(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32, wit: &mut Witness) -> bool {
     if pos.longest[player] as i32 >= target {
         return true;
     }
@@ -489,7 +542,7 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
 }
 
 /// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.
-fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good: BB, work: &mut u32) -> bool {
+pub(crate) fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good: BB, work: &mut u32) -> bool {
     if *work == 0 {
         return true;
     }
