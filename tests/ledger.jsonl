@@ -15,3 +15,5 @@
 {"time": "2026-11-15T02:07:06-07:00", "key": "LADDER-6B", "set": "ply06", "kind": "confirm", "from": 212, "to": 230}
 {"time": "2026-11-15T13:53:19-07:00", "key": "E27A", "set": "proof4", "kind": "gate", "from": 44, "to": 74}
 {"time": "2026-11-15T13:58:37-07:00", "key": "E27B", "set": "proof4", "kind": "gate", "from": 74, "to": 104}
+{"time": "2026-11-15T16:16:35-07:00", "key": "E28", "set": "proof4", "kind": "gate", "from": 104, "to": 134}
+{"time": "2026-11-15T16:31:23-07:00", "key": "E25", "set": "proof4", "kind": "gate", "from": 134, "to": 164}

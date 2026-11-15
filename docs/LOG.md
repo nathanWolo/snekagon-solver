@@ -1466,3 +1466,20 @@ that branch). Four pots, ranked:
 - **Not checked by it:** runs with prefetch on under the shadow build (argued only),
   `--reach-hand` above 2, the proof-number and driver code paths.
 - **The shadow build stays** on `climb/verify` as a tool for the next change to these routines.
+
+## 2026-11-15 E28 and E25: both gates pass; merged; guards running before the freeze
+
+- **E28** (the search branch's seven changes, profiled `8507875` against the profiled base;
+  proof units 104-133, `--window 0,1`): +8.0% [+5.4%, +10.7%] where it stopped, sd 0.070 a
+  unit, LLR +16.4, PASS at 30 units; total time 213.5 s against 195.6 s (0.916x); node counts
+  identical (242,995,080). The agent's screen had said 0.915x.
+- **E25** (prefetch on by default, profiled `36892b4` against the E28 candidate; proof units
+  134-163): +5.8% [+3.2%, +8.4%] where it stopped, LLR +9.8, PASS at 30 units; total time
+  266.5 s against 252.8 s (0.949x); node counts identical (339,005,081). Expected 0.95x.
+- **Merged** into `parallel-v9` (`bd41644`). Not frozen yet.
+- **Guards before the freeze:** `E25-UP` (ply 5 tune units, the next harder file: must not show
+  a higher total time) and `E25-DRV` (whole proof jobs a-d on 16 single-thread workers
+  through `tools/provegate.py`: prefetch has not been timed with 16 threads sharing the
+  memory; four jobs resolve about 12%, so this guard can only catch a large loss).
+- **Gate units:** the proof set's gate range has 57 units left (164-220). More positions are
+  needed before the reach-threat gate: a second sample of children from the same parents.
