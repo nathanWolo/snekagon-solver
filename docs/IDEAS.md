@@ -5,42 +5,57 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 
 ## Open, by expected gain for the effort
 
-1. **Cheapest win first.** The study of root moves (LOG, 2026-11-15) puts the ideal order at 3-6 times
-   fewer nodes than the model of E4 at every upper level (ply 6: 0.67 M against 1.84 M out of sample;
-   static was 3.39 M). The model predicts "wins"; what is missing is "wins cheaply". Within a position
-   a win is cheap when the move leaves few replies after threat zones (correlation +0.44 to +0.50 with
-   log nodes) and when our best next extension is large (-0.40). Fitting the cost directly overfitted
-   200 positions; it needs thousands (the tool makes about 300 moves a second at ply 6), per level,
-   and a two-stage score (cheap features for all moves, look-ahead features for the best 20).
-2. **Merge the parallel solve** (branch `parallel`, E8): exact, 3.9x wall-clock on 8 cores, costs about
-   2% with one thread. Owner's call. Further: its nodes grow 1.7x at 8 threads; the waste is threads
-   on alternatives at winner's nodes below the two joint plies. Node types by a guess of the value
-   (join where the mover is expected to win, share out where it is expected to lose) should cut it.
-3. **Stronger threats.** With six pieces left the side being refuted still tries 16 moves a node. A
-   threat is found today by the cluster bound after one opponent placement; the reach test (hands of
-   one or two) or a two-placement threat would find more, so zones shrink. Cost: a test per candidate.
-4. **A closed form with three pieces left** (two against one). After E3 the leaves with two pieces
-   left and their parents are still 60% of the nodes at ply 6. The list of the opponent's extensions
-   can be built once for the parent instead of once a child.
-5. **Speed of a node (E7).** `Clusters::new()` zeroes about 1 KB twice a node; the move generator
-   builds its context twice at nodes that scan threats; a child position is a 300-byte copy.
-6. **Symmetry-canonical table keys** up to ply 6 (E6). Nothing for the test positions (ply 5 and
-   later); needed before any search from the start position.
-7. **Null-window questions as the unit of work** (E10) for a proof of an opening: "does the mover win"
-   is cheaper than the exact value and is what a proof tree needs.
-8. **A per-level model.** E4's weights come from roots with nine and eight pieces left; at ply 5 (ten
-   left) the gain was 0.92x against 0.72x at ply 6. Root data at ply 5 costs minutes a position.
+1. **More from what the search already knows.** E14 (cover the reply that refuted the last move)
+   was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Three follow-ups
+   failed (E15-E17, below). Not yet tried: the same rule for the second killer; more than two killers
+   a ply; a per-cell count of where refuting replies land, as a score.
+2. **Cheapest win first.** A root pays 21-55% of its nodes before the first winning move and the win
+   it finds costs about twice the cheapest (LOG, "a second look at the best few moves"). The fitted
+   model is at the limit of its eight features (a refit on five times the data gave the same
+   weights), and re-ranking by look-ahead features gave nothing. It needs information of another
+   kind.
+3. **Merge the parallel solve** (branch `parallel-v9`): exact, 3.4x wall-clock on 8 threads, about 2%
+   with one thread on v4. Owner's call. The proof driver on the same branch (`prove`, E18) hands
+   whole positions to workers and keeps every result in a file, so a solve can be stopped and
+   resumed. It beats the shared-table solve where every root move must be refuted (42.8 s against
+   51.9 s) and loses on a drawn position (191 s against 140 s), because it asks two narrow
+   questions.
+3a. **Ask the stronger question first** (the fix for the driver's loss). At a node that needs "at
+   least a draw", "a win" is often true and its proof is found faster. Try the first move with the
+   decisive window and a node budget before the narrow one; or keep the wide window and search one
+   move at a time until alpha has risen. Size: the 1.4x between 195 s and 140 s on the drawn ply-3
+   position. Also worth a study: why the win proof is cheaper (threat zones in the decisive window).
+4. **Node speed, what is left** (v8, share of time): reach tests 29%, threat scans 16%, last pieces
+   10%, killer threats 6%, generating 5%, the rest (table, copy, play) 28%. The generator's
+   per-orientation cost is behind most of these. A witness kept from a reach test that said "yes"
+   could answer the same question at the child (about a third of the tests are such repeats).
+5. **Stronger threats.** A threat is found by the cluster bound after one opponent placement. The
+   exact reach test would find more at three and four pieces left, at about six times the cost of
+   a scan: not worth it as it stands.
+6. **Symmetry-canonical table keys** up to ply 6. Nothing for the test positions (ply 5 and later);
+   needed before any search from the start position.
+7. **More test positions.** The ply-6 gate range is used up and ply 7 has about 90 gate units left.
+   New positions can be labelled by two frozen versions that agree (v0 and the base).
 
 ## Passed
 
-- **E1 last pieces in closed form** (gate `E1`, ply 7): time 0.61x. v1.
-- **E2 threat zones** (gate `E2`, ply 7): time 0.63x; 0.54x at ply 6. v2.
-- **E3 reach test for hands of one or two pieces** (gate `E3`, ply 6): time 0.75x; 0.66x at ply 5. v3.
-- **E4 upper moves ordered by a fitted model** (gate `E4`, ply 6): time 0.72x; 0.92x at ply 5. v4.
+- **E1 last pieces in closed form** (gate `E1`, ply 7). v1.
+- **E2 threat zones** (gate `E2`, ply 7). v2.
+- **E3 reach test for hands of one or two pieces** (gate `E3`, ply 6). v3.
+- **E4 upper moves ordered by a fitted model** (gate `E4`, ply 6). v4.
+- **E9 the first move before the move list** (gate `E9`, ply 6): same nodes, time 0.895x. v5.
+- **E10 the exact reach question first, no cluster bound for that side** (gate `E10`, ply 6): time 0.857x. v6.
+- **E11 a scan recomputes only the covered clusters** (gate `E11-P7`, ply 7): same nodes, time 0.954x. v7.
+- **E12 the reach test starts from the longest snake** (gate `E12`, ply 7): same nodes, time 0.800x. v8.
+- **E14 after a failed move, cover the refuting reply first** (gate `E14`, ply 7): nodes 0.77x on tune. v9.
+
+The sizes to quote are the ladder's (LOG, "Confirmation"), not the gates'.
 
 ## Kept apart
 
-- **E8 parallel solve**: see Open 2.
+- **E8 parallel solve**: see Open 3.
+- **E18 proof driver** (`src/prove.rs` on `parallel-v9`): exact, restartable, not a speed gain yet.
+  See Open 3 and 3a.
 
 ## Dropped (the graveyard)
 
@@ -59,7 +74,15 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 - **Look-ahead features in the model** (part of E4): fewer nodes (2.70 M against 2.92 M at seven or
   more pieces left) but a child position per move: 3.99 s against 2.59 s. *Reopen* as stage two of a
   two-stage score (Open 1).
-- **E9 enhanced transposition cutoffs.** The reference tried it and found no gain. Not tried here.
+- **E13 a distance check before a reach test that needs a second snake**: same nodes, no change in
+  time. Two pieces reach nine steps on a board eleven across. *Reopen if* a tighter test than
+  distance is found.
+- **E15 the last known refuting reply used before the first move**: nodes +0% to +4%.
+- **E16 a counter-move table**: nodes +2% to +10% after the killers, twice the nodes before them.
+- **E17 moves that overlap a blocked killer first**: nodes +4% to +26%.
+- **Reach test for hands of three, again on v8**: nodes -7%, time +13%. The pot is 7% at most.
+- **Re-ranking the first K moves by look-ahead features**: 0.65x to 1.77x across files, no gain.
+- **Enhanced transposition cutoffs.** The reference tried it and found no gain. Not tried here.
 
 ## Inbox
 

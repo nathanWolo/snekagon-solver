@@ -632,3 +632,133 @@ test decided, (confirm) fixed length on fresh units.
 - **Verdict:** dropped at the screen; no gate run.
 - **What it taught:** three order ideas built on E14's success failed in ten minutes at no cost in
   gate units. Screening on node counts is what makes guessing affordable.
+
+## 2026-11-15 E8 again: the parallel solve ported onto v9 (branch `parallel-v9`)
+
+- **What:** the branch `parallel` was built from v4. The same changes (shared atomic table, busy
+  table, set-aside moves, unwinding, the search compiled twice) were put onto v9 by a script
+  (`parv9_patch.py`), fitted around v9's first-move step and answer bonus. Commit `d609ccb` on the
+  new branch `parallel-v9`; a built copy is `frozen/par-v9.exe`. `main` is unchanged.
+- **Identity:** one thread gives v9's node counts exactly (8,076,471 on ply 7 positions 0-589 and
+  7,136,589 on ply 6 positions 0-199). `verify 40` passes.
+- **Correctness:** 16 threads on all of plies 8-11, 590 of ply 7 and 380 of ply 6, then 8 threads
+  on ply 8 and the same tune positions: 21,940 solves, none wrong.
+- **Wall-clock** (tune, ply 5 positions 0-29; v9 one thread 8.16 s, 15.8 M nodes; the same build with
+  one thread 8.22 s):
+
+  | Threads | Seconds | Speed-up | Nodes |
+  | --- | --- | --- | --- |
+  | 2 | 4.69 | 1.74x | 17.3 M |
+  | 4 | 3.06 | 2.67x | 22.4 M |
+  | 8 | 2.44 | 3.35x | 30.6 M |
+  | 16 | 2.18 | 3.74x | 34.5 M |
+
+  The speed-up at 8 threads is a little lower than on v4 (3.9x): v9's tree is leaner, so there is
+  less to share. In absolute terms the 30 positions went from 6.1 s (v4, 8 threads) to 2.4 s.
+- **The ply-4 position again** (`1:60 4B:16,27,28,39 4A:7,8,9,20 4I:15,25,35,45`, 8 threads,
+  `--tt 24`): value -1 for red as before; 570.2 M nodes, 62.2 s (v4-based build: 768.2 M, 134.5 s).
+- **Not measured:** the one-thread cost of this build against v9 by SPRT (the 0.8% above is one
+  reading). On v4 the same plumbing cost 1.9% [0.7%, 3.1%].
+
+## 2026-11-15 Long solve: the position after three moves that the reference reports as a draw
+
+- **What:** `1:60 4B:16,27,28,39 4C:40,41,50,52`, blue to move. The reference reports that red's 4C
+  refutes all 938 blue moves (382 s on 5 threads on its machine) and that blue's `4A:49,59,70,81`
+  does not lose, so the value is a draw. `frozen/par-v9.exe bench work/long/ply3_ublock.txt
+  --threads 16 --tt 25`, nothing else running except this session's file edits.
+- **Result:** value 0, as published. 1,765.8 M nodes, 139.8 s wall-clock on 16 threads (8 cores),
+  about 37 thread-minutes. One run. This is the exact value of the whole position, both halves
+  of the reference's statement in one search.
+
+## 2026-11-15 v9 on the reference's bench files, and a second pair of ladders
+
+- **What:** the five `bench/ply5_*` files of the reference repository (126 positions after five
+  moves), each solved exactly by `frozen/base.exe` (v9, one thread, fresh table per position) and
+  by `frozen/par-v9.exe --threads 16`. One run each on a quiet machine. The reference's numbers
+  are the ones it publishes for its own v4 on its own machine; its solver was not run here.
+- **Result:** every value correct (126 of 126, both builds).
+
+  | File | Positions | v9 nodes | v9 seconds (1 thread) | v4 here (1 thread) | 16 threads, wall | Reference, published |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | `ply5_blue_wins` | 24 | 23.9 M | 13.5 | 28.1 s | 2.9 s | 4.40 M nodes, 13 thread-s |
+  | `ply5_blue_wins_holdout` | 24 | 23.9 M | 13.0 | 29.9 s | 2.8 s | 4.31 M, 14 |
+  | `ply5_random_units` | 24 | 21.9 M | 12.0 | 21.4 s | 2.5 s | 6.16 M, 18 |
+  | `ply5_other_openings` | 24 | 13.2 M | 6.3 | 13.1 s | 1.4 s | 7.45 M, 15 |
+  | `ply5_ublock_refutations` | 30 | 78.7 M | 55.0 | 106.3 s | 9.2 s | 37.37 M, 137 |
+  | Total | 126 | 161.5 M | 99.7 | 198.8 s | 18.8 s | 59.7 M, 197 thread-s |
+
+- **Reading:** v9 is 1.99x faster than v4 on these files in one thread and, at face value, 2.0x
+  faster than the reference's published thread-seconds. The second comparison is across two
+  machines and is not a measurement. The reference still searches 2.7x fewer nodes: its move
+  order and bounds are better than ours, and our nodes are about 5x cheaper. That gap is where
+  the next gains are.
+- **Caveat:** the first ten ublock positions and 30 ply-5 tune positions were looked at while E14
+  was screened, so those ten are not unseen. The other 116 positions were not used for any choice.
+- **LADDER-7B** (ply 7, confirm units 326-354, 290 positions, mean of two passes): v4 3.39 s,
+  4.12 M nodes; v8 1.92 s, 4.12 M; v9 1.65 s, 3.51 M. v4 against v9: +107% [+92%, +124%] per unit;
+  v8 against v9: +18.0% [+8.9%, +27.9%].
+- **LADDER-6B** (ply 6, confirm units 212-229, 180 positions): v4 7.82 s, 9.16 M nodes; v8 4.48 s,
+  9.18 M; v9 3.28 s, 6.70 M. v4 against v9: +139% [+108%, +175%]; v8 against v9: +36.6%
+  [+18.5%, +57.4%].
+- **What it says:** every version since v4 holds on units no decision touched. E14 (v9) confirms at
+  +18% (ply 7) and +37% (ply 6) against its gate reading of +24.7%; the further from the end of
+  the game, the more the order matters. With the first pair of ladders (v0 to v4: 3.30x at ply 7,
+  5.05x at ply 6) the whole climb is about 6.8x at ply 7 and 12x at ply 6. Those two products
+  multiply readings from different units and are rough.
+- **Confirm units left:** none at ply 7 and one at ply 6. A later confirmation needs new positions.
+
+## 2026-11-15 E18: a proof driver that can be stopped and resumed (`prove`, branch `parallel-v9`)
+
+- **Hypothesis.** A coordinator that searches the first plies and hands whole positions to
+  single-thread workers wastes fewer nodes than the shared-table solve (whose nodes grow 1.9x at 8
+  threads), and its results can be kept in a file so that a long solve survives a stop. Expected:
+  up to 2x better use of 16 threads on positions of several minutes. Bar: exact on the labelled
+  sets; faster than `frozen/par-v9.exe` on the ply-4 and ply-3 positions of the long solves.
+  (Process note: this was in my working notes, not in this log, before the build.)
+- **Built** (commit `a787b1f` on `parallel-v9`, `src/prove.rs`; a built copy is
+  `frozen/prove.exe`): `snek prove FILE --threads N --job-threads T --depth D --out RESULTS`.
+  The coordinator searches D plies with the solver's move order, threat zones, killers and the
+  answer rule of E14; positions below are jobs for N workers on one shared table; every finished
+  job and every finished coordinator node is appended to RESULTS, which a later run reads first.
+  The search itself is untouched: one thread still gives v9's node counts (8,076,471 at ply 7).
+- **Correct:** every label on ply 8 (4,000), ply 7 (590), ply 6 (200) and the five bench files
+  (126), in each of the forms below. A results file cut to its first 150 lines is picked up and
+  the proof finished with the same value; a complete file answers at once.
+- **What was learned on the way** (16 threads, one run each, nothing else running):
+
+  | Step | Bench files (5) | Ply-4 position (-1) | Ply-3 position (0) |
+  | --- | --- | --- | --- |
+  | Shared-table solve `par-v9`, one wide window (the reference point) | 18.8 s | 51.9 s, 622 M nodes | 139.8 s, 1,766 M |
+  | 1. Driver, young brothers wait, wide window | 19.5 s | 58.1 s, 748 M | not run |
+  | 2. Least speculative job first | not run | 43.5 s, 530 M | 528 s, 7,410 M |
+  | 3. Two passes with windows of one step | 19.8 s | 45.1 s, 546 M | 191 s, 2,580 M |
+  | 4. Killers travel with the tree | 18.6 s | 42.8 s, 556 M | 222 s, 2,977 M |
+  | Shared-table search asked the same two narrow questions (1 job of 16 threads, depth 0) | not run | not run | 194.8 s, 2,526 M |
+  | Root moves one at a time, each a job of 16 threads (depth 1) | 47.2 s | 61.4 s, 895 M | not run |
+
+  Depth: 2 for the bench files and the ply-4 position, 3 for the ply-3 position (depth 2 there:
+  222 s at step 3).
+- **Step 2, why:** plain young-brothers-wait let all free workers pile onto the alternatives of
+  the oldest node that needs one good move, ahead of root moves that had to be searched anyway.
+  Now a job costs 1, 2, 3 ... for each node on its path where it runs beside 1, 2-3, 4-7 ...
+  older moves that may still cut, and the cheapest job goes first. Nodes on the ply-4 position
+  fell from 748 M to 530 M, below the shared-table solve.
+- **Step 3, why:** with the window (-1, 1) at a drawn root, several drawing moves were under way
+  at once, each with the window it was given before the first of them raised alpha, so each got
+  the full exact proof that only one needs. 7.4 billion nodes. Two passes ("can the mover at
+  least draw", "can the mover win") have no window that can move.
+- **The finding that matters:** on the drawn ply-3 position the two passes cost 1.4x a single
+  wide search with the same engine (194.8 s against 139.8 s), and the driver equals the engine
+  when both ask the same questions (191 s against 194.8 s). So the driver's scheduling is not
+  the loss; the narrow question is. The second pass (blue cannot win, 183 s of the 195) asks of
+  each blue move "does red at least draw". The wide search asked "does red win" of the blue
+  moves it met before the drawing one, and that proof is found faster. Not tested why; the
+  threat zones are sharper in the decisive window, which is the first thing to look at.
+- **Verdict against the bar:** exact: yes. Faster than `par-v9`: yes on the ply-4 position
+  (42.8 s against 51.9 s), no on the ply-3 position (191-222 s against 139.8 s). Kept on the
+  branch for what it adds (a solve that can be stopped and resumed, with progress by root move);
+  not a speed gain as it stands. One run per cell: the differences of 5-10% between steps 3 and
+  4 are inside what two runs of a parallel search differ by, the large ones are not.
+- **What would make it a gain:** ask the stronger question first where it is likely to be true
+  (at a node that needs "at least a draw", try "a win" on the first move with a small budget);
+  or a wide window with one move at a time until alpha has risen. Both are in `IDEAS.md`.

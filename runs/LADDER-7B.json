@@ -1,0 +1,33 @@
+{
+ "time": "2026-11-15T02:06:34-07:00",
+ "key": "LADDER-7B",
+ "kind": "ladder",
+ "set": "ply07",
+ "units": [
+  326,
+  355
+ ],
+ "versions": {
+  "v4": {
+   "exe": "66c7f2a9e5ee",
+   "args": "",
+   "seconds": 3.3855,
+   "nodes": 4115014,
+   "report": "ratio        +107.29%   interval [+92.18%, +123.60%]"
+  },
+  "v8": {
+   "exe": "a5a28e371f18",
+   "args": "",
+   "seconds": 1.917,
+   "nodes": 4123404,
+   "report": "ratio        +18.01%   interval [+8.90%, +27.89%]"
+  },
+  "v9": {
+   "exe": "2deb69fb855b",
+   "args": "",
+   "seconds": 1.6537,
+   "nodes": 3510254,
+   "report": "ratio        +0.00%   interval [+0.00%, +0.00%]"
+  }
+ }
+}
