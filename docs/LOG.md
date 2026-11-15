@@ -669,3 +669,40 @@ test decided, (confirm) fixed length on fresh units.
 - **Result:** value 0, as published. 1,765.8 M nodes, 139.8 s wall-clock on 16 threads (8 cores),
   about 37 thread-minutes. One run. This is the exact value of the whole position, both halves
   of the reference's statement in one search.
+
+## 2026-11-15 v9 on the reference's bench files, and a second pair of ladders
+
+- **What:** the five `bench/ply5_*` files of the reference repository (126 positions after five
+  moves), each solved exactly by `frozen/base.exe` (v9, one thread, fresh table per position) and
+  by `frozen/par-v9.exe --threads 16`. One run each on a quiet machine. The reference's numbers
+  are the ones it publishes for its own v4 on its own machine; its solver was not run here.
+- **Result:** every value correct (126 of 126, both builds).
+
+  | File | Positions | v9 nodes | v9 seconds (1 thread) | v4 here (1 thread) | 16 threads, wall | Reference, published |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | `ply5_blue_wins` | 24 | 23.9 M | 13.5 | 28.1 s | 2.9 s | 4.40 M nodes, 13 thread-s |
+  | `ply5_blue_wins_holdout` | 24 | 23.9 M | 13.0 | 29.9 s | 2.8 s | 4.31 M, 14 |
+  | `ply5_random_units` | 24 | 21.9 M | 12.0 | 21.4 s | 2.5 s | 6.16 M, 18 |
+  | `ply5_other_openings` | 24 | 13.2 M | 6.3 | 13.1 s | 1.4 s | 7.45 M, 15 |
+  | `ply5_ublock_refutations` | 30 | 78.7 M | 55.0 | 106.3 s | 9.2 s | 37.37 M, 137 |
+  | Total | 126 | 161.5 M | 99.7 | 198.8 s | 18.8 s | 59.7 M, 197 thread-s |
+
+- **Reading:** v9 is 1.99x faster than v4 on these files in one thread and, at face value, 2.0x
+  faster than the reference's published thread-seconds. The second comparison is across two
+  machines and is not a measurement. The reference still searches 2.7x fewer nodes: its move
+  order and bounds are better than ours, and our nodes are about 5x cheaper. That gap is where
+  the next gains are.
+- **Caveat:** the first ten ublock positions and 30 ply-5 tune positions were looked at while E14
+  was screened, so those ten are not unseen. The other 116 positions were not used for any choice.
+- **LADDER-7B** (ply 7, confirm units 326-354, 290 positions, mean of two passes): v4 3.39 s,
+  4.12 M nodes; v8 1.92 s, 4.12 M; v9 1.65 s, 3.51 M. v4 against v9: +107% [+92%, +124%] per unit;
+  v8 against v9: +18.0% [+8.9%, +27.9%].
+- **LADDER-6B** (ply 6, confirm units 212-229, 180 positions): v4 7.82 s, 9.16 M nodes; v8 4.48 s,
+  9.18 M; v9 3.28 s, 6.70 M. v4 against v9: +139% [+108%, +175%]; v8 against v9: +36.6%
+  [+18.5%, +57.4%].
+- **What it says:** every version since v4 holds on units no decision touched. E14 (v9) confirms at
+  +18% (ply 7) and +37% (ply 6) against its gate reading of +24.7%; the further from the end of
+  the game, the more the order matters. With the first pair of ladders (v0 to v4: 3.30x at ply 7,
+  5.05x at ply 6) the whole climb is about 6.8x at ply 7 and 12x at ply 6. Those two products
+  multiply readings from different units and are rough.
+- **Confirm units left:** none at ply 7 and one at ply 6. A later confirmation needs new positions.
