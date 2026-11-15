@@ -1347,3 +1347,49 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   96.2 s.
 - **The spoiled arms of E24** (jobs i and j) are not run again: the base has changed build since,
   and a driver read pairs candidate and base anyway.
+
+## 2026-11-15 The machine is a third slower today than last night (the ruler, not the solver)
+
+- **What:** asked how we compare with the reference, I timed the profiled base on its five bench
+  files: 142.6 s on one thread, 161.5 M nodes, all 126 values right (16 threads: 19.9 s). Last
+  night v9 took 99.7 s for the same 161.5 M nodes.
+- **Check:** four builds side by side on `bench_ply5_other_openings` (24 positions, 13,223,437
+  nodes each), three runs, under the lock: v9 of last night (`frozen/base.exe`) 8.68, 8.30,
+  8.40 s; the climb base built with GNU 8.20, 8.62, 8.62; plain MSVC 8.06, 8.07, 8.03; profiled
+  8.26, 7.34, 8.01. Last night `frozen/base.exe` took 6.3 s on this file.
+- **Reading:** the same executable is 1.33x slower today, so today's absolute times cannot be
+  set beside last night's. Paired reads (candidate and base in the same minutes) are not
+  touched by this. Side by side the profiled base is about 0.93x of v9 on this file.
+- **Why, not settled:** the machine now runs three agents, their builds and the desktop
+  app's sessions beside every timing: 3.1 GB of 15.9 GB free, 22 GB committed, the system
+  compressing memory, power plan "Balanced". Earlier today the same was seen and not
+  explained (ply 5 positions 0-29: 8.2 s last night, 11.3-11.8 s today). A long proof should
+  run with the machine to itself; what a quiet machine is worth is a measurement to take when
+  the agents are done.
+
+## 2026-11-15 E28: the search agent's bundle (hypothesis, before the gate)
+
+- **From:** branch `climb/search` (Opus sub-agent), eight commits on `f4e5efc`, tip `8507875`.
+  Seven change the code that runs by default, all claimed to keep every answer: a reach test
+  can answer from the placements an earlier test found (a witness; `--no-witness`); the last
+  piece of a two-piece reach test is generated only where it can close the gap, and without
+  copying the position; threat scans and killer threats stop their bound as soon as it is
+  above what the threat needs; cheaper grow anchors. The eighth extends `--prefetch`.
+- **The agent's screens** (tune positions; median of 5 rounds; node counts identical, 75,382,224
+  on proof positions 0-23): GNU builds 0.880x, with `--prefetch` 0.830x; profiled MSVC builds
+  0.915x, with `--prefetch` 0.877x. The profile takes back about a third of what the hand
+  changes show on the GNU build. Its profile of the base: reach tests 40% of the time (the
+  two-piece "no" answers alone 26%), threat scans 17%.
+- **Hypothesis E28:** the seven changes together, profiled build against profiled base, take
+  less time on fresh proof positions; expected 0.92x. Same nodes. `SPRT[0, 0.05]`, cap 60.
+- **Hypothesis E25 (logged earlier, now on this code):** prefetch on by default (commit
+  `36892b4` on `climb/search-pf`, profiled with it on) against the E28 candidate; expected
+  0.95x. Same nodes. `SPRT[0, 0.05]`, cap 60.
+- **Before a freeze, besides the gates:** the coordinator's own identity and label runs (three
+  identity sets, ply 8, the five bench files, `verify 100`, one 16-thread run), and an
+  independent agent (Opus, branch `climb/verify`) that tries to refute each change and runs old
+  and new code side by side. The witness is the one to worry about: it is the only change
+  that carries an answer from one position to another.
+- **Not split by commit:** the agent's early rounds were lost; the bundle is gated as one. If it
+  fails, nothing is learned about its members; if the review breaks one member, that one is
+  taken out and the rest gated again under a new key.
