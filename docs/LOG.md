@@ -1393,3 +1393,34 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
 - **Not split by commit:** the agent's early rounds were lost; the bundle is gated as one. If it
   fails, nothing is learned about its members; if the review breaks one member, that one is
   taken out and the rest gated again under a new key.
+
+## 2026-11-15 The study agent's report: where the next large gain is
+
+Branch `climb/study` (Opus sub-agent; study build, counts exact; raw outputs in `tools/study/` on
+that branch). Four pots, ranked:
+
+| Pot | Size | What it needs |
+| --- | --- | --- |
+| 1. **Reach threats** (new, exact, built): the reply R that refuted a move is a threat when, with R placed, the mover can no longer reach R's snake length even alone; then only moves that cover or touch R are searched | nodes 0.51x on proof positions 0-11 tested at node start, 0.57x tested after a failed move; 0.67x at ply 7, 0.64x at ply 6; every label right (plies 6-11, proof positions). **Time: no gain yet** (base 39.4-39.9 s; 38.8-41.1 s) | a cheaper test: 1.59 M tests build 33 M reach positions to save 17.5 M nodes; 24 M of them at six pieces left (a hand of three, about 42 positions a test) |
+| 2. Red's wrong moves: nodes under a red move that failed at a node that later cut | 22.6% and 40.7% of the nodes on the two halves of proof positions 0-47; 32.7% at ply 6. Sits under red nodes with 5 and 7 pieces left | an order that finds the cut sooner (IDEAS 2, 2a); no new lever found |
+| 3. The one-player optimum for hands of 3-4 where no reach test is asked | a ceiling of 5-11% of the nodes; overlaps pot 1 | the same cheaper three-piece test |
+| 4. Slack of the cluster bound over the exact one-player optimum | tight high in the tree (slack 0 in 95% at 7-9 left), loose low (slack of 3 or more in 25-50% at 4-6 left), where the reach test already covers it | nothing beyond pot 3 |
+
+- **Why reach threats are exact** (the agent's argument): a move m that neither covers nor
+  touches R leaves R legal, and any sequence of the mover's placements that is legal after m
+  and R is legal after R alone, as m followed by the rest; so the mover's one-player optimum
+  after m and R is at most the optimum after R alone, and the opponent's snakes never shrink.
+  `verify` on that branch checks this monotonicity against brute force.
+- **Where the gain lives:** at 5-6 pieces left (nodes at 5 left 19.0 M to 9.3 M). At 7 or more
+  left nothing (0.99x nodes): there blue can still reach red's length, the refutation is a
+  two-player one. At 3-4 left only: 0.89x nodes, no time.
+- **Nothing found in:** separation of the two sides (0.0-0.03% of nodes), blue's wrong moves
+  (0% on proof positions), a smaller work budget per test.
+- **At nodes where every move fails** (proof 0-47): 8 left: 153-158 moves, about 5 distinct
+  refuting replies, the top one refutes 73-77% of the moves; 6 left: 35 moves, 1.4 distinct
+  replies, 77-79% of children decided at once.
+- **Next (E29, hypothesis):** reach threats on top of the search branch, made to pay with that
+  branch's witness cache and cheaper last-piece generation, tested only where they decide
+  (5-6 left). Expected: the node gain of 0.55x turned into 0.7x time or better on proof
+  positions. An Opus agent has it (branch `climb/threats`, from `climb/search-pf` with
+  `parallel-v9` merged). The rule gets its own independent check before any gate.

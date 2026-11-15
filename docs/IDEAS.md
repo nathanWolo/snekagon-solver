@@ -21,6 +21,11 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    red's moves (hours); a wide window there, and a better guess of the first red move, are the
    next things to build.
 
+0a. **Reach threats (E29, in work).** Found by the study agent on 2026-11-15: the reply that
+   refuted a move is a threat when the mover can no longer reach its length even alone; exact;
+   nodes 0.51-0.57x on proof positions, 0.64-0.67x at plies 6-7; no time gain until the
+   three-piece reach test behind it is cheaper. Branch `climb/threats`. LOG, "The study
+   agent's report".
 1. **More from what the search already knows.** E14 (cover the reply that refuted the last move)
    was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Six follow-ups of the
    same kind failed on node counts (E15-E17, E19-E21, below), a history table among them, and
