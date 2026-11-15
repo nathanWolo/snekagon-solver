@@ -364,3 +364,11 @@ test decided, (confirm) fixed length on fresh units.
 - **Test:** identity: node counts equal to v4 on the tune files of plies 5-7. Gate `E9`: time against
   v4, ply 6, `SPRT[0, 0.05]` on the log ratio, unused gate units. Same nodes, so the noise is the
   timing noise (1-2% a unit) and the gate should decide in under 20 units.
+- **Identity:** node counts equal to v4 on the first 100 tune positions of ply 7 (1,897,508) and ply 6
+  (5,459,285), with the flag on and off. `verify 60` passes.
+- **Screen `E9-S`** (ply 6, tune units 0-19): +13.4% [+12.4%, +14.4%], time 0.879x.
+- **Gate `E9`** (ply 6, unused gate units): PASS at unit 30. +11.4% [+9.8%, +13.0%], time 0.895x
+  (16.91 s to 15.14 s), nodes identical (19,986,475).
+- **Verdict:** accepted. Frozen as v5 (`c01a8bd36dee`, commit `68d5e9e`).
+- **What it taught:** the prediction from the timing study (12%) was within a point of the result. A
+  section timer in a study build is cheap and sizes a speed idea before it is written.
