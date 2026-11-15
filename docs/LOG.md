@@ -1291,3 +1291,33 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   refused by the permission check and it asked whether I would; I did not (a refused action is
   not done for an agent by someone else). The profile run and the screen used the gap. Told to
   all agents' future briefs: stop the solver, never the script that holds the lock.
+
+## 2026-11-15 E27 result: both gates pass; the climb's base is now a profiled MSVC build
+
+- **E27A, the toolchain** (plain MSVC build against the GNU base; proof units 44-73, `--window 0,1`):
+  +4.9% [+2.1%, +7.8%] where it stopped, sd 0.076 per unit, `SPRT[0, 0.05]` PASS at 30 units;
+  total time 175.2 s against 168.2 s (0.960x); node counts identical (183,799,694).
+- **E27B, the profile** (profiled against plain MSVC; proof units 74-103): +6.3% [+3.0%, +9.8%]
+  where it stopped, sd 0.090, PASS at 30 units; total time 162.3 s against 153.3 s (0.944x);
+  node counts identical (177,240,303).
+- **Not measured:** the two together against the GNU base. Passes do not add; the product of
+  the two totals (0.907x) is an expectation, not a reading. Both sizes are read where a
+  sequential test stopped and lean high.
+- **Hypotheses against results:** the toolchain was expected "within 2% either way" and gave
+  about 5%: wrong, in our favour. The profile was expected at 5-15% and gave about 6%.
+- **Frozen:** `frozen/climb-base.exe` = the profiled build that passed (`231876efcb8b`, source
+  of `f4e5efc`). Beside it: `climb-base-plain.exe` (plain MSVC, `7321efa41a10`) and
+  `climb-base-gnu.exe` (the GNU build, `18c5a5c49d58`).
+- **The build is a script now:** `sh tools/build.sh OUT.exe` (plain MSVC) and
+  `sh tools/build.sh --pgo OUT.exe` (profiled; the profile is always collected on proof
+  positions 0-23 with `--window 0,1` and ply 7 positions 0-99). It builds in a short directory
+  because the linker fails on this folder's long path. Two plain builds of the same source
+  differ in 23 bytes (the linker's time stamps): the code is the same.
+- **What changes for the climb** (the skill's rule 2: test the build production runs):
+  - A deciding read compares two profiled builds, base and candidate each built by
+    `tools/build.sh --pgo`. A hand-tuned branch or layout that pays on a plain build may be
+    worth nothing once the compiler has the profile.
+  - Screens may use plain MSVC builds on both arms (a build in 20 s instead of 3 minutes).
+  - The agents now at work started from GNU builds. Their screens stand as screens; their
+    changes are gated on profiled builds.
+- **Gate units:** the proof set's gate range has 117 units left (104-220).

@@ -12,7 +12,10 @@ How a change becomes part of the solver. Changes to this file are logged at the 
   the times; they are exact and repeat on any machine.
 - **Correctness comes first:** every position's value must equal its label, in both arms. One wrong or
   missing value blocks the run.
-- **Environment pin:** see `CLAUDE.md`. Runs record the SHA-256 of both executables.
+- **Environment pin:** see `CLAUDE.md`. Runs record the SHA-256 of both executables. On the
+  climb (branch `parallel-v9`) a deciding read compares two profiled MSVC builds
+  (`sh tools/build.sh --pgo`), because that is the build a long proof runs; screens may use
+  plain MSVC builds on both arms.
 
 | Measured | Value | When | How |
 | --- | --- | --- | --- |
@@ -99,3 +102,4 @@ reference's benchmark units; profiles.
 | --- | --- | --- | --- |
 | 2026-11-14 | First version. The 5% bar, the 10-position unit, the guard and the scaling check are assumptions awaiting the owner. | set-up | Claude, owner asleep |
 | 2026-11-15 | Added the proof benchmark `tests/proof4/`. | The owner put speed of proofs first ("hill climbing our efficiency to get faster proofs") and asked for a benchmark of positions to time each approach on. | Claude, on the owner's word |
+| 2026-11-15 | On the climb, gates compare profiled MSVC builds; the driver is read on whole proof jobs with `tools/provegate.py` (fixed length). | E27 passed: the build that runs long proofs is a profiled one, and a change has to pay on that build. Twelve reserved jobs cannot feed a sequential test. | Claude; the owner approved installing the build tools ("Yes, install it") |

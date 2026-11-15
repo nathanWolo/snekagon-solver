@@ -9,7 +9,8 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
   position exactly, with the value correct. Lower is better.
 - **Production:** the real work a full solution needs: positions after about five moves that come up in
   the proof of an opening. The reference repository's `bench/ply5_*` units stand in for it.
-- **Limits:** this PC (Ryzen 7 5800XT, 16 threads, 16 GB). Rust only (`stable-x86_64-pc-windows-gnu`).
+- **Limits:** this PC (Ryzen 7 5800XT, 16 threads, 16 GB). Rust only (std, no crates). Toolchain:
+  `stable-x86_64-pc-windows-msvc` on branch `parallel-v9` (E27); `main`'s base is a GNU build.
 - **The bar:** owner's words, 2026-11-14: "an ultra fast solver ... with the long term goal of solving it
   from the start position. Good incremental progress would be having a very fast proof number search
   implementation that can solve non-start pos positions fairly quickly."
@@ -23,6 +24,11 @@ Update this section in the same change that freezes a version.
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
   move searched before the list is generated, and after a failed move the moves that cover the
   refuting reply first). Id, commit and date: `frozen/BASE.txt` and `docs/SHIPLOG.md`. Branch `main`.
+- **Base of the climb:** `frozen/climb-base.exe` on branch `parallel-v9`: a profiled MSVC build
+  (E27: the MSVC toolchain +4.9% over the GNU build, the profile +6.3% on top, both gated, node
+  counts identical). Build it and every candidate with `sh tools/build.sh [--pgo] OUT.exe`; a
+  deciding read compares two `--pgo` builds. `frozen/climb-base-plain.exe` is the same source
+  without the profile, for screens.
 - **Parallel solve:** branch `parallel-v9` (`bench --threads N`, `src/par.rs`), the port of branch
   `parallel` (built from v4) onto v9. Exact; 3.4x wall-clock on 8 threads; on v4 the plumbing cost
   about 2% with one thread, which is why it is not merged. A built copy is `frozen/par-v9.exe`.
@@ -73,8 +79,10 @@ Update this section in the same change that freezes a version.
   after a passed gate.
 - **Test data.** Screen on the tune units. Gate once, on unused gate units. Confirm on unused confirm
   units. Nothing is tuned on held-out units. `tests/ledger.jsonl` records every deciding read.
-- **Environment pin:** `cargo build --release` with `-C target-cpu=native`, `lto = "fat"`,
-  `codegen-units = 1`, `panic = "abort"`. Timed runs: one process at a time, nothing else heavy running.
+- **Environment pin:** `-C target-cpu=native`, `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`.
+  On `main`: `cargo build --release` (GNU toolchain). On `parallel-v9`: `sh tools/build.sh` (MSVC
+  toolchain; `--pgo` for anything that is gated or frozen). Timed runs: one process at a time,
+  nothing else heavy running.
 
 ## How we test
 
@@ -98,6 +106,12 @@ The contract is `docs/TESTING.md`. In short:
 - **One machine, one run lock.** Every timed run and anything that uses a processor for more
   than about 15 seconds goes through `sh tools/locked.sh <command>` (one lock for all worktrees;
   at most 15 minutes a command). Compiling and quick checks do not need it.
+- **Never kill the script that holds the lock.** Stop the solver it runs (the child process):
+  the script then ends and gives the lock back. A lock left behind blocks everyone for 20
+  minutes (it happened on 2026-11-15).
+- **A build with the MSVC toolchain needs a short path:** the linker fails inside this folder
+  (LNK1104). `tools/build.sh` builds in a short directory; a plain `cargo +stable-x86_64-pc-windows-msvc build`
+  works only in a checkout whose path is short.
 - **A worktree has no ignored files.** The labelled sets (`tests/set1/*.txt`), `frozen/` and
   `work/` exist only in the main checkout: read them there by absolute path, write your own
   scratch files in your worktree's `work/`.
