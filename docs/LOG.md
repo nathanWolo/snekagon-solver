@@ -1027,3 +1027,39 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
 - **Would settle it:** df-pn on v9 with start numbers from the model, a window on the best few
   children, and alpha-beta below six pieces, screened on node counts at plies 6 and 7 against v9.
   Not built; the owner's call.
+
+## 2026-11-15 The centre-opening run is paused; speed comes first
+
+- **Owner, 11:56:** "you can pause the currently running super long job. im more interested in us
+  hill climbing our efficiency to get faster proofs right now than just brute forcing by running
+  the pc for days".
+- **State at the pause:** 74 of 172 classes refuted, 0 hold, 98 open; 27,481 s (7.6 hours) on 16
+  threads, 6.3 minutes a reply. Nothing is lost: `work/long/ply1_results.txt` (copy at the pause:
+  `ply1_results_paused.txt`), the first run's progress lines in `work/long/ply1_run1.err`.
+- **What the run leaves for the climb:** 302 solved positions three moves in with their values
+  and their cost on 16 threads (70 that blue loses, median 208 s; 158 that blue holds, median
+  32 s). These are the real work of a proof and can serve as its benchmark.
+
+## 2026-11-15 E23: df-pn with the model's order, a window and alpha-beta leaves
+
+- **Hypothesis** (the owner's; written before the build): the proof-number search of E5 lost
+  because it had neither alpha-beta's move order nor its commitment. Given the model's order
+  for its start numbers, a window on the best few children, and alpha-beta below a level, it
+  should close the gap, and its one own ability (to leave a move that turns out dear) may then
+  win.
+- **Expected** (from the pot sizing above): with leaves solved in one go the upper layer does
+  what alpha-beta does and the nodes come out within about 10% of v9; with leaves that return
+  after a budget the search spreads effort and loses 10-25%. A gain would be a surprise and
+  would show most at ply 5.
+- **Build** (branch `main`, options of `--pn`, off by default; `--pn` alone must give the old
+  counts): `--pn-ab L` a node with at most L pieces left is a leaf solved by the v9 search with
+  the window of the question; `--pn-unit U` a leaf returns after its budget and its numbers are
+  the nodes spent so far divided by U (the budget comes from the thresholds); `--pn-model` the
+  children in the model's order; `--pn-width W` only the best W unrefuted children count;
+  `--pn-probe` the children's numbers are read from the table when a node is expanded.
+- **Test:** labels on plies 8-11 first. Then tune units, one thread, a fresh table for each
+  position, the machine quiet: ply 7 positions 0-589, ply 6 positions 0-199, ply 5 positions
+  0-29, against `frozen/base.exe` (v9). Seconds and nodes (the search's own count plus the
+  leaves' alpha-beta nodes).
+- **Bar:** at least 5% less time than v9 on ply 6 and on ply 5 for a gate. Otherwise it is
+  dropped as a speed gain; the options stay if they beat the old `--pn`.

@@ -30,13 +30,15 @@ Update this section in the same change that freezes a version.
 - **Found about the game:** after `1:60 4B:16,27,28,39` red wins with `4B:70,81,82,93` (LOG,
   "the position after two moves is a win for red"; three runs and two engine generations agree;
   the reference solver has not been asked).
-- **The centre opening `1:60` is being solved:** 172 blue replies after symmetry (of 1,932),
-  each needs a red win. At 06:33 on 2026-11-15: 31 refuted, 0 hold, 141 open, about
-  4.4 minutes a reply. What is proved: `python tools/certificate.py work/long/ply1_results.txt`.
-  The run and how to go on with it:
-  `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2 --tt 27 --out work/long/ply1_results.txt`.
-  It can be stopped at any time; the same command continues from the results file. Progress:
-  `grep "root move" work/long/ply1.err`.
+- **The centre opening `1:60` is paused, and speed comes first.** Owner, 2026-11-15 11:56: "you
+  can pause the currently running super long job. im more interested in us hill climbing our
+  efficiency to get faster proofs right now than just brute forcing by running the pc for days".
+  State at the pause: 172 blue replies after symmetry (of 1,932), each needs a red win; 74
+  refuted, 0 hold, 98 open after 7.6 hours on 16 threads (6.3 minutes a reply). What is proved:
+  `python tools/certificate.py work/long/ply1_results.txt`. To go on, when the owner says so:
+  `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2 --tt 27 --out work/long/ply1_results.txt`
+  continues from the results file. The first run's progress lines are in
+  `work/long/ply1_run1.err`, a copy of the results at the pause in `ply1_results_paused.txt`.
 - **Proof driver:** also on `parallel-v9`: `snek prove FILE --threads N --job-threads T --depth D
   --out RESULTS` (`src/prove.rs`, a built copy is `frozen/prove.exe`). A coordinator searches the
   first D plies and hands positions to workers; every result goes to RESULTS and a later run
