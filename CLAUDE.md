@@ -30,13 +30,15 @@ Update this section in the same change that freezes a version.
 - **Found about the game:** after `1:60 4B:16,27,28,39` red wins with `4B:70,81,82,93` (LOG,
   "the position after two moves is a win for red"; three runs and two engine generations agree;
   the reference solver has not been asked).
-- **The centre opening `1:60` is being solved:** 172 blue replies after symmetry (of 1,932),
-  each needs a red win. At 06:33 on 2026-11-15: 31 refuted, 0 hold, 141 open, about
-  4.4 minutes a reply. What is proved: `python tools/certificate.py work/long/ply1_results.txt`.
-  The run and how to go on with it:
-  `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2 --tt 27 --out work/long/ply1_results.txt`.
-  It can be stopped at any time; the same command continues from the results file. Progress:
-  `grep "root move" work/long/ply1.err`.
+- **The centre opening `1:60` is paused, and speed comes first.** Owner, 2026-11-15 11:56: "you
+  can pause the currently running super long job. im more interested in us hill climbing our
+  efficiency to get faster proofs right now than just brute forcing by running the pc for days".
+  State at the pause: 172 blue replies after symmetry (of 1,932), each needs a red win; 74
+  refuted, 0 hold, 98 open after 7.6 hours on 16 threads (6.3 minutes a reply). What is proved:
+  `python tools/certificate.py work/long/ply1_results.txt`. To go on, when the owner says so:
+  `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2 --tt 27 --out work/long/ply1_results.txt`
+  continues from the results file. The first run's progress lines are in
+  `work/long/ply1_run1.err`, a copy of the results at the pause in `ply1_results_paused.txt`.
 - **Proof driver:** also on `parallel-v9`: `snek prove FILE --threads N --job-threads T --depth D
   --out RESULTS` (`src/prove.rs`, a built copy is `frozen/prove.exe`). A coordinator searches the
   first D plies and hands positions to workers; every result goes to RESULTS and a later run
@@ -44,8 +46,15 @@ Update this section in the same change that freezes a version.
   drawn ply-3 position (LOG, E18). `--wide` searches with one window; moves that a symmetry of the
   position maps onto each other are searched once. Long solves and their results files are in
   `work/long/`.
-- **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Exact and 28-60x slower than alpha-beta here;
-  `docs/IDEAS.md` (graveyard) says why and what would reopen it.
+- **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Alone it is 28-60x slower than
+  alpha-beta. With alpha-beta's order and killers above and alpha-beta below
+  (`--pn --pn-ab 9 --pn-model --pn-probe --pn-killers --pn-width 3 --pn-rank 1`) it is level
+  with alpha-beta and not ahead (LOG, E23; `docs/IDEAS.md`, graveyard).
+- **Proof benchmark:** `tests/proof4/positions.txt`: 592 red wins four moves in, children of the
+  positions the paused proof searched to a loss for blue; about 5 s each for v9 on one thread.
+  This is the ruler for "faster proofs". Positions 0-47 are used (E23); a deciding read takes
+  fresh ones. On it the narrow question ("does the mover win", `--pn --pn-ab 12`) takes 0.72x
+  the nodes of the wide window.
 - **State:** the end of `docs/LOG.md`, and the table in `docs/SHIPLOG.md`.
 - **What a gate resolves:** timing noise is about 1-2% per unit (A/A). A change that keeps the node
   counts has sd 0.02-0.08 per unit, a pruning change 0.2, an ordering change 0.25-0.45. Plan with
@@ -80,6 +89,18 @@ The contract is `docs/TESTING.md`. In short:
 6. Pass: commit, `python tools/run.py KEY freeze`, update docs. Fail or undecided: `git checkout src/`, log it.
 
 ## Working in this repo
+
+- **The climb is on branch `parallel-v9`** (search, parallel solve, proof driver, proof-number
+  options). Owner, 2026-11-15: "keep hill climbing the performance of the prover. act as a
+  coordinator with opus sub-agents for implementations." The coordinator owns the deciding
+  measurements and the freezes; sub-agents build in their own git worktrees and branches and
+  return evidence. Nobody gates their own change.
+- **One machine, one run lock.** Every timed run and anything that uses a processor for more
+  than about 15 seconds goes through `sh tools/locked.sh <command>` (one lock for all worktrees;
+  at most 15 minutes a command). Compiling and quick checks do not need it.
+- **A worktree has no ignored files.** The labelled sets (`tests/set1/*.txt`), `frozen/` and
+  `work/` exist only in the main checkout: read them there by absolute path, write your own
+  scratch files in your worktree's `work/`.
 
 - Tools run from the repo root with `python tools/<name>.py`. `tools/hc.py` is the statistics tool.
 - The test set is not in git: rebuild it with `python tools/mktests.py <checkout of BoltKey/snekagon-lab at 61eb3a4> tests/set1`

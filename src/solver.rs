@@ -48,11 +48,16 @@ pub struct Config {
     /// After a failed move, the score added to the moves that cover a cell of the reply that refuted
     /// it (0 = off). 1024 is more than any other score: those moves come first, in their old order.
     pub answer_bonus: u64,
+    /// Ask the processor for a child's table entry ahead of its lookup: when the move is played,
+    /// and for the next move in the order while this one is searched.
+    pub prefetch: bool,
+    /// Nodes with at most this many pieces left (both hands) neither read nor write the table.
+    pub tt_skip: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: false, tt_skip: 0 }
     }
 }
 
@@ -238,7 +243,7 @@ pub struct Solver {
     root_ply: usize,
     path: Vec<(u64, i32, i32)>,
     unwind_to: usize,
-    killers: [[u16; 2]; MAX_PLY],
+    pub(crate) killers: [[u16; 2]; MAX_PLY],
     bufs: Vec<Vec<u64>>,
     defer_bufs: Vec<Vec<u16>>,
     replies: Vec<(u32, BB)>,
@@ -413,6 +418,20 @@ impl Solver {
         (buf, skipped, th)
     }
 
+    /// One more window search for a driver above: the table stays and `nodes` goes on counting.
+    /// `node_limit` is a limit on `nodes`. UNKNOWN when it stopped the search.
+    pub(crate) fn search_more(&mut self, pos: &Pos, alpha: i32, beta: i32, node_limit: u64) -> i32 {
+        self.node_limit = node_limit;
+        self.aborted = false;
+        let v = self.search::<false>(pos, alpha, beta);
+        if self.aborted {
+            self.aborted = false;
+            UNKNOWN
+        } else {
+            v
+        }
+    }
+
     #[inline]
     fn probe(&self, key: u64) -> Option<Entry> {
         // in bounds: mask is the bucket count minus one
@@ -424,6 +443,36 @@ impl Solver {
             }
         }
         None
+    }
+
+    /// Starts loading the table entry of `key` into the cache.
+    #[inline(always)]
+    fn prefetch(&self, key: u64) {
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
+            _mm_prefetch(self.slots.0.add((key as usize) & self.mask) as *const i8, _MM_HINT_T0);
+        }
+    }
+
+    /// The hash of the position after the mover plays the placement `m`.
+    #[inline(always)]
+    fn hash_after(&self, pos: &Pos, m: u16) -> u64 {
+        let t = self.t;
+        let me = pos.stm as usize;
+        let p = &t.placements[m as usize];
+        let mut h = pos.hash ^ t.zob_stm ^ t.zob_piece[me][p.piece as usize];
+        for j in 0..p.n as usize {
+            h ^= t.zob_cell[me][p.cell_list[j] as usize];
+        }
+        h
+    }
+
+    #[inline(always)]
+    fn store_if(&mut self, on: bool, key: u64, lo: i32, hi: i32, mv: u16, work: u64) {
+        if on {
+            self.store(key, lo, hi, mv, work);
+        }
     }
 
     #[inline]
@@ -733,7 +782,9 @@ impl Solver {
         // 1. what the table knows: the value lies in [lo, hi]
         let (mut lo, mut hi) = (-1, 1);
         let mut tt_move = PASS;
-        if let Some(e) = self.probe(pos.hash) {
+        let use_tt = level as u32 > self.cfg.tt_skip;
+        if !use_tt {
+        } else if let Some(e) = self.probe(pos.hash) {
             lo = e.lo as i32;
             hi = e.hi as i32;
             tt_move = e.mv;
@@ -768,7 +819,7 @@ impl Solver {
                     self.reach_by[0][level][0] += 1;
                     if !can_reach_touching(t, pos, me, need, &mut work) {
                         self.reach_by[0][level][1] += 1;
-                        self.store(pos.hash, lo, a, PASS, 1);
+                        self.store_if(use_tt, pos.hash, lo, a, PASS, 1);
                         return a;
                     }
                 }
@@ -781,7 +832,7 @@ impl Solver {
                     self.reach_by[1][level][0] += 1;
                     if !can_reach_touching(t, pos, opp, need, &mut work) {
                         self.reach_by[1][level][1] += 1;
-                        self.store(pos.hash, b, hi, PASS, 1);
+                        self.store_if(use_tt, pos.hash, b, hi, PASS, 1);
                         return b;
                     }
                 }
@@ -823,7 +874,7 @@ impl Solver {
                 self.reach_by[0][level][0] += 1;
                 if !can_reach_touching(t, pos, me, theirs_now + 1, &mut work) {
                     self.reach_by[0][level][1] += 1;
-                    self.store(pos.hash, lo, alpha, PASS, 1);
+                    self.store_if(use_tt, pos.hash, lo, alpha, PASS, 1);
                     return alpha;
                 }
             }
@@ -832,7 +883,7 @@ impl Solver {
                 self.reach_by[1][level][0] += 1;
                 if !can_reach_touching(t, pos, opp, mine_now + 1, &mut work) {
                     self.reach_by[1][level][1] += 1;
-                    self.store(pos.hash, beta, hi, PASS, 1);
+                    self.store_if(use_tt, pos.hash, beta, hi, PASS, 1);
                     return beta;
                 }
             }
@@ -883,7 +934,7 @@ impl Solver {
                 self.reach_by[0][total][0] += 1;
                 if !can_reach(t, pos, me, need, &my_clusters, &mut work) {
                     self.reach_by[0][total][1] += 1;
-                    self.store(pos.hash, lo, alpha, PASS, 1);
+                    self.store_if(use_tt, pos.hash, lo, alpha, PASS, 1);
                     return alpha;
                 }
             }
@@ -894,7 +945,7 @@ impl Solver {
                 self.reach_by[1][total][0] += 1;
                 if !can_reach(t, pos, opp, need, &their_clusters, &mut work) {
                     self.reach_by[1][total][1] += 1;
-                    self.store(pos.hash, beta, hi, PASS, 1);
+                    self.store_if(use_tt, pos.hash, beta, hi, PASS, 1);
                     return beta;
                 }
             }
@@ -948,6 +999,9 @@ impl Solver {
                 }
                 let mut child = *pos;
                 child.play(t, first);
+                if self.cfg.prefetch {
+                    self.prefetch(child.hash);
+                }
                 let v = -self.search::<PAR>(&child, -beta, -alpha);
                 if !busy.is_null() {
                     unsafe { &*busy }.finish(move_key);
@@ -963,7 +1017,7 @@ impl Solver {
                     self.prof[level][2] += 1;
                     self.prof[level][3] += 1;
                     self.prof[level][4] += 1;
-                    self.store(pos.hash, lo.max(v), hi, first, self.nodes - nodes_at_start + 1);
+                    self.store_if(use_tt, pos.hash, lo.max(v), hi, first, self.nodes - nodes_at_start + 1);
                     return v;
                 }
                 pre = Some((first, v));
@@ -1110,6 +1164,14 @@ impl Solver {
                     }
                     let mut child = *pos;
                     child.play(t, m);
+                    if self.cfg.prefetch {
+                        self.prefetch(child.hash);
+                        if i >= 3 && i + 1 < n {
+                            // the next move in the order: its entry loads while this one is searched
+                            let next = (buf[i + 1] & 0xFFFF) as u16;
+                            self.prefetch(self.hash_after(pos, next));
+                        }
+                    }
                     searched += 1;
                     v = -self.search::<PAR>(&child, -beta, -alpha);
                     if !busy.is_null() {
@@ -1199,7 +1261,7 @@ impl Solver {
         if best_move == PASS {
             best_move = tt_move;
         }
-        self.store(pos.hash, nlo, nhi, best_move, self.nodes - nodes_at_start + 1);
+        self.store_if(use_tt, pos.hash, nlo, nhi, best_move, self.nodes - nodes_at_start + 1);
         best
     }
 }

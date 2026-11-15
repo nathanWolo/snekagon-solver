@@ -181,6 +181,8 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-lazy" => o.cfg.lazy = false,
             "--no-narrow" => o.cfg.narrow = false,
             "--answer-bonus" => o.cfg.answer_bonus = val().parse().unwrap(),
+            "--prefetch" => o.cfg.prefetch = true,
+            "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
@@ -210,6 +212,13 @@ fn parse_opts(args: &[String]) -> Opts {
             "--par-join" => o.cfg.par_join = val().parse().unwrap(),
             "--pn-slack" => o.pn_cfg.slack = val().parse().unwrap(),
             "--pn-rank" => o.pn_cfg.rank_div = val().parse().unwrap(),
+            "--pn-mul" => o.pn_cfg.rank_mul = val().parse().unwrap(),
+            "--pn-ab" => o.pn_cfg.ab_level = val().parse().unwrap(),
+            "--pn-unit" => o.pn_cfg.unit = val().parse().unwrap(),
+            "--pn-width" => o.pn_cfg.width = val().parse().unwrap(),
+            "--pn-model" => o.pn_cfg.model = true,
+            "--pn-probe" => o.pn_cfg.probe_kids = true,
+            "--pn-killers" => o.pn_cfg.killers = true,
             "--pn-tt" => o.pn_cfg.tt_bits = val().parse().unwrap(),
             "--tt" => o.cfg.tt_bits = val().parse().unwrap(),
             "--nodes" => o.nodes = val().parse().unwrap(),
@@ -274,6 +283,7 @@ fn bench(t: &Tables, o: &Opts) {
     let mut pn = if o.pn { Some(PnSolver::new(o.pn_cfg, o.cfg)) } else { None };
     let (mut total_nodes, mut total_us, mut wrong, mut unknown, mut n) = (0u64, 0u128, 0u32, 0u32, 0u32);
     let mut par = if o.threads > 1 { Some(par::ParSolver::new(o.cfg, o.threads)) } else { None };
+    let mut pn_stats = [0u64; 3];
     let out = std::io::stdout();
     let mut out = out.lock();
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
@@ -297,7 +307,12 @@ fn bench(t: &Tables, o: &Opts) {
         };
         let us = start.elapsed().as_micros();
         let nodes = match (pn.as_ref(), par.as_ref()) {
-            (Some(p), _) => p.nodes,
+            (Some(p), _) => {
+                pn_stats[0] += p.nodes;
+                pn_stats[1] += p.expansions;
+                pn_stats[2] += p.leaves;
+                p.total_nodes()
+            }
             (None, Some(p)) => p.nodes,
             (None, None) => solver.nodes,
         };
@@ -320,6 +335,9 @@ fn bench(t: &Tables, o: &Opts) {
         }
     }
     writeln!(out, "# positions {} nodes {} seconds {:.3} wrong {} unknown {}", n, total_nodes, total_us as f64 / 1e6, wrong, unknown).unwrap();
+    if o.pn {
+        writeln!(out, "# pn: nodes {} expansions {} leaf calls {}", pn_stats[0], pn_stats[1], pn_stats[2]).unwrap();
+    }
     if o.profile {
         writeln!(out, "# nodes by pieces left: {:?}", solver.by_left).unwrap();
         writeln!(out, "# left: nodes | table cuts, bound cuts, searched nodes, moves searched, first-move cuts, no cut, moves left unsearched, scans").unwrap();
@@ -367,6 +385,22 @@ fn main() {
             let v = solver.solve(&pos, -1, 1, o.nodes);
             println!("value {} nodes {} seconds {:.3}", v, solver.nodes, start.elapsed().as_secs_f64());
         }
+        "children" => {
+            // every position one move after each position of a file, as "<line index> <position>"
+            let text = std::fs::read_to_string(&args[2]).expect("cannot read the position file");
+            let mut moves = Vec::new();
+            for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
+                let (_, rest) = line.trim().split_once(char::is_whitespace).expect("line needs a label and a position");
+                let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
+                moves.clear();
+                pos.moves(t, &mut moves);
+                for &m in &moves {
+                    let mut child = pos;
+                    child.play(t, m);
+                    println!("{} {}", i, child.to_text());
+                }
+            }
+        }
         "rootmoves" => {
             let o = parse_opts(&args[2..]);
             study::root_moves(t, &o.rest[0], o.from, o.to, o.cfg, o.nodes);
@@ -386,7 +420,7 @@ fn main() {
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
-            println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-tt BITS --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
+            println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-mul N --pn-ab LEVEL --pn-unit NODES --pn-width N --pn-model --pn-probe --pn-killers --pn-tt BITS --prefetch --tt-skip LEVEL --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }

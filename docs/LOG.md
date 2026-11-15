@@ -1027,3 +1027,143 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
 - **Would settle it:** df-pn on v9 with start numbers from the model, a window on the best few
   children, and alpha-beta below six pieces, screened on node counts at plies 6 and 7 against v9.
   Not built; the owner's call.
+
+## 2026-11-15 The centre-opening run is paused; speed comes first
+
+- **Owner, 11:56:** "you can pause the currently running super long job. im more interested in us
+  hill climbing our efficiency to get faster proofs right now than just brute forcing by running
+  the pc for days".
+- **State at the pause:** 74 of 172 classes refuted, 0 hold, 98 open; 27,481 s (7.6 hours) on 16
+  threads, 6.3 minutes a reply. Nothing is lost: `work/long/ply1_results.txt` (copy at the pause:
+  `ply1_results_paused.txt`), the first run's progress lines in `work/long/ply1_run1.err`.
+- **What the run leaves for the climb:** 302 solved positions three moves in with their values
+  and their cost on 16 threads (70 that blue loses, median 208 s; 158 that blue holds, median
+  32 s). These are the real work of a proof and can serve as its benchmark.
+
+## 2026-11-15 E23: df-pn with the model's order, a window and alpha-beta leaves
+
+- **Hypothesis** (the owner's; written before the build): the proof-number search of E5 lost
+  because it had neither alpha-beta's move order nor its commitment. Given the model's order
+  for its start numbers, a window on the best few children, and alpha-beta below a level, it
+  should close the gap, and its one own ability (to leave a move that turns out dear) may then
+  win.
+- **Expected** (from the pot sizing above): with leaves solved in one go the upper layer does
+  what alpha-beta does and the nodes come out within about 10% of v9; with leaves that return
+  after a budget the search spreads effort and loses 10-25%. A gain would be a surprise and
+  would show most at ply 5.
+- **Build** (branch `main`, options of `--pn`, off by default; `--pn` alone must give the old
+  counts): `--pn-ab L` a node with at most L pieces left is a leaf solved by the v9 search with
+  the window of the question; `--pn-unit U` a leaf returns after its budget and its numbers are
+  the nodes spent so far divided by U (the budget comes from the thresholds); `--pn-model` the
+  children in the model's order; `--pn-width W` only the best W unrefuted children count;
+  `--pn-probe` the children's numbers are read from the table when a node is expanded.
+- **Test:** labels on plies 8-11 first. Then tune units, one thread, a fresh table for each
+  position, the machine quiet: ply 7 positions 0-589, ply 6 positions 0-199, ply 5 positions
+  0-29, against `frozen/base.exe` (v9). Seconds and nodes (the search's own count plus the
+  leaves' alpha-beta nodes).
+- **Bar:** at least 5% less time than v9 on ply 6 and on ply 5 for a gate. Otherwise it is
+  dropped as a speed gain; the options stay if they beat the old `--pn`.
+- **Built** as planned, plus `--pn-killers` (the proof-number layers share the alpha-beta
+  solver's killers: a move that proved the mover's goal at a ply goes first, and after a refuted
+  move the moves that cover a cell of the refuting reply) and `--pn-mul` (the slope of the start
+  numbers). `snek children FILE` lists the positions one move after each position of a file.
+- **Identity:** without `--pn` the counts are v9's (8,076,471 on ply 7 positions 0-589, 7,136,589
+  on ply 6 positions 0-199); `--pn` alone gives the old counts (733,362 on ply 7 positions 0-7).
+- **Correct:** every label on plies 8-11 (16,000 positions, leaves at 5 pieces with a unit of 40
+  nodes so that leaves stop and resume), ply 7 0-589, ply 6 0-379, ply 5 0-244, and 48 proof
+  positions in eight variants. No wrong value.
+- **A new benchmark, made for this: `tests/proof4/`** (`tools/mkproof.py`): 592 positions four
+  moves in, eight children of each of the 74 positions that the paused run searched to a loss
+  for blue. Each is a red win that the proof of the centre opening has to show. v9 needs about
+  5 M nodes and 5 s for one. Positions 0-47 were used here; the rest are unused.
+- **Results** (one thread, a fresh table for each position; nodes are exact; the seconds of the
+  two right-hand columns were taken with six to eight runs side by side, so only their order
+  counts). "Narrow" is the v9 search asked the question of a proof-number search ("does the mover
+  win", then if not "does the opponent win") with windows of one step: `--pn --pn-ab 12`. The
+  hybrids have `--pn-model --pn-probe --pn-killers --pn-width 3 --pn-rank 1`.
+
+  | Search | Ply 6, 0-199 (alone) | Ply 5, 30-244 | Proof positions 0-47 |
+  | --- | --- | --- | --- |
+  | v9, wide window | 7.14 M, 3.77 s | 103.0 M, 92.8 s | 247.9 M, 246.8 s |
+  | v9, narrow | 7.21 M, 3.67 s | 84.3 M, 76.8 s | 178.4 M, 183.4 s |
+  | Hybrid, proof numbers at the root only | 7.12 M, 3.61 s | 95.7 M, 83.8 s | 174.6 M, 180.3 s |
+  | Hybrid, two layers | 7.09 M, 3.78 s | 100.9 M, 90.1 s | 187.9 M, 196.7 s |
+  | Hybrid, three layers | 8.37 M, 5.54 s | not run | 169.5 M, 174.0 s |
+  | Two layers, leaves with a budget (unit 10,000) | 7.29 M at unit 3,000 | 98.8 M, 89.5 s | 179.3 M, 179.3 s |
+  | Root only, leaves with a budget (unit 10,000) | 8.94 M at unit 3,000 | not run | 383.9 M, 387.5 s |
+
+  Before the killers the hybrid took 7.38 M nodes at ply 6 (root only) and 8.75 M (two layers).
+  The old `--pn` takes 52.5 M nodes and 67 s on the first 30 positions of ply 7, where v9 takes
+  about 0.25 s.
+- **Reading.**
+  1. With alpha-beta's order, its killers and alpha-beta below, the proof-number search went
+     from 60 times slower to level with alpha-beta: within 5% at ply 6 and on the proof
+     positions, 14-20% behind at ply 5. It does not get ahead. The first reading on ply 5
+     (positions 0-29: 4% fewer nodes, 14% fewer with a budget) did not hold on the 215 fresh
+     ones.
+  2. The part that only a proof-number search has, leaves that return after a budget so that
+     effort can move, gains nothing that repeats (-5% to +2% with two layers) and can cost 2.2x.
+     This is what the pot sizing said.
+  3. **The gain found on the way is the question, not the search:** asked "does the mover win"
+     with a window of one step, v9 itself takes 18% fewer nodes at ply 5 and 28% fewer on the
+     proof positions than with the wide window. The window study after E18 had this (0.82-0.94x
+     for a won position); it grows with depth. The proof driver already asks its jobs narrow
+     questions, so the paused run had this gain; `bench` and `solve` do not.
+- **Verdict against the bar** (5% less time than v9's best on ply 6 and ply 5): not met; no
+  gate. The options stay, off by default, as the proof-number search of this project
+  (`--pn --pn-ab 9 --pn-model --pn-probe --pn-killers --pn-width 3 --pn-rank 1`).
+- **Reopen if:** a cost predictor exists that the numbers could carry (see "cheapest win
+  first"), or positions appear where the first moves in order are dear and wrong.
+
+## 2026-11-15 E24: a proof job as many single-thread jobs, not one job of 16 threads
+
+- **Hypothesis** (written before the run; the idea is the two-level search of the owner's
+  link): the dear jobs of the paused proof are positions where every blue move must be refuted
+  (about 900 moves, each about 4 s on one thread). The run gave each such position to one
+  shared-table search on 16 threads, whose nodes grow about 2x at 16 threads. The driver with a
+  coordinator ply and 16 single-thread workers on different blue moves wastes less.
+- **Expected:** 1.2-1.4x less wall-clock (E18 on the ply-4 position: 42.8 s against 51.9-61.4 s).
+- **Test:** the three cheapest winning jobs of the run (77, 78 and 88 s there), each solved from
+  a cold table by `frozen/prove.exe` four ways with 16 threads in all: one job of 16 threads
+  (`--depth 0`, what the run did), 16 single-thread workers at depth 1 and at depth 2, four
+  workers of four threads at depth 1. One at a time on a quiet machine, `--tt 27`.
+- **Bar:** at least 10% less wall-clock than the job of 16 threads on each of the three.
+
+## 2026-11-15 E25, E26, E27: three cheap node-speed tries (hypotheses, written before the timing)
+
+Asked by the owner: the search visits 1.4-2.1 M nodes a second on one thread, engines for chess
+or Ultimate Tic Tac Toe 10 M and more; is there low-hanging fruit? Where the time is: a node here
+carries proofs (IDEAS, Open 4). A profile of three proof positions (v9, 9.94 M nodes): 46% of the
+nodes have five pieces left, 20% three, 19% four, 11% two; 6.35 M reach tests, 4.31 M of them
+decide their node; at five pieces left 32% of the nodes end on the table, 49% on a reach test.
+`perft 3` counts 316 M placements in 0.31 s: generating is not the cost.
+
+- **E25, prefetch** (`--prefetch`): ask for a child's table entry when its move is played, and for
+  the next move's entry while this one is searched (from the fourth move on, where the order is
+  fixed). Same nodes. Expected: 2-5% less time, more at depth where the table is far larger than
+  the cache (the same build makes 1.9 M nodes a second at ply 6 and 1.4 M at ply 5).
+- **E26, no table at the lowest levels** (`--tt-skip L`): a node with at most L pieces left
+  neither reads nor writes the table. At three pieces left 9% of the lookups hit. Expected:
+  about even at L = 3 (a lookup saved on 20% of the nodes against 6% more nodes at ply 7), a
+  loss at L = 4; worth one screen because it also keeps cheap entries out of the table.
+- **E27, a profile-guided build:** same source, the compiler told which branches are taken
+  (typically 5-15%). **Blocked:** the GNU toolchain (`stable-x86_64-pc-windows-gnu`) ships
+  without the profiler runtime (`can't find crate for profiler_builtins`), and the MSVC toolchain
+  that is installed cannot link here (no Visual Studio build tools). The LLVM tools component
+  was installed on the owner's word and is not needed otherwise. Open again if the owner
+  installs the build tools.
+- **Test:** screens on tune units, one thread, alone on a quiet machine: ply 6 positions 0-199,
+  ply 5 positions 0-29, proof positions 0-23. Three runs an arm, interleaved. Then the gate on
+  fresh proof positions through `tools/run.py` (unit: 2 positions) if a screen shows 2% or more.
+- **Bar:** `SPRT[0, 0.05]` as before; the guard on total time.
+
+## 2026-11-15 Pot sizing: the same position twice in a proof, up to symmetry (nothing there)
+
+- **Idea:** with three coordinator plies the driver would solve positions four moves in one by
+  one; key its results by the canonical position (the least of the twelve mirror images), so
+  that a position reached under two blue replies is solved once.
+- **Measured without building** (`python tools/sharepot.py work/long/ply1_results_paused.txt`):
+  the 74 positions searched to a loss for blue have 66,585 children. 66,567 are distinct as they
+  stand, 66,433 up to symmetry over all parents (0.2% repeat), and no parent has a symmetry of
+  its own. Red's answers differ from reply to reply, so the transpositions do not meet.
+- **Verdict:** dropped before a build. Reopen only if red's answers are chosen to coincide.

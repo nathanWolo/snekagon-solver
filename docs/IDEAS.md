@@ -5,8 +5,10 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 
 ## Open, by expected gain for the effort
 
-0. **Finish the centre opening.** `1:60` has 172 blue replies after symmetry; 31 were refuted
-   by 06:33 on 2026-11-15 (LOG, "the centre opening"), none held.
+0. **Finish the centre opening: paused by the owner on 2026-11-15, speed first.** `1:60` has
+   172 blue replies after symmetry; 74 were refuted at the pause (11:56), none held, 6.3
+   minutes a reply. Resume only on the owner's word (CLAUDE.md, "Right now"). The climb's ruler
+   for proof work is `tests/proof4/` (TESTING.md).
    *Considered and not built:* a survey order, every reply gets a few red tries before any
    reply gets more (one cost term in the driver's scheduler). It would show early which replies
    are stubborn, but it is never faster to the value of `1:60`: if a reply holds, the
@@ -40,7 +42,10 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    (LOG, the window study). So: a wide window at the root when its moves are searched one at a
    time (safe, not built); a guess of the value to choose the first pass (the sign of the lead
    after a shallow search). "Ask for a win first" is refuted: the weaker statement is the cheaper
-   proof.
+   proof. *Measured at depth (E23):* the right narrow question takes 0.82x the nodes of the wide
+   window on 215 ply-5 positions and 0.72x on 48 proof positions four moves in. The driver's jobs
+   already have it; `bench` and `solve` (and so the numbers on the reference's bench files) do
+   not, and need the guess.
 4. **Node speed, what is left** (v8, share of time): reach tests 29%, threat scans 16%, last pieces
    10%, killer threats 6%, generating 5%, the rest (table, copy, play) 28%. The generator's
    per-orientation cost is behind most of these. A witness kept from a reach test that said "yes"
@@ -75,6 +80,12 @@ The sizes to quote are the ladder's (LOG, "Confirmation"), not the gates'.
 
 ## Dropped (the graveyard)
 
+- **E23 df-pn with alpha-beta's order, killers and alpha-beta leaves** (options of `--pn` on
+  `main`, off by default). Exact. Level with alpha-beta asked the same narrow question (within
+  5% at ply 6 and on proof positions, 14-20% behind at ply 5), never ahead; leaves with a budget,
+  the one thing only a proof-number search has, gain nothing that repeats and can cost 2.2x.
+  *Why:* with a good order the search is at its best when it commits, and its numbers carry no
+  prediction of cost (LOG, the pot sizing before E23). *Reopen if:* a cost predictor exists.
 - **E5 proof-number search (df-pn)**, `--pn` on both branches. Exact (12,100 labelled positions) and
   far slower than alpha-beta: 28-60x at ply 7 in its best setting. Not gated: the screen was decisive.
   *Why:* most moves at a winner's node are wins that are expensive to prove or losses that are cheap
