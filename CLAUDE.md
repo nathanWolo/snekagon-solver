@@ -46,8 +46,15 @@ Update this section in the same change that freezes a version.
   drawn ply-3 position (LOG, E18). `--wide` searches with one window; moves that a symmetry of the
   position maps onto each other are searched once. Long solves and their results files are in
   `work/long/`.
-- **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Exact and 28-60x slower than alpha-beta here;
-  `docs/IDEAS.md` (graveyard) says why and what would reopen it.
+- **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Alone it is 28-60x slower than
+  alpha-beta. With alpha-beta's order and killers above and alpha-beta below
+  (`--pn --pn-ab 9 --pn-model --pn-probe --pn-killers --pn-width 3 --pn-rank 1`) it is level
+  with alpha-beta and not ahead (LOG, E23; `docs/IDEAS.md`, graveyard).
+- **Proof benchmark:** `tests/proof4/positions.txt`: 592 red wins four moves in, children of the
+  positions the paused proof searched to a loss for blue; about 5 s each for v9 on one thread.
+  This is the ruler for "faster proofs". Positions 0-47 are used (E23); a deciding read takes
+  fresh ones. On it the narrow question ("does the mover win", `--pn --pn-ab 12`) takes 0.72x
+  the nodes of the wide window.
 - **State:** the end of `docs/LOG.md`, and the table in `docs/SHIPLOG.md`.
 - **What a gate resolves:** timing noise is about 1-2% per unit (A/A). A change that keeps the node
   counts has sd 0.02-0.08 per unit, a pruning change 0.2, an ordering change 0.25-0.45. Plan with

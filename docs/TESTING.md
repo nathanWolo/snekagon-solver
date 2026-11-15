@@ -47,6 +47,16 @@ refuses a key that was used before.
 As the base gets faster, move to the next harder file and say so in the log. A change is also read on
 the tune units of the next harder file before it is frozen (see the scaling check).
 
+**The proof benchmark** (`tests/proof4/`, 2026-11-15; `tools/mkproof.py` from the results file
+of the paused proof of the centre opening). 592 positions four moves in, red to move, each a win
+for red: eight children of each of the 74 positions that were searched to a loss for blue. The
+label follows from the parent's value and every solve checks it. This is the real work of a
+proof, so it is the ruler when the question is "faster proofs": about 5 M nodes and 5 s a
+position for v9 on one thread. Positions 0-47 are tune (used by E23); 48-591 are unused: a
+deciding read takes the next unused ones and says which in the log. `tools/run.py` does not
+know this set yet; until it does, runs are `snek bench tests/proof4/positions.txt --from A --to B`
+for each arm, one at a time for seconds, side by side for node counts.
+
 ## Before any speed test
 
 - `target/release/snek verify 100`: the fast move generator, the per-placement check, snakes, hashes
@@ -88,3 +98,4 @@ reference's benchmark units; profiles.
 | Date | Change | Why | Decided by |
 | --- | --- | --- | --- |
 | 2026-11-14 | First version. The 5% bar, the 10-position unit, the guard and the scaling check are assumptions awaiting the owner. | set-up | Claude, owner asleep |
+| 2026-11-15 | Added the proof benchmark `tests/proof4/`. | The owner put speed of proofs first ("hill climbing our efficiency to get faster proofs") and asked for a benchmark of positions to time each approach on. | Claude, on the owner's word |
