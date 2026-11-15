@@ -861,3 +861,35 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
   against the wrong answer. Whether blue has any reply to `1:60` that holds is now the question
   that decides the centre opening, and with twelve symmetries there are about 135 replies to
   check, not 1,589.
+
+## 2026-11-15 E22: a table lookup of every child before the first move (dropped at the screen)
+
+- **Hypothesis:** high in the tree many positions are reached by the same moves in another order.
+  Before a node's moves are searched, look up the position after each move in the table; one
+  that is already known to be worth beta cuts without a search (the "enhanced transposition
+  cutoff" of chess engines). The reference tried it and reports no gain; it was not tried here.
+  Expected: a few percent of nodes at the levels where a lookup per move is cheap against a
+  subtree. Bar for a gate: 5% of nodes on both sets at no cost in time.
+- **Build:** `--etc L`: the lookup at nodes with at least L pieces left (99 = never, the
+  default). Patch `e22_patch.py`; with the option off the node counts are the base's exactly.
+- **Screen (v9, one thread, all labels correct; seconds are from a loaded machine and only
+  show the direction):**
+
+  | `--etc` | Ply 7 nodes (590 positions) | s | Ply 6 nodes (200 positions) | s |
+  | --- | --- | --- | --- | --- |
+  | off | 8,076,471 | 11.4 | 7,136,589 | 10.2 |
+  | 8 | 8,076,471 | 11.9 | 7,136,589 | 10.3 |
+  | 7 | 8,076,471 | 11.8 | 7,142,825 (+0.1%) | 10.9 |
+  | 6 | 8,110,196 (+0.4%) | 12.1 | 7,121,144 (-0.2%) | 11.2 |
+  | 5 | 8,068,010 (-0.1%) | 14.8 | 7,064,633 (-1.0%) | 13.3 |
+  | 4 | 8,038,268 (-0.5%) | 16.7 | 7,070,840 (-0.9%) | 14.5 |
+  | 3 | 8,038,315 (-0.5%) | 20.1 | 7,070,836 (-0.9%) | 16.9 |
+
+- **Verdict:** dropped. At most 1% of nodes, and the lookups cost 30-75% more time at the
+  levels where they find anything. It agrees with the reference's finding. The search already
+  gets these cuts one ply later: a child that the table knows returns at once when it is
+  searched, so the lookup only saves the moves ordered before it, and the order already puts
+  the table move and the killers first.
+- **Reopens if** the order of moves gets worse for another reason (so that the cutting child
+  comes late), or in the proof driver's top plies, where one saved move is minutes and the
+  lookup is free. The driver already does that with its results file ("known results first").
