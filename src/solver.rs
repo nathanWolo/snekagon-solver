@@ -65,11 +65,14 @@ pub struct Config {
     pub reach_threat_max: u32,
     /// The positions a reach-threat test may look at (when they run out, no threat).
     pub reach_threat_work: u32,
+    /// A reach threat that grows an opponent snake also prunes the moves that touch it without
+    /// covering it, when they grow one of the mover's snakes (the two then commute).
+    pub reach_threat_grow: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: false, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: false, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true }
     }
 }
 
@@ -191,6 +194,8 @@ const NO_BOUND: i32 = 2;
 pub(crate) struct Threats {
     pub(crate) n: usize,
     zone: [BB; MAX_THREATS],
+    /// The zone for a move that grows one of the mover's snakes (a subset of `zone`).
+    zone_grow: [BB; MAX_THREATS],
     value: [i32; MAX_THREATS],
     tried: [u16; MAX_TRIED],
     ntried: usize,
@@ -201,7 +206,7 @@ pub(crate) struct Threats {
 
 impl Threats {
     pub(crate) fn new() -> Threats {
-        Threats { n: 0, zone: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0, rtried: [PASS; MAX_TRIED], nrtried: 0 }
+        Threats { n: 0, zone: [0; MAX_THREATS], zone_grow: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0, rtried: [PASS; MAX_TRIED], nrtried: 0 }
     }
     /// Upper bound on our value for a move covering `cells`.
     #[inline]
@@ -213,6 +218,26 @@ impl Threats {
             }
         }
         b
+    }
+    /// `bound_for` for a move with the cells `cells` that grows one of the mover's snakes (`grows`)
+    /// or starts a new one.
+    #[inline]
+    pub(crate) fn bound_for_move(&self, cells: BB, grows: bool) -> i32 {
+        let mut b = NO_BOUND;
+        for i in 0..self.n {
+            let z = if grows { self.zone_grow[i] } else { self.zone[i] };
+            if cells & z == 0 && self.value[i] < b {
+                b = self.value[i];
+            }
+        }
+        b
+    }
+    #[inline]
+    fn push(&mut self, zone: BB, zone_grow: BB, value: i32) {
+        self.zone[self.n] = zone;
+        self.zone_grow[self.n] = zone_grow;
+        self.value[self.n] = value;
+        self.n += 1;
     }
 }
 
@@ -661,16 +686,19 @@ impl Solver {
             };
             if rv <= 0 {
                 self.rt_stats[2] += 1;
-                th.zone[th.n] = b.cells | b.border;
-                th.value[th.n] = rv;
-                th.n += 1;
+                // A move m that touches b without covering it, when m grows one of our snakes and b
+                // grows one of theirs: a placement that grows a snake is legal exactly when its cells
+                // are empty and the player's own cells allow it, so m and b stay legal after each
+                // other and commute; any sequence of ours after m and b is one after b alone (m then
+                // the rest), and the argument above holds for m too.
+                let zone_grow = if self.cfg.reach_threat_grow { threat_zone(pos, opp, b) } else { b.cells | b.border };
+                th.push(b.cells | b.border, zone_grow, rv);
                 return;
             }
         }
         if value <= 0 && first_time {
-            th.zone[th.n] = threat_zone(pos, opp, b);
-            th.value[th.n] = value;
-            th.n += 1;
+            let z = threat_zone(pos, opp, b);
+            th.push(z, z, value);
         }
     }
 
@@ -787,9 +815,7 @@ impl Solver {
             }
             let redundant = (0..th.n).any(|i| th.zone[i] & !f.1 == 0 && th.value[i] <= f.2);
             if !redundant {
-                th.zone[th.n] = f.1;
-                th.value[th.n] = f.2;
-                th.n += 1;
+                th.push(f.1, f.1, f.2);
             }
         }
     }
@@ -1094,7 +1120,7 @@ impl Solver {
                 if now >> p.piece & 1 == 0 || !pos.legal_placement(t, me, p) {
                     continue;
                 }
-                if th.n > 0 && th.bound_for(p.cells) <= alpha {
+                if th.n > 0 && th.bound_for_move(p.cells, p.border & pos.cells[me] != 0) <= alpha {
                     continue;
                 }
                 first = cand;
@@ -1147,7 +1173,7 @@ impl Solver {
             pos.for_each_move(t, me, pos.pieces_now(), |m| {
                 let p = &t.placements[m as usize];
                 if th.n > 0 {
-                    let bound = th.bound_for(p.cells);
+                    let bound = th.bound_for_move(p.cells, p.border & pos.cells[me] != 0);
                     if bound <= alpha {
                         skipped = skipped.max(bound);
                         return;
@@ -1249,7 +1275,8 @@ impl Solver {
                     v = value;
                 } else {
                     if th.n > 0 {
-                        let bound = th.bound_for(t.placements[m as usize].cells);
+                        let pm = &t.placements[m as usize];
+                        let bound = th.bound_for_move(pm.cells, pm.border & pos.cells[me] != 0);
                         if bound <= alpha {
                             skipped = skipped.max(bound);
                             continue;

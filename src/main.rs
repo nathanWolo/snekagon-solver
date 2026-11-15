@@ -104,7 +104,12 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                         let opt_b = bounds::one_player_optimum(t, &after_b, me);
                         for _ in 0..4 {
                             let m = moves[rng.below(moves.len())];
-                            if m == PASS || t.placements[m as usize].cells & (b.cells | b.border) != 0 {
+                            if m == PASS || t.placements[m as usize].cells & b.cells != 0 {
+                                continue;
+                            }
+                            let pm = &t.placements[m as usize];
+                            let both_grow = pm.border & pos.cells[me] != 0 && b.border & pos.cells[opp] != 0;
+                            if pm.cells & b.border != 0 && !both_grow {
                                 continue;
                             }
                             let mut child = pos;
@@ -222,6 +227,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-threat-min" => o.cfg.reach_threat_min = val().parse().unwrap(),
             "--reach-threat-max" => o.cfg.reach_threat_max = val().parse().unwrap(),
             "--reach-threat-work" => o.cfg.reach_threat_work = val().parse().unwrap(),
+            "--no-reach-threat-grow" => o.cfg.reach_threat_grow = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
