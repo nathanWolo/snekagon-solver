@@ -750,15 +750,46 @@ test decided, (confirm) fixed length on fresh units.
 - **The finding that matters:** on the drawn ply-3 position the two passes cost 1.4x a single
   wide search with the same engine (194.8 s against 139.8 s), and the driver equals the engine
   when both ask the same questions (191 s against 194.8 s). So the driver's scheduling is not
-  the loss; the narrow question is. The second pass (blue cannot win, 183 s of the 195) asks of
-  each blue move "does red at least draw". The wide search asked "does red win" of the blue
-  moves it met before the drawing one, and that proof is found faster. Not tested why; the
-  threat zones are sharper in the decisive window, which is the first thing to look at.
+  the loss; splitting a drawn position into two passes is. (My first guess at why, "the win is
+  the proof the search finds faster", was tested in the next entry and is wrong.)
 - **Verdict against the bar:** exact: yes. Faster than `par-v9`: yes on the ply-4 position
   (42.8 s against 51.9 s), no on the ply-3 position (191-222 s against 139.8 s). Kept on the
   branch for what it adds (a solve that can be stopped and resumed, with progress by root move);
   not a speed gain as it stands. One run per cell: the differences of 5-10% between steps 3 and
   4 are inside what two runs of a parallel search differ by, the large ones are not.
-- **What would make it a gain:** ask the stronger question first where it is likely to be true
-  (at a node that needs "at least a draw", try "a win" on the first move with a small budget);
-  or a wide window with one move at a time until alpha has risen. Both are in `IDEAS.md`.
+- **What would make it a gain:** see the next entry: one pass where the value is decisive and the
+  first question is the right one; a wide window with one move at a time where a draw is likely.
+
+## 2026-11-15 Study: what the search window costs (after E18)
+
+- **Question.** E18 left a guess: two narrow passes lose to one wide search because a win is a
+  cheaper proof than "at least a draw". Tested directly on labelled tune positions, by the label.
+- **How:** `snek bench FILE --only LABEL --window A,B` (branch `parallel-v9`, commit `639d659`),
+  v9 search, one thread, fresh table per position. Node counts are exact; the solve on ply 2 was
+  running beside this, so the times are not used.
+
+  | Positions (value for the mover) | Wide (-1, 1) | "At least a draw" (-1, 0) | "A win" (0, 1) |
+  | --- | --- | --- | --- |
+  | Ply 7, wins (355) | 2.43 M | 1.39 M | 1.99 M |
+  | Ply 7, draws (35) | 1.62 M | 0.54 M | 1.32 M |
+  | Ply 7, losses (200) | 4.03 M | 3.64 M | 2.61 M |
+  | Ply 6, wins (185) | 6.05 M | 3.80 M | 5.68 M |
+  | Ply 6, draws (3) | 0.27 M | 0.08 M | 0.25 M |
+  | Ply 6, losses (12) | 0.81 M | 0.84 M | 0.49 M |
+
+- **What it says.**
+  1. The guess was wrong. The weaker true statement is the cheaper proof: for a won position "at
+     least a draw" takes 0.57-0.63x the nodes of the wide search and "a win" 0.82-0.94x; for a
+     lost one "cannot win" takes 0.60-0.65x and "cannot even draw" 0.90-1.03x.
+  2. A decisive position solved by the right single pass costs 0.82-1.03x the wide search. The
+     wrong pass first costs both: 1.39x for the wins at ply 7 (1.39 M + 1.99 M against 2.43 M).
+  3. A drawn position needs both passes and costs 1.15x (ply 7) to 1.23x (ply 6, three positions)
+     the wide search. On the drawn ply-3 position it was 1.39x (194.8 s against 139.8 s). The
+     wide search shares work between the two proofs that two passes do twice.
+- **For the driver:** two passes are right when the value is decisive and the first question is
+  chosen well, and wrong for a draw. Where the root moves are searched one at a time (jobs of
+  several threads, depth 1) a wide window at the root is safe and is the better default; the
+  trouble in E18 came only from several wide-window moves under way at once.
+- **For the solve of ply 2** (running): its second pass asks of each red move "does blue at least
+  draw", which is the question a wide search would ask after its first drawing move, so nothing
+  is lost there.
