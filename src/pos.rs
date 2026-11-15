@@ -207,6 +207,22 @@ impl Pos {
         }
     }
 
+    /// The generator context for placements that grow an own snake only (`free_new` is left empty).
+    #[inline]
+    pub fn gen_ctx_grow(&self, player: usize) -> Gen {
+        let empty = self.empty();
+        let own = self.cells[player];
+        let s = shape_of(own);
+        let not_next_body = empty & !neighbours(s.body);
+        Gen {
+            free_new: 0,
+            allowed: [not_next_body & !s.t3 & !s.pair, not_next_body & !s.t2, not_next_body & !s.t1],
+            next_own: empty & s.t1,
+            own,
+            own_with_nb: own & s.t1,
+        }
+    }
+
     /// Whether `player` may place p now, straight from the rules (one placement at a time).
     pub fn legal_placement(&self, t: &Tables, player: usize, p: &Placement) -> bool {
         let occ = self.occupied();
@@ -267,14 +283,30 @@ impl Pos {
         if pieces == 0 {
             return false;
         }
-        let mut g = self.gen_ctx(player);
         if touching != 0 {
-            g.free_new = 0;
+            // only placements that grow a snake: no new-snake anchors to compute
+            let mut g = self.gen_ctx_grow(player);
             g.next_own &= neighbours(touching);
             if g.next_own == 0 {
                 return false;
             }
+            for piece in (0..NPIECES).rev() {
+                if pieces >> piece & 1 == 0 {
+                    continue;
+                }
+                for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
+                    let mut anchors = grow_anchors(o, &g);
+                    while anchors != 0 {
+                        if f(o.placement_at[first(anchors)] as u16) {
+                            return true;
+                        }
+                        anchors &= anchors - 1;
+                    }
+                }
+            }
+            return false;
         }
+        let g = self.gen_ctx(player);
         for piece in (0..NPIECES).rev() {
             if pieces >> piece & 1 == 0 {
                 continue;
