@@ -5,10 +5,25 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 
 ## Open, by expected gain for the effort
 
+0. **Finish the centre opening.** `1:60` has 172 blue replies after symmetry; 31 were refuted
+   by 06:33 on 2026-11-15 (LOG, "the centre opening"), none held.
+   *Considered and not built:* a survey order, every reply gets a few red tries before any
+   reply gets more (one cost term in the driver's scheduler). It would show early which replies
+   are stubborn, but it is never faster to the value of `1:60`: if a reply holds, the
+   refutations of the others were not needed for it. The dearest reply so far took 21 red
+   tries. If every one loses, the start position is a
+   win for red. The run is set up and can be resumed (CLAUDE.md, "Right now"). What decides its
+   length is how soon red's winning move comes up in the order at ply 2: a red move that only
+   draws costs about 20 s, the win about 5 minutes. The driver tries the last winning moves and
+   their mirror images first (not measured). If a blue reply holds, showing it costs all of
+   red's moves (hours); a wide window there, and a better guess of the first red move, are the
+   next things to build.
+
 1. **More from what the search already knows.** E14 (cover the reply that refuted the last move)
-   was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Three follow-ups
-   failed (E15-E17, below). Not yet tried: the same rule for the second killer; more than two killers
-   a ply; a per-cell count of where refuting replies land, as a score.
+   was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Six follow-ups of the
+   same kind failed on node counts (E15-E17, E19-E21, below), a history table among them, and
+   so did a table lookup of every child (E22). Rules of
+   this kind look used up; what is left is a per-cell count of where refuting replies land.
 2. **Cheapest win first.** A root pays 21-55% of its nodes before the first winning move and the win
    it finds costs about twice the cheapest (LOG, "a second look at the best few moves"). The fitted
    model is at the limit of its eight features (a refit on five times the data gave the same
@@ -81,9 +96,16 @@ The sizes to quote are the ladder's (LOG, "Confirmation"), not the gates'.
 - **E15 the last known refuting reply used before the first move**: nodes +0% to +4%.
 - **E16 a counter-move table**: nodes +2% to +10% after the killers, twice the nodes before them.
 - **E17 moves that overlap a blocked killer first**: nodes +4% to +26%.
+- **E19 the answer rule with the reply's whole zone** (cells next to a reply that starts a new snake
+  too): nodes -0.1% at ply 7, +5.3% at ply 6.
+- **E20 the answer bonus, halved, for the second killer**: nodes +4% and +14%.
+- **E21 a history table of cutting moves in the score**: best weight -5.3% at ply 7 and +2.1% at
+  ply 6; larger weights worse on both. Reopen if the score it is added to changes.
 - **Reach test for hands of three, again on v8**: nodes -7%, time +13%. The pot is 7% at most.
 - **Re-ranking the first K moves by look-ahead features**: 0.65x to 1.77x across files, no gain.
-- **Enhanced transposition cutoffs.** The reference tried it and found no gain. Not tried here.
+- **E22 enhanced transposition cutoffs** (look every child up in the table before the first
+  move): nodes -0.5% at ply 7 and -1.0% at ply 6 at best, time +30% to +75% at those levels. The
+  reference found the same. Reopen if the cutting child starts to come late in the order.
 
 ## Inbox
 

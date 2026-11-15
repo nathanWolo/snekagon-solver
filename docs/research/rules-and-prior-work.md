@@ -106,6 +106,12 @@ Measured on a Ryzen 7 250 (16 threads) with other work running. So v4 spends abo
 - Their estimate for the centre opening at v2/v3 speed: 10,000 to 30,000 thread-hours.
 - By symmetry there are 12 distinct first moves.
 
+### Found in this project (not in the reference's notes)
+
+- After `1:60 4B:16,27,28,39`, red wins with `4B:70,81,82,93` (2026-11-15; `docs/LOG.md`). So the
+  blue reply the reference studied loses against the right answer. Checked by three runs of this
+  project's engines; not checked with the reference solver.
+
 ## Not verified here
 
 - The reference code was not run on this machine: running downloaded code needs the owner's word. Every

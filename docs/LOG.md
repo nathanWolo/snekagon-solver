@@ -793,3 +793,175 @@ test decided, (confirm) fixed length on fresh units.
 - **For the solve of ply 2** (running): its second pass asks of each red move "does blue at least
   draw", which is the question a wide search would ask after its first drawing move, so nothing
   is lost there.
+
+## 2026-11-15 E19, E20, E21: three more order ideas, dropped at the screen
+
+Screened on exact node counts while the ply-2 solve was running (one thread; the counts do not
+depend on load). Tune positions: ply 7, 0-589 (v9: 8,076,471 nodes) and ply 6, 0-199 (7,136,589).
+The bar, as for E15-E17: 5% fewer nodes on both, or no gate. Each was built behind an option on a
+copy of the search, the option off gave v9's counts exactly, and the source was reverted.
+
+- **E19: the answer rule with the whole zone.** Hypothesis: E14 prefers moves that cover a cell of
+  the reply that refuted the last move. A reply that starts a new snake is also made illegal by a
+  move next to it, so those moves should get the bonus too (the zone the threat rule uses).
+  Result: ply 7 8,069,607 (-0.1%), ply 6 7,512,568 (+5.3%). Dropped.
+- **E20: the same bonus, halved, for the second killer one ply down.** Result: ply 7 8,402,919
+  (+4.0%), ply 6 8,162,263 (+14.4%). Dropped. With the zone as well: +4.4% and +14.9%.
+- **E21: a history table.** Hypothesis: the killers hold the last two moves that cut at a ply; a
+  table by player and placement of how often a move cut anywhere (decayed) adds what they forget,
+  as in chess engines. Added to the move score with a weight.
+
+  | Weight | Ply 7 | Ply 6 |
+  | --- | --- | --- |
+  | 4 | 7,645,662 (-5.3%) | 7,287,587 (+2.1%) |
+  | 16 | 8,002,285 (-0.9%) | 7,521,289 (+5.4%) |
+  | 64 | 8,208,743 (+1.6%) | 7,555,596 (+5.9%) |
+  | 256 | 9,136,107 (+13.1%) | 8,424,616 (+18.0%) |
+  | 64, cuts counted by pieces left | 8,032,426 (-0.5%) | 7,579,846 (+6.2%) |
+
+  Dropped: the only setting that helps one set hurts the other.
+- **What they taught:** six order ideas after E14 have now failed on node counts (E15-E17, E19-E21).
+  The order above the model is at a local best for rules of this kind; the next gain in nodes
+  needs a different kind of information (IDEAS, "cheapest win first"), or better bounds.
+
+## 2026-11-15 Long solve: the position after two moves is a win for red
+
+- **What:** `1:60 4B:16,27,28,39`, red to move. The reference reports that red's `4C:40,41,50,52`
+  draws here; whether red can win was open. Solved with the proof driver:
+  `frozen/prove.exe prove work/long/ply2.txt --threads 1 --job-threads 16 --depth 1 --tt 27 --out
+  work/long/ply2_results.txt` (build `ef60f52`): the root's moves one at a time, each solved by 16
+  threads on one shared table, every root move's result appended to the results file.
+- **Seed:** the results file started with one line, the value 0 of the position after red's 4C
+  (the ply-3 long solve above, which agrees with the reference). That answered the first question
+  ("can red at least draw") at once. A first attempt without the seed was stopped after five
+  minutes inside that question.
+- **Result: value +1. Red wins with `4B:70,81,82,93`**, the 72nd move in the order. The 4B piece
+  goes on the far side of the centre from blue's piece and joins red's centre cell, a snake of 5.
+  - Root moves 2 to 71 (4C, 4A and 4B placements): after each, blue has a reply that at least
+    draws. 70 jobs, 20.6 billion nodes, 1,549 s; the cheapest 1.1 s, the median 13.8 s, the
+    dearest 94 s. Blue's holding reply was one of the last two that had held in 25 of these
+    (mean 11.8 s) and another one in 42 (mean 28.1 s).
+  - Root move 72: every blue reply loses. 4.32 billion nodes, 318 s.
+  - Whole run: 24.96 billion nodes, 1,868 s (31 minutes) on 16 threads.
+- **Checks, because the result is new and matters:**
+  1. `frozen/par-v9.exe bench work/long/ply3_redwin.txt --threads 16 --tt 27` (the plain
+     shared-table solve: another binary, a cold table, the wide window) on the position after red's
+     move: value -1 for blue. 4.95 billion nodes, 371 s.
+  2. `frozen/par.exe` (the parallel solve built from v4, without E9, E10, E11, E12 and E14) on the
+     same position, 16 threads: value -1 for blue. 14.73 billion nodes, 1,745 s (other runs of mine
+     were going beside it for part of that time).
+  3. What stands behind every engine: all labelled positions of plies 5 to 11 (about 17,000, values
+     from the reference's data), and the two long solves that reproduce the reference's published
+     results for this very opening (the ply-4 blue win, the ply-3 draw after 4C).
+- **Not checked:** the reference solver was not run on this position (it is downloaded code and
+  was not run here at all). A proof by an independent program is the check that would settle it
+  for a reader who does not trust this one; the command for the owner is in the report.
+- **What it means:** blue's reply `4B:16,27,28,39` to the centre opening loses. With the
+  reference's result that this reply wins against red's `4A:7,8,9,20`, the reply is sound only
+  against the wrong answer. Whether blue has any reply to `1:60` that holds is now the question
+  that decides the centre opening, and with twelve symmetries there are about 135 replies to
+  check, not 1,589. (Corrected in the next entry: 172 classes of 1,932 replies.)
+
+## 2026-11-15 E22: a table lookup of every child before the first move (dropped at the screen)
+
+- **Hypothesis:** high in the tree many positions are reached by the same moves in another order.
+  Before a node's moves are searched, look up the position after each move in the table; one
+  that is already known to be worth beta cuts without a search (the "enhanced transposition
+  cutoff" of chess engines). The reference tried it and reports no gain; it was not tried here.
+  Expected: a few percent of nodes at the levels where a lookup per move is cheap against a
+  subtree. Bar for a gate: 5% of nodes on both sets at no cost in time.
+- **Build:** `--etc L`: the lookup at nodes with at least L pieces left (99 = never, the
+  default). Patch `e22_patch.py`; with the option off the node counts are the base's exactly.
+- **Screen (v9, one thread, all labels correct; seconds are from a loaded machine and only
+  show the direction):**
+
+  | `--etc` | Ply 7 nodes (590 positions) | s | Ply 6 nodes (200 positions) | s |
+  | --- | --- | --- | --- | --- |
+  | off | 8,076,471 | 11.4 | 7,136,589 | 10.2 |
+  | 8 | 8,076,471 | 11.9 | 7,136,589 | 10.3 |
+  | 7 | 8,076,471 | 11.8 | 7,142,825 (+0.1%) | 10.9 |
+  | 6 | 8,110,196 (+0.4%) | 12.1 | 7,121,144 (-0.2%) | 11.2 |
+  | 5 | 8,068,010 (-0.1%) | 14.8 | 7,064,633 (-1.0%) | 13.3 |
+  | 4 | 8,038,268 (-0.5%) | 16.7 | 7,070,840 (-0.9%) | 14.5 |
+  | 3 | 8,038,315 (-0.5%) | 20.1 | 7,070,836 (-0.9%) | 16.9 |
+
+- **Verdict:** dropped. At most 1% of nodes, and the lookups cost 30-75% more time at the
+  levels where they find anything. It agrees with the reference's finding. The search already
+  gets these cuts one ply later: a child that the table knows returns at once when it is
+  searched, so the lookup only saves the moves ordered before it, and the order already puts
+  the table move and the killers first.
+- **Reopens if** the order of moves gets worse for another reason (so that the cutting child
+  comes late), or in the proof driver's top plies, where one saved move is minutes and the
+  lookup is free. The driver already does that with its results file ("known results first").
+
+## 2026-11-15 Long solve under way: the centre opening `1:60`
+
+- **Question:** does every blue reply to `1:60` lose? Then the centre opening is a win for red,
+  and so is the start position (red chooses the opening). Expected from the solve above: about
+  5 minutes for a reply whose refutation is tried early, hours for a reply that holds (all of
+  red's moves must then be shown not to win).
+- **Run:** `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2
+  --tt 27 --out work/long/ply1_results.txt` (build `22d36ad`), started at 04:18. The
+  coordinator holds the first two plies (blue's reply, red's answer); each position after them
+  is one job for 16 threads on the shared table. The results file was seeded with the results
+  of the solve above (73 positions), so the reply `4B:16,27,28,39` was done at once.
+- **New in this build, not measured against the build without them:** moves that a symmetry of
+  the position maps onto each other are searched once; a move that cut at a coordinator ply is
+  tried first at its sibling nodes, and so are its twelve mirror images ("winners").
+- **The count, checked without the solver:** `tools/certificate.py` builds the replies from the
+  piece shapes: 1,932 blue replies (a first piece may not touch the centre tile) in 172
+  classes under the twelve symmetries. The driver searches 172 root moves. This corrects
+  the entry above, which guessed "about 135 replies, not 1,589": 1,589 is the number of red
+  moves in the position after two moves.
+- **Progress at 06:33: 31 of 172 classes are refuted, 141 are open.** No reply holds so far.
+  133 minutes and 102.4 billion nodes for the 30 replies done in this
+  run, 4.4 minutes a reply.
+
+  | Blue's reply (cells) | Red wins with | Red moves tried | Seconds |
+  | --- | --- | --- | --- |
+  | 9,19,28,29 | 4B:36,37,48,49 | 3 | 174 |
+  | 16,27,28,39 | 4B:70,81,82,93 | seed (72, 31 min) |  |
+  | 17,19,28,29 | 4C:61,63,72,73 | 1 | 136 |
+  | 17,27,36,37 | 4C:29,30,39,50 | 1 | 188 |
+  | 18,20,29,30 | 4C:61,63,72,73 | 2 | 158 |
+  | 18,28,37,38 | 4B:41,42,50,51 | 3 | 208 |
+  | 19,29,38,39 | 4B:36,37,48,49 | 1 | 185 |
+  | 20,30,39,40 | 4B:36,37,48,49 | 4 | 248 |
+  | 27,28,37 | 4B:41,42,50,51 | 1 | 203 |
+  | 27,37,46,47 | 4C:29,30,39,50 | 5 | 247 |
+  | 28,30,39,40 | 4C:51,52,61,63 | 1 | 400 |
+  | 28,38,47,48 | 4C:29,30,39,50 | 3 | 357 |
+  | 38,39,48 | 4C:71,72,83,93 | 4 | 322 |
+  | 38,48,57,58 | 4C:27,28,39,49 | 2 | 200 |
+  | 40,42,51,52 | 4C:27,28,39,49 | 2 | 500 |
+  | 48,58,67,68 | 4B:18,28,39,49 | 2 | 168 |
+  | 51,53,62,63 | 4B:18,28,39,49 | 1 | 191 |
+  | 53,62,63,72 | 4B:71,81,92,102 | 8 | 555 |
+  | 62,72,81,82 | 4C:51,52,61,63 | 8 | 264 |
+  | 63,72,73,82 | 4C:71,81,92,93 | 2 | 339 |
+  | 63,73,82,83 | 4C:71,81,92,93 | 1 | 220 |
+  | 72,81,82,91 | 4B:30,39,40,49 | 1 | 211 |
+  | 72,82,91,92 | 4B:36,37,48,49 | 1 | 100 |
+  | 73,82,83,92 | 4B:18,28,39,49 | 1 | 205 |
+  | 73,83,92,93 | 4B:36,37,48,49 | 1 | 77 |
+  | 80,82,91,92 | 4B:30,39,40,49 | 2 | 218 |
+  | 81,82,83 | 4B:36,37,48,49 | 1 | 420 |
+  | 81,83,92,93 | 4B:57,58,69,70 | 2 | 289 |
+  | 81,91,100,101 | 4B:30,39,40,49 | 1 | 94 |
+  | 81,92,103,114 | 4B:18,28,39,49 | 21 | 840 |
+  | 91,93,102,103 | 4B:71,80,81,90 | 1 | 237 |
+
+  The winning move was red's first try for 14 of the 30 replies done in this run (tries,
+  sorted: 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 8, 8, 21). The first reply of a new kind is the dear one: against the
+  first straight four (`4I:81,92,103,114`) red's win was the 21st try, 14 minutes. Red's winning
+  moves so far: `4B:36,37,48,49` (6), `4B:18,28,39,49` (4), `4C:29,30,39,50` (3), `4B:30,39,40,49` (3). All of them grow the centre tile with a piece of four.
+- **What this does not show:** nothing about the 141 open classes. The order has taken the
+  four-cell replies first; whether the small pieces are as quick to refute is not known. At the
+  rate so far the rest is about 10 hours of this PC, more if a reply holds.
+- **To go on:** the run can be stopped at any time and the same command continues from the
+  results file. `python tools/certificate.py work/long/ply1_results.txt` lists what is proved
+  and says so when every class has a reply that loses.
+- **Before the result is claimed:** each line of the certificate is a position that another
+  program can check (after `1:60`, blue's reply and red's move, blue to move loses). With
+  `frozen/par-v9.exe bench` that is about 172 times 5 minutes; the reference solver would be
+  the independent check.

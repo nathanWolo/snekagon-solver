@@ -27,11 +27,23 @@ Update this section in the same change that freezes a version.
   `parallel` (built from v4) onto v9. Exact; 3.4x wall-clock on 8 threads; on v4 the plumbing cost
   about 2% with one thread, which is why it is not merged. A built copy is `frozen/par-v9.exe`.
   Merging is the owner's call (asked 2026-11-15).
+- **Found about the game:** after `1:60 4B:16,27,28,39` red wins with `4B:70,81,82,93` (LOG,
+  "the position after two moves is a win for red"; three runs and two engine generations agree;
+  the reference solver has not been asked).
+- **The centre opening `1:60` is being solved:** 172 blue replies after symmetry (of 1,932),
+  each needs a red win. At 06:33 on 2026-11-15: 31 refuted, 0 hold, 141 open, about
+  4.4 minutes a reply. What is proved: `python tools/certificate.py work/long/ply1_results.txt`.
+  The run and how to go on with it:
+  `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2 --tt 27 --out work/long/ply1_results.txt`.
+  It can be stopped at any time; the same command continues from the results file. Progress:
+  `grep "root move" work/long/ply1.err`.
 - **Proof driver:** also on `parallel-v9`: `snek prove FILE --threads N --job-threads T --depth D
   --out RESULTS` (`src/prove.rs`, a built copy is `frozen/prove.exe`). A coordinator searches the
   first D plies and hands positions to workers; every result goes to RESULTS and a later run
   starts from it. Exact; faster than the shared-table solve on the ply-4 position, slower on the
-  drawn ply-3 position (LOG, E18). Long solves and their results files are in `work/long/`.
+  drawn ply-3 position (LOG, E18). `--wide` searches with one window; moves that a symmetry of the
+  position maps onto each other are searched once. Long solves and their results files are in
+  `work/long/`.
 - **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Exact and 28-60x slower than alpha-beta here;
   `docs/IDEAS.md` (graveyard) says why and what would reopen it.
 - **State:** the end of `docs/LOG.md`, and the table in `docs/SHIPLOG.md`.

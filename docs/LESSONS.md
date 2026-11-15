@@ -32,6 +32,13 @@ machine, and were not reproduced here.
 - **Bounds that answer the same question are paid twice.** The cluster bound cut one node in eight
   where the exact reach test also applied, and the exact test ran at the other seven anyway (E10).
 - **Each earlier ply costs about ten times more** (v0: ply 9 0.5 ms, ply 8 6 ms, ply 7 50 ms).
+- **The big positions are within reach of this PC.** The position after two moves
+  (`1:60 4B:16,27,28,39`) took 31 minutes on 16 threads and is a win for red; the reference's
+  estimate for the centre opening was 10,000 to 30,000 thread-hours at its earlier speed. What a
+  root move costs there: about 20 s to show that blue holds a draw against a red move, about
+  5 minutes to prove a red win.
+- **High in the tree the order of moves is nearly the whole cost.** In that solve 26 of the 31
+  minutes went to 70 red moves that only draw, tried before the 72nd, which wins.
 - **A drawn position is two proofs, and one wide search does them cheaper than two narrow ones.**
   On the drawn ply-3 position the wide window took 140 s and the same engine asked "can the mover
   draw" and then "can the mover win" took 195 s; on drawn tune positions the two passes cost
@@ -101,6 +108,9 @@ machine, and were not reproduced here.
 - The reference solver was not run here (downloaded code). A same-machine comparison needs the owner
   to build and run it; the commands are in `docs/research/rules-and-prior-work.md`.
 - The project lives in a folder the app made for this session and needs a permanent home.
+- The red win after `1:60 4B:16,27,28,39` is checked by three runs of this project's engines. A
+  run of the reference solver on `1:60 4B:16,27,28,39 4B:70,81,82,93` (blue to move, expected
+  loss) would check it with another program; that needs the owner (downloaded code).
 - The proof driver (`prove`, branch `parallel-v9`) is exact and restartable but not faster than the
   shared-table solve on a drawn position (E18). Keep it on the branch, or merge it with the
   parallel solve?
