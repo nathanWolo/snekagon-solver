@@ -18,6 +18,7 @@
 //! run reads the file first, so a proof that was stopped goes on where it was. Every value in the
 //! file and in the table is a proof, so the answer is exact whatever the timing.
 
+use crate::geom::*;
 use crate::pieces::*;
 use crate::pos::*;
 use crate::solver::*;
@@ -43,6 +44,8 @@ pub struct ProveCfg {
     pub quiet: bool,
     /// Plain young-brothers-wait: after the first move, any number side by side.
     pub plain: bool,
+    /// Search every move, also those a symmetry of the position maps onto one already listed.
+    pub no_symmetry: bool,
     /// Ask "can the mover win" before "can the mover at least draw".
     pub upper_first: bool,
     /// One search with the full window instead of the two questions. A node whose window is wide
@@ -165,6 +168,16 @@ struct Driver<'a> {
     res: ProveResult,
 }
 
+/// The cells of `bb` after symmetry `s` of the board.
+fn sym_cells(t: &Tables, mut bb: BB, s: usize) -> BB {
+    let mut out: BB = 0;
+    while bb != 0 {
+        out |= bit(t.geo.sym[s][first(bb)] as usize);
+        bb &= bb - 1;
+    }
+    out
+}
+
 fn bounds_of(alpha: i32, beta: i32, v: i32) -> (i32, i32) {
     if v <= alpha {
         (-1, v)
@@ -273,6 +286,28 @@ impl<'a> Driver<'a> {
                             _ => 2,
                         }
                     });
+                    // Moves that a symmetry of the position maps onto each other lead to the same
+                    // game: the first of each such set in the order is searched, the others not.
+                    // (After the first move at the centre this leaves a twelfth of the replies.)
+                    if !self.c.no_symmetry {
+                        let stab: Vec<usize> = (0..NSYM).filter(|&s| sym_cells(t, pos.cells[0], s) == pos.cells[0] && sym_cells(t, pos.cells[1], s) == pos.cells[1]).collect();
+                        if stab.len() > 1 {
+                            let mut seen = std::collections::HashSet::new();
+                            n.moves.retain(|e| {
+                                let m = (*e & 0xFFFF) as u16;
+                                if m == PASS {
+                                    return true;
+                                }
+                                if seen.contains(&m) {
+                                    return false;
+                                }
+                                for &s in &stab {
+                                    seen.insert(t.sym_placement[m as usize][s]);
+                                }
+                                true
+                            });
+                        }
+                    }
                     if n.moves.is_empty() && skipped == -2 {
                         n.moves.push(PASS as u64);
                     }
