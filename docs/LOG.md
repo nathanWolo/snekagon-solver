@@ -1167,3 +1167,35 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   stand, 66,433 up to symmetry over all parents (0.2% repeat), and no parent has a symmetry of
   its own. Red's answers differ from reply to reply, so the transpositions do not meet.
 - **Verdict:** dropped before a build. Reopen only if red's answers are chosen to coincide.
+- **First three jobs** (`frozen/prove.exe`, one run each, quiet machine; seconds of wall-clock):
+
+  | Job | One job of 16 threads | 16 workers, depth 1 | 16 workers, depth 2 | 4 workers of 4 threads, depth 1 |
+  | --- | --- | --- | --- | --- |
+  | a | 77.0 | 55.5 | 55.4 | 57.5 |
+  | b | 74.1 | 67.4 | 73.1 | 73.2 |
+  | c | 87.1 | 78.0 | 45.5 | 78.6 |
+  | all | 238.2 | 200.9 (0.84x) | 174.0 (0.73x) | 209.3 (0.88x) |
+
+  The bar (10% on each job) is not met on job b. Seven more jobs were started and stopped: I
+  compiled while the first was being timed, which spoiled it, and stopping the task left the
+  script and a solver running (found and killed by hand: stopping a background shell does not
+  stop the solver it started). The base's three settings are being run again on four jobs kept
+  for the deciding read (g to j), every run under the run lock.
+
+## 2026-11-15 The climb moves to `parallel-v9`, with sub-agents
+
+- **Owner:** "keep hill climbing the performance of the prover. act as a coordinator with opus
+  sub-agents for implementations."
+- **Set-up:** `main` merged into `parallel-v9` (commit `f4e5efc`: the E23 options, the proof
+  benchmark, `--prefetch`, `--tt-skip`); identity and values checked on the merged build
+  (8,076,471 and 7,136,589 nodes; the bench file through `prove`: wrong 0). The build is kept as
+  `frozen/climb-base.exe`, the base of this climb. `tools/locked.sh` is the machine's run lock;
+  `tools/run.py` knows the set `proof4` (unit: 2 positions; tune 0-87, gate 88-441) and takes
+  `--base`, and runs every arm under the lock.
+- **Three agents (Opus), each in its own worktree and branch:** `climb/search` (one-thread
+  speed of the search on proof positions), `climb/driver` (wall-clock of `prove` on proof jobs),
+  `climb/study` (where a 2x could come from: counts, no shipping). They return evidence; the
+  coordinator gates on positions and jobs they were told not to touch (proof positions 48 and
+  later; jobs g to j).
+- **Worktrees:** the app's own worktree isolation fails here (the folder's path is too long for
+  git), so the worktrees were made by hand in a shorter place.

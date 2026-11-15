@@ -83,8 +83,9 @@ def next_unused(name, kind):
 def solve_units(exe, args, name, u0, u1):
     """Runs one arm on units [u0, u1); returns per-unit (seconds, nodes) and whether every value was right."""
     g = group(name)
-    cmd = [exe, "bench", set_path(name), "--from", str(u0 * g), "--to", str(u1 * g)] + args
-    out = subprocess.run(cmd, capture_output=True, text=True)
+    # under the machine's run lock (tools/locked.sh), so that no other timed or heavy run overlaps
+    cmd = ["sh", os.path.join(ROOT, "tools", "locked.sh"), exe, "bench", set_path(name), "--from", str(u0 * g), "--to", str(u1 * g)] + args
+    out = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
     units = {}
     ok = out.returncode == 0
     for line in out.stdout.splitlines():
