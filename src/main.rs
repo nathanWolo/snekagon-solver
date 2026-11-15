@@ -154,11 +154,15 @@ struct Opts {
     out: Option<String>,
     plain: bool,
     upper_first: bool,
+    /// `bench`: the window every position is searched with (one thread).
+    window: (i32, i32),
+    /// `bench`: only positions with this label.
+    only: Option<String>,
     rest: Vec<String>,
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, window: (-1, 1), only: None, rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -192,6 +196,12 @@ fn parse_opts(args: &[String]) -> Opts {
             "--out" => o.out = Some(val()),
             "--plain" => o.plain = true,
             "--upper-first" => o.upper_first = true,
+            "--window" => {
+                let v = val();
+                let (a, b) = v.split_once(',').expect("--window A,B");
+                o.window = (a.parse().unwrap(), b.parse().unwrap());
+            }
+            "--only" => o.only = Some(val()),
             "--par-level" => o.cfg.par_level = val().parse().unwrap(),
             "--par-join" => o.cfg.par_join = val().parse().unwrap(),
             "--pn-slack" => o.pn_cfg.slack = val().parse().unwrap(),
@@ -267,6 +277,9 @@ fn bench(t: &Tables, o: &Opts) {
             continue;
         }
         let (expected, rest) = line.trim().split_once(char::is_whitespace).expect("line needs an expected value and a position");
+        if o.only.as_deref().is_some_and(|x| x != expected) {
+            continue;
+        }
         let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
         solver.clear();
         if let Some(p) = pn.as_mut() {
@@ -276,7 +289,7 @@ fn bench(t: &Tables, o: &Opts) {
         let v = match (pn.as_mut(), par.as_mut()) {
             (Some(p), _) => p.solve(&pos, o.nodes),
             (None, Some(p)) => p.solve(&pos),
-            (None, None) => solver.solve(&pos, -1, 1, o.nodes),
+            (None, None) => solver.solve(&pos, o.window.0, o.window.1, o.nodes),
         };
         let us = start.elapsed().as_micros();
         let nodes = match (pn.as_ref(), par.as_ref()) {
@@ -289,6 +302,8 @@ fn bench(t: &Tables, o: &Opts) {
             "unknown"
         } else if expected == "?" || expected.parse::<i32>().ok() == Some(v) {
             "ok"
+        } else if o.window != (-1, 1) && expected.parse::<i32>().is_ok_and(|e| (v <= o.window.0 && e <= v) || (v >= o.window.1 && e >= v)) {
+            "ok" // a bound outside the window, and a true one
         } else {
             wrong += 1;
             "WRONG"
