@@ -25,10 +25,21 @@ Update this section in the same change that freezes a version.
   move searched before the list is generated, and after a failed move the moves that cover the
   refuting reply first). Id, commit and date: `frozen/BASE.txt` and `docs/SHIPLOG.md`. Branch `main`.
 - **Base of the climb:** `frozen/climb-base.exe` on branch `parallel-v9`: a profiled MSVC build
-  (E27: the MSVC toolchain +4.9% over the GNU build, the profile +6.3% on top, both gated, node
-  counts identical). Build it and every candidate with `sh tools/build.sh [--pgo] OUT.exe`; a
-  deciding read compares two `--pgo` builds. `frozen/climb-base-plain.exe` is the same source
-  without the profile, for screens.
+  (E27: the MSVC toolchain +4.9% over the GNU build, the profile +6.3% on top) of v9 plus the
+  search agent's same-node speed changes (E28, 0.916x) with table prefetch on by default (E25,
+  0.949x). All gated on proof positions with identical node counts. Build it and every
+  candidate with `sh tools/build.sh [--pgo] OUT.exe`; a deciding read compares two `--pgo`
+  builds. `frozen/climb-base-plain.exe` is the same source without the profile, for screens.
+- **In work (sub-agents, Opus):** reach threats (E29, branch `climb/threats`: an exact rule that
+  halves the nodes of a proof and does not yet save time), a sizing study of a learned move
+  order (`climb/order`, the owner's GPU question), the proof driver (`climb/driver`). A build
+  that runs old and new routines side by side is on `climb/verify` (`--features shadow`).
+- **Gate units:** `tests/proof4` has 57 unused gate units (164-220); `tests/proof4b` (1,184
+  positions, none shared) has 355 (88-442). A learned order is gated only on positions whose
+  parents were kept out of its training.
+- **Absolute times drift with the machine:** with agents at work the same executable ran a
+  third slower than the night before. Only paired reads count; a long proof wants the machine
+  to itself.
 - **Parallel solve:** branch `parallel-v9` (`bench --threads N`, `src/par.rs`), the port of branch
   `parallel` (built from v4) onto v9. Exact; 3.4x wall-clock on 8 threads; on v4 the plumbing cost
   about 2% with one thread, which is why it is not merged. A built copy is `frozen/par-v9.exe`.

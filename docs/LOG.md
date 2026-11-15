@@ -1487,3 +1487,28 @@ that branch). Four pots, ranked:
   them in `tests/proof4/`; `tools/mkproof.py --exclude`). `tools/run.py --set proof4b`: tune
   units 0-87, gate 88-442. A first draw of it overlapped the first set in 13 positions,
   because my patch of the sampler had not applied; redrawn, overlap 0.
+
+## 2026-11-15 E28 and E25 frozen: the climb's base is the search bundle with prefetch on
+
+- **Guards, both held:**
+  - `E25-UP` (ply 5, the tune range's three units, 30 positions): total time 10.38 s against
+    8.61 s (0.83x), node counts identical (15,824,832).
+  - `E25-DRV` (whole proof jobs on 16 single-thread workers, depth 1, seconds, base then
+    candidate): a 50.8 / 43.7, b 62.9 / 53.7, c 64.1 / 58.5, d 127.5 / 77.0; total 305.2 s
+    against 232.9 s. Job d's base run is an outlier of the kind the A/A showed (the driver's
+    own sd is 0.115 a job), so the size is not to be read off this; the guard asked only
+    whether 16 workers lose with prefetch on, and they do not.
+- **Frozen:** `frozen/climb-base.exe` = `3d3bd213049b` (profiled MSVC build of `36892b4`, in
+  `parallel-v9` as `bd41644`); `frozen/climb-base-plain.exe` = the plain MSVC build of the same
+  source (`6729272a400c`). The base before it is `frozen/E27B-231876efcb8b.exe`.
+- **Since this morning, on proof positions, one thread** (each read against the base of its
+  time, not against one fixed base; passes do not add): MSVC toolchain 0.960x, profile 0.944x,
+  the search bundle 0.916x, prefetch 0.949x. The product is 0.79x; a direct read of the
+  morning's GNU build against today's base has not been taken.
+- **Lessons:**
+  - The agent's screen on profiled builds (0.915x and 0.953-0.958x) predicted both gates
+    (0.916x, 0.949x). Its GNU screens (0.880x) would have overstated the bundle: a third of
+    the hand-tuning's gain was something the compiler finds by itself with a profile.
+  - The independent verifier found the argument that makes the riskiest change safe in a
+    sentence (a witness can only say yes, and only a no prunes). Asking a second agent to
+    break a change cost 35 minutes and is now a tool (`--features shadow`).
