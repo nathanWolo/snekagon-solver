@@ -56,11 +56,20 @@ pub struct Config {
     /// Answer a reach test from a sequence an earlier test found (this node's or the parent's), when
     /// it still applies.
     pub witness: bool,
+    /// Reach threats: after a failed move, the reply that refuted it is a threat when, with it
+    /// placed, the mover can no longer build a snake as long as it (the mover alone, the opponent
+    /// frozen). Zone: the reply's cells and border. Tested at nodes with between `reach_threat_min`
+    /// and `reach_threat_max` pieces left (both hands).
+    pub reach_threat: bool,
+    pub reach_threat_min: u32,
+    pub reach_threat_max: u32,
+    /// The positions a reach-threat test may look at (when they run out, no threat).
+    pub reach_threat_work: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: false, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000 }
     }
 }
 
@@ -185,11 +194,14 @@ pub(crate) struct Threats {
     value: [i32; MAX_THREATS],
     tried: [u16; MAX_TRIED],
     ntried: usize,
+    /// The replies tested as reach threats.
+    rtried: [u16; MAX_TRIED],
+    nrtried: usize,
 }
 
 impl Threats {
     pub(crate) fn new() -> Threats {
-        Threats { n: 0, zone: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0 }
+        Threats { n: 0, zone: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0, rtried: [PASS; MAX_TRIED], nrtried: 0 }
     }
     /// Upper bound on our value for a move covering `cells`.
     #[inline]
@@ -582,12 +594,27 @@ impl Solver {
     }
 
     /// Adds the opponent placement `m` to the threats if the bounds decide the game after it.
-    fn try_threat(&self, pos: &Pos, m: u16, th: &mut Threats) {
-        if m == PASS || th.n >= MAX_THREATS || th.ntried >= MAX_TRIED || th.tried[..th.ntried].contains(&m) {
+    /// `deep` (after a failed move, with `reach_threat`): also test it as a reach threat.
+    fn try_threat(&self, pos: &Pos, m: u16, alpha: i32, deep: bool, th: &mut Threats) {
+        if m == PASS || th.n >= MAX_THREATS {
             return;
         }
-        th.tried[th.ntried] = m;
-        th.ntried += 1;
+        let first_time = th.ntried < MAX_TRIED && !th.tried[..th.ntried].contains(&m);
+        let deep = deep && th.nrtried < MAX_TRIED && !th.rtried[..th.nrtried].contains(&m) && {
+            let level = pos.left[0].count_ones() + pos.left[1].count_ones();
+            level >= self.cfg.reach_threat_min && level <= self.cfg.reach_threat_max
+        };
+        if !first_time && !deep {
+            return;
+        }
+        if first_time {
+            th.tried[th.ntried] = m;
+            th.ntried += 1;
+        }
+        if deep {
+            th.rtried[th.nrtried] = m;
+            th.nrtried += 1;
+        }
         let t = self.t;
         let me = pos.stm as usize;
         let opp = me ^ 1;
@@ -607,11 +634,40 @@ impl Solver {
         } else if my_upper <= opp_len {
             0
         } else {
-            return;
+            2
         };
-        th.zone[th.n] = threat_zone(pos, opp, b);
-        th.value[th.n] = value;
-        th.n += 1;
+        // A reach threat: with b placed, can we still build a snake as long as the opponent's? If
+        // not, a move of ours that neither covers nor touches b leaves b playable, is itself playable
+        // after b, and our one-player optimum after both is no more than after b alone (any sequence
+        // of our placements legal after the move and b is legal after b alone, as the move followed
+        // by the rest; the opponent's snakes never shrink): the move is worth at most the threat's
+        // value. Zone: b's cells and border.
+        if deep && pos.left[me] != 0 && (value == 2 || (value == 0 && alpha < 0)) {
+            let mut child = *pos;
+            child.place_for(t, opp, m);
+            let mut work = self.cfg.reach_threat_work;
+            let rv = if !can_reach_alone(t, &child, me, opp_len, &mut work) {
+                -1
+            } else if value == 2 && alpha >= 0 && {
+                work = self.cfg.reach_threat_work;
+                !can_reach_alone(t, &child, me, opp_len + 1, &mut work)
+            } {
+                0
+            } else {
+                2
+            };
+            if rv <= 0 {
+                th.zone[th.n] = b.cells | b.border;
+                th.value[th.n] = rv;
+                th.n += 1;
+                return;
+            }
+        }
+        if value <= 0 && first_time {
+            th.zone[th.n] = threat_zone(pos, opp, b);
+            th.value[th.n] = value;
+            th.n += 1;
+        }
     }
 
     /// Adds every opponent placement after which our value is at most alpha by the bounds.
@@ -988,8 +1044,8 @@ impl Solver {
             }
         }
         if threats_on {
-            self.try_threat(pos, self.killers[ply + 1][0], &mut th);
-            self.try_threat(pos, self.killers[ply + 1][1], &mut th);
+            self.try_threat(pos, self.killers[ply + 1][0], alpha, false, &mut th);
+            self.try_threat(pos, self.killers[ply + 1][1], alpha, false, &mut th);
         }
         let mut skipped = -2; // the best bound of the moves skipped because of threats
         let mut scanned = !threats_on;
@@ -1252,7 +1308,7 @@ impl Solver {
                 // first move has failed this is probably a node where every move must be refuted, so
                 // look for all of the opponent's threats.
                 if threats_on && first_pass && i + 1 < n {
-                    self.try_threat(pos, self.killers[ply + 1][0], &mut th);
+                    self.try_threat(pos, self.killers[ply + 1][0], alpha, self.cfg.reach_threat, &mut th);
                     if !scanned {
                         scanned = true;
                         self.prof[level][7] += 1;
