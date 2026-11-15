@@ -86,6 +86,39 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             assert_eq!(fresh.nsnakes, pos.nsnakes);
             let round = Pos::from_text(&pos.to_text()).unwrap();
             assert_eq!(round.hash, pos.hash);
+            // what reach threats rely on: if the opponent could play b now, our one-player optimum
+            // after b is no lower than after any move of ours that neither covers nor touches b,
+            // followed by b (which stays legal)
+            {
+                let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
+                let k = pos.left[me].count_ones();
+                if !moves.is_empty() && pos.left[opp] != 0 && k >= 2 && (k == 2 || (k == 3 && rng.below(20) == 0)) {
+                    for _ in 0..40 {
+                        let b = &t.placements[rng.below(t.placements.len())];
+                        if pos.left[opp] >> b.piece & 1 == 0 || !pos.legal_placement(t, opp, b) {
+                            continue;
+                        }
+                        let bi = t.placements.iter().position(|q| std::ptr::eq(q, b)).unwrap() as u16;
+                        let mut after_b = pos;
+                        after_b.place_for(t, opp, bi);
+                        let opt_b = bounds::one_player_optimum(t, &after_b, me);
+                        for _ in 0..4 {
+                            let m = moves[rng.below(moves.len())];
+                            if m == PASS || t.placements[m as usize].cells & (b.cells | b.border) != 0 {
+                                continue;
+                            }
+                            let mut child = pos;
+                            child.play(t, m);
+                            assert!(child.legal_placement(t, opp, b), "reach threat no longer playable at {}", pos.to_text());
+                            child.place_for(t, opp, bi);
+                            let opt_mb = bounds::one_player_optimum(t, &child, me);
+                            assert!(opt_mb <= opt_b, "one-player optimum rose after our own move at {}", pos.to_text());
+                            threat_checks += 1;
+                        }
+                        break;
+                    }
+                }
+            }
             // what the threat zones rely on: if the opponent could play b now, our upper bound after b
             // is no lower than after any move of ours that leaves b playable, followed by b
             let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
@@ -182,6 +215,10 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-narrow" => o.cfg.narrow = false,
             "--answer-bonus" => o.cfg.answer_bonus = val().parse().unwrap(),
             "--prefetch" => o.cfg.prefetch = true,
+            "--study" => o.cfg.study = true,
+            "--reach-threat" => o.cfg.reach_threat = val().parse().unwrap(),
+            "--reach-threat-work" => o.cfg.reach_threat_work = val().parse().unwrap(),
+            "--study-work" => o.cfg.study_work = val().parse().unwrap(),
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
@@ -346,6 +383,9 @@ fn bench(t: &Tables, o: &Opts) {
         }
         writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
+    }
+    if o.cfg.study {
+        study::print_stats(&mut out, &solver);
     }
     if wrong > 0 {
         std::process::exit(1);

@@ -53,11 +53,64 @@ pub struct Config {
     pub prefetch: bool,
     /// Nodes with at most this many pieces left (both hands) neither read nor write the table.
     pub tt_skip: u32,
+    /// Study build: collect the pot measurements of `StudyStats` (observation only; the search is unchanged).
+    pub study: bool,
+    /// Study: the work budget of one reach test asked by the study (reach threats, one-player optimum).
+    pub study_work: u32,
+    /// Reach threats (an opponent placement after which our one-player optimum is too short) at
+    /// nodes with at least this many pieces left. 99 = never.
+    pub reach_threat: u32,
+    /// The work budget of one reach-threat test.
+    pub reach_threat_work: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: false, tt_skip: 0 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: false, tt_skip: 0, study: false, study_work: 20000, reach_threat: 99, reach_threat_work: 2000 }
+    }
+}
+
+/// One searched move of a node, for the study: the move, how its child was decided, the child's
+/// reply (PASS if none), the child's nodes, and the reach-threat savings counted inside the child.
+#[derive(Clone, Copy)]
+pub struct Rec {
+    pub m: u16,
+    pub kind: u8,
+    pub reply: u16,
+    pub nodes: u64,
+    pub inner: [u64; 2],
+}
+
+/// Pot measurements (study build). Every saving is exclusive: a subtree counted under an outer
+/// node is not counted again for nodes inside it.
+pub struct StudyStats {
+    /// Nodes under moves that failed at a node that later cut, by the side to move at that node and
+    /// by the pieces left at the wasted node (outermost attribution).
+    pub waste: [[u64; 16]; 2],
+    /// Nodes where every move failed, by pieces left: count, moves searched, distinct replies, moves
+    /// refuted by the top reply, nodes under the moves, nodes under the top reply's moves, children
+    /// decided without a move, by the table, by their first move, by a later move, pass children.
+    pub an: [[u64; 12]; 16],
+    /// Reach threats at those nodes, by pieces left: tests, tests that give a threat, moves pruned
+    /// (in order), nodes pruned (in order), work, moves pruned (oracle), nodes pruned (oracle).
+    pub rt: [[u64; 8]; 16],
+    /// Exclusive saved nodes of the reach threats: [in order, oracle].
+    pub rt_saved: [u64; 2],
+    /// One-player optimum at nodes the present bounds did not decide, by pieces left: nodes looked
+    /// at, tests asked, nodes it decides, work, tests that ran out of work.
+    pub opt: [[u64; 6]; 16],
+    pub opt_saved: u64,
+    /// Upper bound minus one-player optimum, by pieces left, by hand size of the player, slack 0..7.
+    pub slack: [[[u64; 8]; 6]; 16],
+    /// Separated positions (no placement of one side can touch a placement of the other): by pieces
+    /// left, [nodes looked at, separated].
+    pub sep: [[u64; 2]; 16],
+    pub sep_saved: u64,
+}
+
+impl StudyStats {
+    pub fn new() -> StudyStats {
+        StudyStats { waste: [[0; 16]; 2], an: [[0; 12]; 16], rt: [[0; 8]; 16], rt_saved: [0; 2], opt: [[0; 6]; 16], opt_saved: 0, slack: [[[0; 8]; 6]; 16], sep: [[0; 2]; 16], sep_saved: 0 }
     }
 }
 
@@ -247,6 +300,11 @@ pub struct Solver {
     bufs: Vec<Vec<u64>>,
     defer_bufs: Vec<Vec<u16>>,
     replies: Vec<(u32, BB)>,
+    /// Study build only.
+    pub st: Box<StudyStats>,
+    ret_kind: u8,
+    ret_mv: u16,
+    recs: Vec<Vec<Rec>>,
 }
 
 /// The result of a finished game for the side to move.
@@ -286,6 +344,10 @@ impl Solver {
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
             defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
             replies: Vec::with_capacity(1024),
+            st: Box::new(StudyStats::new()),
+            ret_kind: 0,
+            ret_mv: PASS,
+            recs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
         }
     }
 
@@ -573,7 +635,7 @@ impl Solver {
     }
 
     /// Adds the opponent placement `m` to the threats if the bounds decide the game after it.
-    fn try_threat(&self, pos: &Pos, m: u16, th: &mut Threats) {
+    fn try_threat(&self, pos: &Pos, m: u16, alpha: i32, th: &mut Threats) {
         if m == PASS || th.n >= MAX_THREATS || th.ntried >= MAX_TRIED || th.tried[..th.ntried].contains(&m) {
             return;
         }
@@ -593,11 +655,38 @@ impl Solver {
         } else if my_upper <= opp_len {
             0
         } else {
-            return;
+            2
         };
-        th.zone[th.n] = threat_zone(pos, opp, b);
-        th.value[th.n] = value;
-        th.n += 1;
+        let _ = alpha;
+        // A reach threat (`--reach-threat L`): with b placed, can we still build a snake as long as
+        // the opponent's? If not, a move of ours that neither covers nor touches b leaves b playable,
+        // is itself playable after b, and our one-player optimum after both is no more than after b
+        // alone: the move is worth at most the threat's value. Zone: b's cells and border.
+        let level = pos.left[0].count_ones() + pos.left[1].count_ones();
+        let ask = level >= self.cfg.reach_threat && pos.left[me] != 0 && (value == 2 || (value == 0 && alpha < 0));
+        let mut rv = 2;
+        if ask {
+            let mut child = *pos;
+            child.place_for(t, opp, m);
+            let mut work = self.cfg.reach_threat_work;
+            if !can_reach_alone(t, &child, me, opp_len, &mut work) {
+                rv = -1;
+            } else if value == 2 && alpha >= 0 {
+                let mut work = self.cfg.reach_threat_work;
+                if !can_reach_alone(t, &child, me, opp_len + 1, &mut work) {
+                    rv = 0;
+                }
+            }
+        }
+        if rv <= 0 {
+            th.zone[th.n] = b.cells | b.border;
+            th.value[th.n] = rv;
+            th.n += 1;
+        } else if value <= 0 {
+            th.zone[th.n] = threat_zone(pos, opp, b);
+            th.value[th.n] = value;
+            th.n += 1;
+        }
     }
 
     /// Adds every opponent placement after which our value is at most alpha by the bounds.
@@ -703,6 +792,250 @@ impl Solver {
         }
     }
 
+    /// Study: at a node the present bounds left open, would the exact one-player optimum decide it
+    /// (bit 1), are the two sides separated (bit 2)? Also samples the slack of the upper bound.
+    fn study_node(&mut self, pos: &Pos, level: usize, alpha: i32, beta: i32, test_me: bool, test_them: bool) -> u8 {
+        let t = self.t;
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let mine_now = pos.longest[me] as i32;
+        let theirs_now = pos.longest[opp] as i32;
+        let budget = self.cfg.study_work;
+        let mut mark = 0u8;
+        self.st.opt[level][0] += 1;
+        let mut ask = |st: &mut StudyStats, player: usize, need: i32| -> bool {
+            let mut work = budget;
+            st.opt[level][1] += 1;
+            let r = can_reach_alone(t, pos, player, need, &mut work);
+            st.opt[level][3] += (budget - work) as u64;
+            if work == 0 {
+                st.opt[level][4] += 1;
+            }
+            r
+        };
+        if !test_me && pos.left[me] != 0 {
+            let need = theirs_now + if alpha >= 0 { 1 } else { 0 };
+            if mine_now < need && !ask(&mut self.st, me, need) {
+                mark |= 1;
+            }
+        }
+        if mark == 0 && !test_them && pos.left[opp] != 0 {
+            let need = mine_now + if beta <= 0 { 1 } else { 0 };
+            if theirs_now < need && !ask(&mut self.st, opp, need) {
+                mark |= 1;
+            }
+        }
+        if mark & 1 != 0 {
+            self.st.opt[level][2] += 1;
+        }
+        // separation: whole growable areas, and only the clusters that can still reach the other's length
+        self.st.sep[level][0] += 1;
+        let gm = growable(pos, me);
+        let go = growable(pos, opp);
+        if go & (gm | neighbours(gm)) == 0 {
+            self.st.sep[level][1] += 1;
+        }
+        {
+            let mut cm = Clusters::new();
+            let mut co = Clusters::new();
+            upper_bound_ex(t, pos, me, 0, Some(&mut cm));
+            upper_bound_ex(t, pos, opp, 0, Some(&mut co));
+            if !cm.overflow && !co.overflow {
+                let rel = |c: &Clusters, other_now: i32| -> BB {
+                    let mut r = 0;
+                    for i in 0..c.n {
+                        if c.upper[i] >= other_now {
+                            r |= c.cells[i];
+                        }
+                    }
+                    r
+                };
+                let rm = rel(&cm, theirs_now);
+                let ro = rel(&co, mine_now);
+                if go & (rm | neighbours(rm)) == 0 && gm & (ro | neighbours(ro)) == 0 {
+                    self.st.sep[level][1 + 0] += 0;
+                    mark |= 2;
+                }
+            }
+        }
+        if mark & 2 != 0 {
+            self.st.opt[level][5] += 1;
+        }
+        // slack of the upper bound, on a sample of the nodes
+        if self.nodes & 7 == 0 {
+            for player in 0..2 {
+                let h = pos.left[player].count_ones() as usize;
+                if h == 0 || h > 5 {
+                    continue;
+                }
+                let upper = upper_bound(t, pos, player);
+                let mut opt = pos.longest[player] as i32;
+                let mut ok = true;
+                while opt < upper {
+                    let mut work = budget;
+                    let r = can_reach_alone(t, pos, player, opt + 1, &mut work);
+                    if work == 0 {
+                        ok = false;
+                        break;
+                    }
+                    if !r {
+                        break;
+                    }
+                    opt += 1;
+                }
+                if ok {
+                    self.st.slack[level][h][((upper - opt) as usize).min(7)] += 1;
+                }
+            }
+        }
+        mark
+    }
+
+    fn study_close(&mut self, mark: u8, s_opt0: u64, s_sep0: u64, nodes_at_start: u64) {
+        let below = self.nodes - nodes_at_start;
+        if mark & 1 != 0 {
+            self.st.opt_saved = s_opt0 + below;
+        }
+        if mark & 2 != 0 {
+            self.st.sep_saved = s_sep0 + below;
+        }
+    }
+
+    /// Study: a node where every move failed. How the refutations look, and what reach threats (a
+    /// reply of the opponent after which our one-player optimum is too short) would have pruned.
+    fn study_all_node(&mut self, pos: &Pos, level: usize, alpha: i32, recs: &[Rec]) {
+        let t = self.t;
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let a = &mut self.st.an[level];
+        a[0] += 1;
+        a[1] += recs.len() as u64;
+        let mut replies: Vec<(u16, u64, u64)> = Vec::new(); // reply, moves, nodes
+        for r in recs {
+            a[4] += r.nodes;
+            match r.kind {
+                0 => a[6] += 1,
+                1 => a[7] += 1,
+                3 => a[8] += 1,
+                4 => a[9] += 1,
+                _ => a[10] += 1,
+            }
+            if r.reply != PASS {
+                if let Some(e) = replies.iter_mut().find(|e| e.0 == r.reply) {
+                    e.1 += 1;
+                    e.2 += r.nodes;
+                } else {
+                    replies.push((r.reply, 1, r.nodes));
+                }
+            }
+        }
+        a[2] += replies.len() as u64;
+        if let Some(top) = replies.iter().max_by_key(|e| e.1) {
+            a[3] += top.1;
+            a[5] += top.2;
+        }
+        if pos.left[me] == 0 || pos.left[opp] == 0 {
+            return;
+        }
+        // reach threats. A reply R is a threat when, with R placed, our one-player optimum is below
+        // (or, for a draw, not above) R's length. A move of ours that leaves R legal and that would
+        // itself be legal after R is then worth at most that value.
+        let budget = self.cfg.study_work;
+        let test = |st: &mut StudyStats, r: u16| -> Option<(BB, BB, bool, i32)> {
+            let p = &t.placements[r as usize];
+            if pos.left[opp] >> p.piece & 1 == 0 || !pos.legal_placement(t, opp, p) {
+                return None;
+            }
+            let mut child = *pos;
+            child.place_for(t, opp, r);
+            let target = child.longest[opp] as i32;
+            st.rt[level][0] += 1;
+            let mut work = budget;
+            let mut value = 2;
+            if !can_reach_alone(t, &child, me, target, &mut work) {
+                value = -1;
+            } else if alpha >= 0 {
+                let mut w2 = budget;
+                if !can_reach_alone(t, &child, me, target + 1, &mut w2) {
+                    value = 0;
+                }
+                work = work.min(w2);
+            }
+            st.rt[level][4] += (budget - work) as u64;
+            if value > alpha {
+                return None;
+            }
+            st.rt[level][1] += 1;
+            let grows = p.border & pos.cells[opp] != 0;
+            Some((p.cells, p.border, grows, value))
+        };
+        let own = pos.cells[me];
+        let covered = |z: &(BB, BB, bool, i32), m: u16| -> bool {
+            // true: the move m is worth at most the threat's value
+            let q = &t.placements[m as usize];
+            if q.cells & z.0 != 0 {
+                return false;
+            }
+            if q.cells & z.1 == 0 {
+                return true;
+            }
+            // m touches R: fine only if R grows (then R is still legal) and m grows (then m is legal after R)
+            z.2 && q.border & own != 0
+        };
+        // in the search's order: a reply is tested when it first refutes a move, up to eight
+        let mut zones: Vec<(BB, BB, bool, i32)> = Vec::new();
+        let mut tested: Vec<u16> = Vec::new();
+        for r in recs {
+            if zones.iter().any(|z| covered(z, r.m)) {
+                self.st.rt[level][2] += 1;
+                self.st.rt[level][3] += r.nodes;
+                self.st.rt_saved[0] += r.nodes - r.inner[0];
+            }
+            if r.reply != PASS && !tested.contains(&r.reply) && tested.len() < 8 {
+                tested.push(r.reply);
+                if let Some(z) = test(&mut self.st, r.reply) {
+                    zones.push(z);
+                }
+            }
+        }
+        // oracle: every distinct reply tested first (up to 16 by frequency)
+        let mut by_freq = replies.clone();
+        by_freq.sort_unstable_by(|x, y| y.1.cmp(&x.1));
+        let mut zones2: Vec<(BB, BB, bool, i32)> = Vec::new();
+        for e in by_freq.iter().take(16) {
+            if let Some(i) = tested.iter().position(|&x| x == e.0) {
+                let _ = i;
+            }
+            let p = &t.placements[e.0 as usize];
+            if pos.left[opp] >> p.piece & 1 == 0 || !pos.legal_placement(t, opp, p) {
+                continue;
+            }
+            let mut child = *pos;
+            child.place_for(t, opp, e.0);
+            let target = child.longest[opp] as i32;
+            let mut work = budget;
+            let mut value = 2;
+            if !can_reach_alone(t, &child, me, target, &mut work) {
+                value = -1;
+            } else if alpha >= 0 {
+                let mut w2 = budget;
+                if !can_reach_alone(t, &child, me, target + 1, &mut w2) {
+                    value = 0;
+                }
+            }
+            if value <= alpha {
+                zones2.push((p.cells, p.border, p.border & pos.cells[opp] != 0, value));
+            }
+        }
+        for r in recs {
+            if zones2.iter().any(|z| covered(z, r.m)) {
+                self.st.rt[level][5] += 1;
+                self.st.rt[level][6] += r.nodes;
+                self.st.rt_saved[1] += r.nodes - r.inner[1];
+            }
+        }
+    }
+
     /// True when the table now decides the node at `ply` of the current path for its window.
     #[inline]
     fn resolved(&self, ply: usize) -> bool {
@@ -766,6 +1099,8 @@ impl Solver {
         }
         let level = ((pos.left[0].count_ones() + pos.left[1].count_ones()) as usize).min(15);
         self.by_left[level] += 1;
+        self.ret_kind = 0;
+        self.ret_mv = PASS;
         if pos.is_over() {
             return game_result(pos);
         }
@@ -790,10 +1125,14 @@ impl Solver {
             tt_move = e.mv;
             if lo >= hi || lo >= beta {
                 self.prof[level][0] += 1;
+                self.ret_kind = 1;
+                self.ret_mv = e.mv;
                 return lo;
             }
             if hi <= alpha {
                 self.prof[level][0] += 1;
+                self.ret_kind = 1;
+                self.ret_mv = e.mv;
                 return hi;
             }
         }
@@ -952,12 +1291,24 @@ impl Solver {
         }
         let (alpha0, beta0) = (alpha, beta);
 
+        // Study: would an exact one-player bound, or a separation of the two sides, decide this node?
+        let mut study_mark = 0u8;
+        let (s_opt0, s_sep0) = (self.st.opt_saved, self.st.sep_saved);
+        if self.cfg.study && (4..=11).contains(&level) {
+            study_mark = self.study_node(pos, level, alpha, beta, test_me, test_them);
+        }
+        // the study's loop-start snapshots (waste)
+        let (bl0, w0) = if self.cfg.study { (self.by_left, self.st.waste) } else { ([0; 16], [[0; 16]; 2]) };
+        let (mut cur_bl, mut cur_w) = (bl0, w0);
+        let mut recs = if self.cfg.study { std::mem::take(&mut self.recs[ply]) } else { Vec::new() };
+        recs.clear();
+
         // 3. threats: the opponent's refutations one ply down are the natural candidates
         let threats_on = self.cfg.threats && self.cfg.bounds && pos.left[opp] != 0;
         let mut th = Threats::new();
         if threats_on {
-            self.try_threat(pos, self.killers[ply + 1][0], &mut th);
-            self.try_threat(pos, self.killers[ply + 1][1], &mut th);
+            self.try_threat(pos, self.killers[ply + 1][0], alpha, &mut th);
+            self.try_threat(pos, self.killers[ply + 1][1], alpha, &mut th);
         }
         let mut skipped = -2; // the best bound of the moves skipped because of threats
         let mut scanned = !threats_on;
@@ -1002,7 +1353,12 @@ impl Solver {
                 if self.cfg.prefetch {
                     self.prefetch(child.hash);
                 }
+                let (n_before, rt_before) = (self.nodes, self.st.rt_saved);
                 let v = -self.search::<PAR>(&child, -beta, -alpha);
+                if self.cfg.study {
+                    let inner = [self.st.rt_saved[0] - rt_before[0], self.st.rt_saved[1] - rt_before[1]];
+                    recs.push(Rec { m: first, kind: self.ret_kind, reply: self.ret_mv, nodes: self.nodes - n_before, inner });
+                }
                 if !busy.is_null() {
                     unsafe { &*busy }.finish(move_key);
                 }
@@ -1010,6 +1366,12 @@ impl Solver {
                     return self.after_abort::<PAR>(pos, ply, alpha_in, beta_in);
                 }
                 if v >= beta {
+                    if self.cfg.study {
+                        self.study_close(study_mark, s_opt0, s_sep0, nodes_at_start);
+                        self.recs[ply] = recs;
+                        self.ret_kind = 3;
+                        self.ret_mv = first;
+                    }
                     if self.killers[ply][0] != first {
                         self.killers[ply][1] = self.killers[ply][0];
                         self.killers[ply][0] = first;
@@ -1173,7 +1535,16 @@ impl Solver {
                         }
                     }
                     searched += 1;
+                    if self.cfg.study {
+                        cur_bl = self.by_left;
+                        cur_w = self.st.waste;
+                    }
+                    let (n_before, rt_before) = (self.nodes, self.st.rt_saved);
                     v = -self.search::<PAR>(&child, -beta, -alpha);
+                    if self.cfg.study {
+                        let inner = [self.st.rt_saved[0] - rt_before[0], self.st.rt_saved[1] - rt_before[1]];
+                        recs.push(Rec { m, kind: self.ret_kind, reply: self.ret_mv, nodes: self.nodes - n_before, inner });
+                    }
                     if !busy.is_null() {
                         unsafe { &*busy }.finish(move_key);
                     }
@@ -1195,6 +1566,17 @@ impl Solver {
                     }
                     if searched == 1 {
                         self.prof[level][4] += 1;
+                    }
+                    if self.cfg.study && searched > 1 {
+                        // the moves before this one failed: their nodes are waste, attributed here
+                        for s in 0..2 {
+                            for l in 0..16 {
+                                self.st.waste[s][l] -= cur_w[s][l] - w0[s][l];
+                            }
+                        }
+                        for l in 0..16 {
+                            self.st.waste[me][l] += cur_bl[l] - bl0[l];
+                        }
                     }
                     break;
                 }
@@ -1220,7 +1602,7 @@ impl Solver {
                 // first move has failed this is probably a node where every move must be refuted, so
                 // look for all of the opponent's threats.
                 if threats_on && first_pass && i + 1 < n {
-                    self.try_threat(pos, self.killers[ply + 1][0], &mut th);
+                    self.try_threat(pos, self.killers[ply + 1][0], alpha, &mut th);
                     if !scanned {
                         scanned = true;
                         self.prof[level][7] += 1;
@@ -1258,6 +1640,24 @@ impl Solver {
             nhi = best;
         }
         debug_assert!(nlo <= nhi);
+        if self.cfg.study {
+            let cut = best >= beta0;
+            if !cut && !recs.is_empty() && level >= 4 {
+                self.study_all_node(pos, level, alpha0, &recs);
+            }
+            self.study_close(study_mark, s_opt0, s_sep0, nodes_at_start);
+            self.recs[ply] = recs;
+            if self.recs[ply].is_empty() {
+                self.ret_kind = 6;
+                self.ret_mv = PASS;
+            } else if cut {
+                self.ret_kind = if self.recs[ply].len() == 1 { 3 } else { 4 };
+                self.ret_mv = best_move;
+            } else {
+                self.ret_kind = 5;
+                self.ret_mv = PASS;
+            }
+        }
         if best_move == PASS {
             best_move = tt_move;
         }

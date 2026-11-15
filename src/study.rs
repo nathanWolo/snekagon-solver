@@ -111,3 +111,54 @@ pub fn root_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
         }
     }
 }
+
+/// Prints the pot measurements of a study build (`--study`).
+pub fn print_stats<W: std::io::Write>(out: &mut W, s: &Solver) {
+    let st = &s.st;
+    let total: u64 = s.by_left.iter().sum();
+    writeln!(out, "# study: total nodes {}", total).unwrap();
+    let w: [u64; 2] = [st.waste[0].iter().sum(), st.waste[1].iter().sum()];
+    writeln!(out, "# waste (nodes under failed moves at nodes that cut, outermost): red-to-move nodes {} ({:.1}%), blue-to-move nodes {} ({:.1}%)", w[0], 100.0 * w[0] as f64 / total as f64, w[1], 100.0 * w[1] as f64 / total as f64).unwrap();
+    writeln!(out, "# waste by pieces left of the wasted node: left nodes | under red's failed moves, under blue's failed moves (share of the level)").unwrap();
+    for l in 2..12 {
+        let n = s.by_left[l].max(1);
+        writeln!(out, "#  {:2}: {:9} | {:9} {:5.1}% {:9} {:5.1}%", l, s.by_left[l], st.waste[0][l], 100.0 * st.waste[0][l] as f64 / n as f64, st.waste[1][l], 100.0 * st.waste[1][l] as f64 / n as f64).unwrap();
+    }
+    writeln!(out, "# all-fail nodes: left count | moves/node distinct-replies/node top-reply-share-of-moves top-reply-share-of-nodes nodes/node | kinds of children: bound, table, first-cut, later-cut, other").unwrap();
+    for l in 4..12 {
+        let a = &st.an[l];
+        if a[0] == 0 {
+            continue;
+        }
+        let c = a[0] as f64;
+        writeln!(out, "#  {:2}: {:7} | {:6.1} {:5.2} {:5.1}% {:5.1}% {:8.1} | {} {} {} {} {}", l, a[0], a[1] as f64 / c, a[2] as f64 / c, 100.0 * a[3] as f64 / a[1].max(1) as f64, 100.0 * a[5] as f64 / a[4].max(1) as f64, a[4] as f64 / c, a[6], a[7], a[8], a[9], a[10]).unwrap();
+    }
+    writeln!(out, "# reach threats at all-fail nodes: left | tests threats work/test | in order: moves pruned, nodes under them | oracle: moves, nodes").unwrap();
+    for l in 4..12 {
+        let r = &st.rt[l];
+        if r[0] == 0 {
+            continue;
+        }
+        writeln!(out, "#  {:2}: {:7} {:7} {:8.1} | {:8} {:10} | {:8} {:10}", l, r[0], r[1], r[4] as f64 / r[0] as f64, r[2], r[3], r[5], r[6]).unwrap();
+    }
+    writeln!(out, "# reach threats, exclusive nodes saved: in order {} ({:.1}%), oracle {} ({:.1}%)", st.rt_saved[0], 100.0 * st.rt_saved[0] as f64 / total as f64, st.rt_saved[1], 100.0 * st.rt_saved[1] as f64 / total as f64).unwrap();
+    writeln!(out, "# one-player optimum at open nodes: left | nodes tests decided work/test out-of-work | separated (whole) separated (relevant clusters)").unwrap();
+    for l in 4..12 {
+        let o = &st.opt[l];
+        if o[0] == 0 {
+            continue;
+        }
+        writeln!(out, "#  {:2}: {:8} {:8} {:8} {:8.1} {:6} | {:6} {:6}", l, o[0], o[1], o[2], o[3] as f64 / o[1].max(1) as f64, o[4], st.sep[l][1], o[5]).unwrap();
+    }
+    writeln!(out, "# exclusive nodes saved: one-player optimum {} ({:.1}%), separation {} ({:.1}%)", st.opt_saved, 100.0 * st.opt_saved as f64 / total as f64, st.sep_saved, 100.0 * st.sep_saved as f64 / total as f64).unwrap();
+    writeln!(out, "# slack of the upper bound over the one-player optimum (sample), by pieces left and hand: counts of slack 0..7+").unwrap();
+    for l in 4..12 {
+        for h in 1..6 {
+            let sl = &st.slack[l][h];
+            if sl.iter().sum::<u64>() == 0 {
+                continue;
+            }
+            writeln!(out, "#  {:2} hand {}: {:?}", l, h, sl).unwrap();
+        }
+    }
+}
