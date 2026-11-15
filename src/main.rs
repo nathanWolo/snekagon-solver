@@ -194,10 +194,15 @@ struct Opts {
     /// `bench`: only positions with this label.
     only: Option<String>,
     rest: Vec<String>,
+    /// `bench`: order study dump (file, levels mask, every, cap per root).
+    dump: Option<String>,
+    dump_levels: u32,
+    dump_every: u64,
+    dump_cap: u64,
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, no_symmetry: false, window: (-1, 1), only: None, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, no_symmetry: false, window: (-1, 1), only: None, rest: Vec::new(), dump: None, dump_levels: 1 << 7 | 1 << 5, dump_every: 1, dump_cap: u64::MAX };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -247,6 +252,10 @@ fn parse_opts(args: &[String]) -> Opts {
                 o.window = (a.parse().unwrap(), b.parse().unwrap());
             }
             "--only" => o.only = Some(val()),
+            "--dump" => o.dump = Some(val()),
+            "--dump-levels" => o.dump_levels = val().split(',').map(|x| 1u32 << x.parse::<u32>().unwrap()).fold(0, |a, b| a | b),
+            "--dump-every" => o.dump_every = val().parse().unwrap(),
+            "--dump-cap" => o.dump_cap = val().parse().unwrap(),
             "--par-level" => o.cfg.par_level = val().parse().unwrap(),
             "--par-join" => o.cfg.par_join = val().parse().unwrap(),
             "--pn-slack" => o.pn_cfg.slack = val().parse().unwrap(),
@@ -323,6 +332,11 @@ fn bench(t: &Tables, o: &Opts) {
     let (mut total_nodes, mut total_us, mut wrong, mut unknown, mut n) = (0u64, 0u128, 0u32, 0u32, 0u32);
     let mut par = if o.threads > 1 { Some(par::ParSolver::new(o.cfg, o.threads)) } else { None };
     let mut pn_stats = [0u64; 3];
+    if let Some(f) = &o.dump {
+        let out = std::io::BufWriter::new(std::fs::File::create(f).unwrap());
+        let meta = std::io::BufWriter::new(std::fs::File::create(format!("{}.meta", f)).unwrap());
+        solver.dump = Some(Box::new(solver::Dump { out, meta, levels: o.dump_levels, every: o.dump_every.max(1), cap: o.dump_cap, seen: [0; 16], taken_root: 0, root: 0 }));
+    }
     let out = std::io::stdout();
     let mut out = out.lock();
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
@@ -335,6 +349,10 @@ fn bench(t: &Tables, o: &Opts) {
         }
         let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
         solver.clear();
+        if let Some(d) = solver.dump.as_mut() {
+            d.taken_root = 0;
+            d.root = i;
+        }
         if let Some(p) = pn.as_mut() {
             p.clear();
         }
@@ -390,6 +408,16 @@ fn bench(t: &Tables, o: &Opts) {
     }
     if o.cfg.study {
         study::print_stats(&mut out, &solver);
+    }
+    writeln!(out, "# red nodes at the move loop: left nodes cut cut-first waste-at-cut win-sub-at-cut").unwrap();
+    for l in 2..12 {
+        let r = solver.red_loop[l];
+        writeln!(out, "#r {:2} {} {} {} {} {}", l, r[0], r[1], r[2], r[3], r[4]).unwrap();
+    }
+    if let Some(d) = solver.dump.as_mut() {
+        use std::io::Write as _;
+        d.out.flush().unwrap();
+        d.meta.flush().unwrap();
     }
     if wrong > 0 {
         std::process::exit(1);
@@ -448,6 +476,10 @@ fn main() {
         "rootmoves" => {
             let o = parse_opts(&args[2..]);
             study::root_moves(t, &o.rest[0], o.from, o.to, o.cfg, o.nodes);
+        }
+        "ordermoves" => {
+            let o = parse_opts(&args[2..]);
+            study::order_moves(t, &o.rest[0], o.from, o.to, o.cfg, o.nodes);
         }
         "bench" => {
             let o = parse_opts(&args[2..]);

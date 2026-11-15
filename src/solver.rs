@@ -74,6 +74,20 @@ impl Default for Config {
     }
 }
 
+/// Order study (climb/order): a sample of red's nodes at chosen levels, written as positions, and
+/// counters of red's nodes that reach the move loop, by pieces left.
+pub struct Dump {
+    pub out: std::io::BufWriter<std::fs::File>,
+    pub meta: std::io::BufWriter<std::fs::File>,
+    /// Bit L: dump nodes with L pieces left.
+    pub levels: u32,
+    pub every: u64,
+    pub cap: u64,
+    pub seen: [u64; 16],
+    pub taken_root: u64,
+    pub root: usize,
+}
+
 /// One searched move of a node, for the study: the move, how its child was decided, the child's
 /// reply (PASS if none), the child's nodes, and the reach-threat savings counted inside the child.
 #[derive(Clone, Copy)]
@@ -120,10 +134,10 @@ impl StudyStats {
 
 /// What the table knows about a position: its value lies in [lo, hi]; mv was the best move.
 #[derive(Clone, Copy)]
-struct Entry {
-    lo: i8,
-    hi: i8,
-    mv: u16,
+pub(crate) struct Entry {
+    pub(crate) lo: i8,
+    pub(crate) hi: i8,
+    pub(crate) mv: u16,
 }
 
 /// The transposition table, shared by all threads of a solve. A bucket holds two entries; an entry
@@ -235,8 +249,8 @@ const NO_BOUND: i32 = 2;
 /// covers no cell of a threat's zone leaves it playable and is worth at most the threat's value.
 pub(crate) struct Threats {
     pub(crate) n: usize,
-    zone: [BB; MAX_THREATS],
-    value: [i32; MAX_THREATS],
+    pub(crate) zone: [BB; MAX_THREATS],
+    pub(crate) value: [i32; MAX_THREATS],
     tried: [u16; MAX_TRIED],
     ntried: usize,
     rtried: [u16; MAX_TRIED],
@@ -313,6 +327,10 @@ pub struct Solver {
     ret_kind: u8,
     ret_mv: u16,
     recs: Vec<Vec<Rec>>,
+    pub dump: Option<Box<Dump>>,
+    /// Red's nodes that reach the move loop, by pieces left: [nodes, cut, cut by the first move,
+    /// nodes under failed moves at cut nodes, nodes under the winning move at cut nodes].
+    pub red_loop: [[u64; 5]; 16],
 }
 
 /// The result of a finished game for the side to move.
@@ -357,6 +375,8 @@ impl Solver {
             ret_kind: 0,
             ret_mv: PASS,
             recs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
+            dump: None,
+            red_loop: [[0; 5]; 16],
         }
     }
 
@@ -504,7 +524,7 @@ impl Solver {
     }
 
     #[inline]
-    fn probe(&self, key: u64) -> Option<Entry> {
+    pub(crate) fn probe(&self, key: u64) -> Option<Entry> {
         // in bounds: mask is the bucket count minus one
         let b = unsafe { &*self.slots.0.add((key as usize) & self.mask) };
         for i in 0..2 {
@@ -643,8 +663,28 @@ impl Solver {
         best
     }
 
+    /// Order study: count a red node that reached the move loop, and write it if sampled.
+    #[allow(clippy::too_many_arguments)]
+    fn red_note(&mut self, level: usize, cut: u8, win_sub: u64, total: u64, dumping: bool, pos: &Pos, tt: u16, k1: u16, k2: u16, a: i32, b: i32, searched: u64) {
+        let r = &mut self.red_loop[level];
+        if cut == 1 {
+            r[1] += 1;
+            if searched == 1 {
+                r[2] += 1;
+            }
+            r[3] += total.saturating_sub(win_sub);
+            r[4] += win_sub;
+        }
+        if dumping {
+            use std::io::Write;
+            let d = self.dump.as_mut().unwrap();
+            writeln!(d.out, "? {}", pos.to_text()).unwrap();
+            writeln!(d.meta, "{} {} {} {} {} {} {} {} {} {} {}", d.root, level, tt, k1, k2, a, b, cut, searched, total, win_sub).unwrap();
+        }
+    }
+
     /// Adds the opponent placement `m` to the threats if the bounds decide the game after it.
-    fn try_threat(&self, pos: &Pos, m: u16, alpha: i32, deep: bool, th: &mut Threats) {
+    pub(crate) fn try_threat(&self, pos: &Pos, m: u16, alpha: i32, deep: bool, th: &mut Threats) {
         if m == PASS || th.n >= MAX_THREATS {
             return;
         }
@@ -1318,6 +1358,21 @@ impl Solver {
             }
         }
         let (alpha0, beta0) = (alpha, beta);
+        let is_red = me == RED;
+        let mut dumping = false;
+        if is_red {
+            self.red_loop[level][0] += 1;
+            if let Some(d) = self.dump.as_mut() {
+                if d.levels >> level & 1 != 0 {
+                    d.seen[level] += 1;
+                    if d.seen[level] % d.every == 0 && d.taken_root < d.cap {
+                        d.taken_root += 1;
+                        dumping = true;
+                    }
+                }
+            }
+        }
+        let (dk1, dk2) = (self.killers[ply][0], self.killers[ply][1]);
 
         // Study: would an exact one-player bound, or a separation of the two sides, decide this node?
         let mut study_mark = 0u8;
@@ -1346,6 +1401,7 @@ impl Solver {
         // before the list is built.
         let (k1, k2) = (self.killers[ply][0], self.killers[ply][1]);
         let mut pre: Option<(u16, i32)> = None;
+        let mut pre_sub = 0u64;
         // In a parallel solve: a move another thread is searching is set aside and taken up again
         // after the others, when its answer is probably in the table.
         // A plain pointer, not a clone of the Arc: a clone would have every thread write the same
@@ -1394,6 +1450,10 @@ impl Solver {
                     return self.after_abort::<PAR>(pos, ply, alpha_in, beta_in);
                 }
                 if v >= beta {
+                    if is_red {
+                        let sub = self.nodes - n_before;
+                        self.red_note(level, 1, sub, self.nodes - nodes_at_start, dumping, pos, tt_move, dk1, dk2, alpha0, beta0, 1);
+                    }
                     if self.cfg.study {
                         self.study_close(study_mark, s_opt0, s_sep0, nodes_at_start);
                         self.recs[ply] = recs;
@@ -1411,6 +1471,7 @@ impl Solver {
                     return v;
                 }
                 pre = Some((first, v));
+                pre_sub = self.nodes - n_before;
             }
         }
 
@@ -1492,6 +1553,7 @@ impl Solver {
         let mut best = -2;
         let mut best_move = PASS;
         let mut answered = PASS;
+        let mut last_sub = 0u64;
         if buf.is_empty() && skipped == -2 {
             let mut child = *pos;
             child.play(t, PASS);
@@ -1569,6 +1631,7 @@ impl Solver {
                     }
                     let (n_before, rt_before) = (self.nodes, self.st.rt_saved);
                     v = -self.search::<PAR>(&child, -beta, -alpha);
+                    last_sub = self.nodes - n_before;
                     if self.cfg.study {
                         let inner = [self.st.rt_saved[0] - rt_before[0], self.st.rt_saved[1] - rt_before[1]];
                         recs.push(Rec { m, kind: self.ret_kind, reply: self.ret_mv, nodes: self.nodes - n_before, inner });
@@ -1657,6 +1720,12 @@ impl Solver {
             return self.after_abort::<PAR>(pos, ply, alpha_in, beta_in);
         }
 
+        if is_red && !self.aborted {
+            let cut = best >= beta0;
+            let total = self.nodes - nodes_at_start;
+            let win_sub = if cut { if searched == 1 && pre.is_some() { pre_sub } else { last_sub } } else { 0 };
+            self.red_note(level, cut as u8, win_sub, total, dumping, pos, tt_move, dk1, dk2, alpha0, beta0, searched);
+        }
         // 6. store what we learned
         let (mut nlo, mut nhi) = (lo, hi);
         if best <= alpha0 {

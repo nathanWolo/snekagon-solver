@@ -112,6 +112,105 @@ pub fn root_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
     }
 }
 
+/// Order study (climb/order): for every legal move of each position, the move's cells and border,
+/// the eight features of the solver's model exactly as the solver computes them, a few look-ahead
+/// features, then the move's value ("does it win", fresh table), its nodes, and for a failed move
+/// the refuting reply (the child's table move) with the threat the solver would make of it
+/// (`try_threat` after a failed move: zone and value, "-" if none). Before each position's moves a
+/// line `#scan i zone:value ...` gives the threats `scan_threats` finds at alpha 0.
+pub fn order_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, cap: u64) {
+    let text = std::fs::read_to_string(path).expect("cannot read the position file");
+    let mut solver = Solver::new(cfg);
+    println!("pos,move,piece,n,cells,border,lead,grows,joined,front,touch,my_ends8,their_ends8,my_up,their_up,their_moves,my_moves,their_best,my_next,win,nodes,reply,rcells,rzone,rvalue");
+    let mut list = Vec::new();
+    for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
+        if i < from || i >= to {
+            continue;
+        }
+        let (_, rest) = line.trim().split_once(char::is_whitespace).expect("line needs an expected value and a position");
+        let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let own = pos.cells[me];
+        let theirs = pos.cells[opp];
+        let empty = pos.empty();
+        let front = neighbours(shape_of(theirs).ends) & empty;
+        let their_shape = shape_of(theirs);
+        let their_free = neighbours(their_shape.ends) & empty & !neighbours(their_shape.body);
+        {
+            let mut cl = Clusters::new();
+            upper_bound_ex(t, &pos, me, 0, Some(&mut cl));
+            let mut th = Threats::new();
+            if pos.left[opp] != 0 {
+                solver.scan_threats(&pos, &cl, 0, &mut th);
+            }
+            let mut s = format!("#scan {}", i);
+            for k in 0..th.n {
+                s += &format!(" {:x}:{}", th.zone[k], th.value[k]);
+            }
+            println!("{}", s);
+        }
+        pos.moves(t, &mut list);
+        for &m in list.iter() {
+            let p = &t.placements[m as usize];
+            let mut joined = p.n as i32;
+            for j in 0..pos.nsnakes[me] as usize {
+                if pos.snakes[me][j] & p.border != 0 {
+                    joined += count(pos.snakes[me][j]) as i32;
+                }
+            }
+            let after = joined.max(pos.longest[me] as i32);
+            let mine = shape_of(own | p.cells);
+            let my_ends = count(neighbours(mine.ends) & empty & !p.cells & !neighbours(mine.body)) as i32;
+            let their_ends = count(their_free & !p.cells) as i32;
+            let lead = after - pos.longest[opp] as i32;
+            let grows = (p.border & own != 0) as u8;
+            let is_front = (p.cells & front != 0) as u8;
+            let touch = (p.border & theirs != 0) as u8;
+            let mut child = pos;
+            child.play(t, m);
+            let my_up = upper_bound(t, &child, me);
+            let their_up = upper_bound(t, &child, opp);
+            let their_moves = child.count_moves(t);
+            let mut my_moves = 0u32;
+            child.for_each_move(t, me, child.left[me], |_| my_moves += 1);
+            let mut their_best = child.longest[opp] as u32;
+            child.for_each_move(t, opp, child.left[opp], |r| their_best = their_best.max(child.longest_after(opp, &t.placements[r as usize])));
+            let mut my_next = child.longest[me] as u32;
+            child.for_each_move(t, me, child.left[me], |r| my_next = my_next.max(child.longest_after(me, &t.placements[r as usize])));
+            solver.clear();
+            let v = solver.solve(&child, -1, 0, cap);
+            let win = if v == UNKNOWN {
+                "?"
+            } else if v <= -1 {
+                "1"
+            } else {
+                "0"
+            };
+            let nodes = solver.nodes;
+            let (mut reply, mut rz, mut rv, mut rc) = (PASS, String::from("-"), String::from("-"), 0u128);
+            if win == "0" {
+                if let Some(e) = solver.probe(child.hash) {
+                    reply = e.mv;
+                }
+                if reply != PASS {
+                    rc = t.placements[reply as usize].cells;
+                    let mut th = Threats::new();
+                    solver.try_threat(&pos, reply, 0, true, &mut th);
+                    if th.n > 0 {
+                        rz = format!("{:x}", th.zone[0]);
+                        rv = format!("{}", th.value[0]);
+                    }
+                }
+            }
+            println!(
+                "{},{},{},{},{:x},{:x},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:x},{},{}",
+                i, m, p.piece, p.n, p.cells, p.border, lead, grows, joined, is_front, touch, my_ends, their_ends, my_up, their_up, their_moves, my_moves, their_best, my_next, win, nodes, reply, rc, rz, rv
+            );
+        }
+    }
+}
+
 /// Prints the pot measurements of a study build (`--study`).
 pub fn print_stats<W: std::io::Write>(out: &mut W, s: &Solver) {
     let st = &s.st;
