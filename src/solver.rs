@@ -30,11 +30,13 @@ pub struct Config {
     pub model: [i32; NFEATURES],
     /// log2 of the number of table entries.
     pub tt_bits: u32,
+    /// Search the table move or a killer before the move list is generated.
+    pub staged: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22, staged: true }
     }
 }
 
@@ -499,6 +501,50 @@ impl Solver {
         let mut skipped = -2; // the best bound of the moves skipped because of threats
         let mut scanned = !threats_on;
 
+        // 4a. The first move of the order is the table move, else a killer, when one of them is
+        // legal here and no threat rules it out. Three in four nodes cut on it, so it is searched
+        // before the list is built.
+        let (k1, k2) = (self.killers[ply][0], self.killers[ply][1]);
+        let mut pre: Option<(u16, i32)> = None;
+        if self.cfg.staged {
+            let now = pos.pieces_now();
+            let mut first = PASS;
+            for cand in [tt_move, k1, k2] {
+                if cand == PASS {
+                    continue;
+                }
+                let p = &t.placements[cand as usize];
+                if now >> p.piece & 1 == 0 || !pos.legal_placement(t, me, p) {
+                    continue;
+                }
+                if th.n > 0 && th.bound_for(p.cells) <= alpha {
+                    continue;
+                }
+                first = cand;
+                break;
+            }
+            if first != PASS {
+                let mut child = *pos;
+                child.play(t, first);
+                let v = -self.search(&child, -beta, -alpha);
+                if self.aborted {
+                    return 0;
+                }
+                if v >= beta {
+                    if self.killers[ply][0] != first {
+                        self.killers[ply][1] = self.killers[ply][0];
+                        self.killers[ply][0] = first;
+                    }
+                    self.prof[level][2] += 1;
+                    self.prof[level][3] += 1;
+                    self.prof[level][4] += 1;
+                    self.store(pos.hash, lo.max(v), hi, first, self.nodes - nodes_at_start + 1);
+                    return v;
+                }
+                pre = Some((first, v));
+            }
+        }
+
         // 4. generate and score the moves
         let mut buf = std::mem::take(&mut self.bufs[ply]);
         buf.clear();
@@ -506,7 +552,6 @@ impl Solver {
             let own = pos.cells[me];
             let theirs = pos.cells[opp];
             let front = neighbours(shape_of(theirs).ends) & pos.empty();
-            let (k1, k2) = (self.killers[ply][0], self.killers[ply][1]);
             let use_model = level as u32 >= self.cfg.model_level;
             let w = self.cfg.model;
             let empty = pos.empty();
@@ -596,19 +641,27 @@ impl Solver {
                     buf[3..].sort_unstable_by(|a, b| b.cmp(a));
                 }
                 let m = (buf[i] & 0xFFFF) as u16;
-                if th.n > 0 {
-                    let bound = th.bound_for(t.placements[m as usize].cells);
-                    if bound <= alpha {
-                        skipped = skipped.max(bound);
-                        continue;
+                let v;
+                if let (0, Some((first, value))) = (i, pre) {
+                    // searched before the list was built
+                    assert!(m == first, "the placement check and the generator disagree");
+                    searched += 1;
+                    v = value;
+                } else {
+                    if th.n > 0 {
+                        let bound = th.bound_for(t.placements[m as usize].cells);
+                        if bound <= alpha {
+                            skipped = skipped.max(bound);
+                            continue;
+                        }
                     }
-                }
-                let mut child = *pos;
-                child.play(t, m);
-                searched += 1;
-                let v = -self.search(&child, -beta, -alpha);
-                if self.aborted {
-                    break;
+                    let mut child = *pos;
+                    child.play(t, m);
+                    searched += 1;
+                    v = -self.search(&child, -beta, -alpha);
+                    if self.aborted {
+                        break;
+                    }
                 }
                 if v > best {
                     best = v;

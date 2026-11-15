@@ -161,6 +161,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-last" => o.cfg.last_pieces = false,
             "--no-threats" => o.cfg.threats = false,
             "--no-reach" => o.cfg.reach = false,
+            "--no-staged" => o.cfg.staged = false,
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
             "--model" => {
