@@ -201,3 +201,34 @@ test decided, (confirm) fixed length on fresh units.
   upper node; the fit could be particular to these 40 positions (hence the validation files).
 - **Test:** flag `--no-model` restores v3 (identity). Choose features and L on tune by node counts
   and time. Gate `E4` on ply 6 with `SPRT[0, 0.05]`; scaling check on ply 5 tune.
+- **Data** (tune units only): `work/rm2_*.csv` from `snek rootmoves`: ply 6 positions 0-79 and 140-199,
+  ply 7 positions 0-119, ply 5 positions 0-7; 49,892 moves in 209 positions with a win.
+- **What predicts what, within a position** (`tools/rootcost.py`): a win is cheap when the move leaves
+  few replies after threat zones (correlation with log nodes +0.44 to +0.50) and when our best next
+  extension is large (-0.40); a move wins more often with a larger lead and next extension (+0.2).
+  The median win costs 6 times the cheapest win of its position.
+- **Fits** (`tools/rootfit.py`; cost = nodes up to and including the first win, summed): searching
+  the weights on the cost itself overfits (train 2.5x better than static, test 1.0-1.9x); a plain
+  logistic fit of "wins" transfers. Out of sample: 12 features, ply 6: 3.39 M to 1.84 M; ply 7: 1.00 M
+  to 0.58 M. Eight cheap features (lead, size, grows, joined length, covers a cell at an opponent end,
+  touches the opponent, free cells at our ends and at theirs after the move), all data: 11.1 M to
+  6.9 M; twelve: 6.8 M. The ideal order (cheapest win first) would pay 1.8 M.
+- **In the solver** (tune, ply 6 positions 200-259, not used for the fit; base 5.24 M nodes, 4.32 s):
+  twelve features at 9 / 8 / 7 or more pieces left: 3.63 / 3.14 / 2.70 M nodes, 3.19 / 3.22 / 3.99 s (the
+  four look-ahead features need a child position per move). Eight cheap features at 9 / 8 / 7 / 6 / 5:
+  3.50 / 3.32 / 2.92 / 2.93 / 2.77 M nodes, 2.94 / 2.87 / 2.59 / 2.65 / 2.74 s. Kept: eight features, seven
+  or more pieces left.
+- **Identity:** `--no-model` gives 2,400,236 nodes on the first 100 ply-7 positions, as v3 does.
+- **Correctness:** labels equal on all 12,000 positions of plies 9-11 and the first 1,000 of ply 8.
+- **Gate `E4`** (ply 6, gate units 68-103, `SPRT[0, 0.05]`): PASS at unit 36, LLR +2.97. Where it stopped:
+  +45.6% [+25.3%, +69.3%] (gate); over the 40 units run: total time 19.85 s against 27.44 s (0.72x),
+  nodes 0.67x. **Flaw in the run:** five study processes were still using other cores, against the
+  contract's "nothing else heavy running". Both arms ran interleaved under the same load and the node
+  ratio does not depend on load, so the verdict stands; the size is measured again below.
+- **Scaling check `E4-UP`** (ply 5, tune units 0-2): 23.7 s against 25.8 s (0.92x), nodes 0.87x: no harm,
+  and a smaller gain than at ply 6. The fit has only seven ply-5 positions behind it.
+- **Verdict:** accepted. Frozen as v4.
+- **What it taught:** (1) the noise per unit is 0.45 for an ordering change against 0.18-0.24 for a
+  pruning change: it wins big on some units and loses on others, so its gate needed 36 units where the
+  others needed 30 at five times the margin. (2) Fitting to the cost itself overfits 200 positions;
+  fitting "wins" does not. (3) The cheap features did as well in the solver as the expensive ones.

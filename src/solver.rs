@@ -21,13 +21,20 @@ pub struct Config {
     pub reach_hand: u32,
     /// Positions one reach test may look at before it gives up.
     pub reach_work: u32,
+    /// With at least this many pieces left, moves are ordered by the fitted model. 99 = never.
+    pub model_level: u32,
+    /// Model weights (a logistic fit of "this move wins", scaled by 64): our lead after the move, piece
+    /// size, grows a snake, length of the snake joined, covers a cell next to an opponent end, touches
+    /// the opponent, free cells at our ends after, free cells at their ends after, their longest snake
+    /// after their best reply, ours after our best next placement, their upper bound, our upper bound.
+    pub model: [i32; NFEATURES],
     /// log2 of the number of table entries.
     pub tt_bits: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, tt_bits: 22 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22 }
     }
 }
 
@@ -43,6 +50,10 @@ struct Entry {
 
 const EMPTY: Entry = Entry { key: 0, lo: -1, hi: 1, work: 0, gen: 0, mv: PASS };
 pub const UNKNOWN: i32 = -9;
+pub const NFEATURES: usize = 12;
+/// Fitted on tune positions of plies 6 and 7 (`tools/rootfit.py --win-only`, 2026-11-15). The last four
+/// (one placement ahead, bounds after the move) cost a child position each and did not pay: weight 0.
+pub const MODEL: [i32; NFEATURES] = [21, 17, 21, -1, 1, -3, 9, -7, 0, 0, 0, 0];
 const MAX_THREATS: usize = 6;
 const MAX_TRIED: usize = 8;
 const MAX_FOUND: usize = 64;
@@ -496,6 +507,11 @@ impl Solver {
             let theirs = pos.cells[opp];
             let front = neighbours(shape_of(theirs).ends) & pos.empty();
             let (k1, k2) = (self.killers[ply][0], self.killers[ply][1]);
+            let use_model = level as u32 >= self.cfg.model_level;
+            let w = self.cfg.model;
+            let empty = pos.empty();
+            let their_shape = shape_of(theirs);
+            let their_free = neighbours(their_shape.ends) & empty & !neighbours(their_shape.body);
             pos.for_each_move(t, me, pos.pieces_now(), |m| {
                 let p = &t.placements[m as usize];
                 if th.n > 0 {
@@ -513,6 +529,37 @@ impl Solver {
                     score += 128;
                 } else if p.border & theirs != 0 {
                     score += 32;
+                }
+                if use_model {
+                    let mut joined = p.n as i32;
+                    for j in 0..pos.nsnakes[me] as usize {
+                        if pos.snakes[me][j] & p.border != 0 {
+                            joined += count(pos.snakes[me][j]) as i32;
+                        }
+                    }
+                    let after = joined.max(pos.longest[me] as i32);
+                    let mine = shape_of(own | p.cells);
+                    let my_ends = count(neighbours(mine.ends) & empty & !p.cells & !neighbours(mine.body)) as i32;
+                    let their_ends = count(their_free & !p.cells) as i32;
+                    let mut s = w[0] * (after - pos.longest[opp] as i32)
+                        + w[1] * p.n as i32
+                        + w[2] * (p.border & own != 0) as i32
+                        + w[3] * joined
+                        + w[4] * (p.cells & front != 0) as i32
+                        + w[5] * (p.border & theirs != 0) as i32
+                        + w[6] * my_ends
+                        + w[7] * their_ends;
+                    if w[8] != 0 || w[9] != 0 || w[10] != 0 || w[11] != 0 {
+                        // one placement ahead for each side, and both bounds, in the position after the move
+                        let mut child = *pos;
+                        child.play(t, m);
+                        let mut their_best = child.longest[opp] as u32;
+                        child.for_each_move(t, opp, child.left[opp], |r| their_best = their_best.max(child.longest_after(opp, &t.placements[r as usize])));
+                        let mut my_next = child.longest[me] as u32;
+                        child.for_each_move(t, me, child.left[me], |r| my_next = my_next.max(child.longest_after(me, &t.placements[r as usize])));
+                        s += w[8] * their_best as i32 + w[9] * my_next as i32 + w[10] * upper_bound(t, &child, opp) + w[11] * upper_bound(t, &child, me);
+                    }
+                    score = (s + (1 << 20)).max(0) as u64;
                 }
                 if m == tt_move {
                     score = TT_MOVE;

@@ -315,6 +315,24 @@ impl Pos {
         n
     }
 
+    /// The number of legal placements of `player` among `pieces`.
+    pub fn count_moves_for(&self, t: &Tables, player: usize, pieces: u8) -> u32 {
+        if pieces == 0 {
+            return 0;
+        }
+        let g = self.gen_ctx(player);
+        let mut n = 0;
+        for piece in 0..NPIECES {
+            if pieces >> piece & 1 == 0 {
+                continue;
+            }
+            for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
+                n += count(legal_anchors(o, &g));
+            }
+        }
+        n
+    }
+
     pub fn has_move(&self, t: &Tables, player: usize, pieces: u8) -> bool {
         if pieces == 0 {
             return false;

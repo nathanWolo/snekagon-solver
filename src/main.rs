@@ -161,6 +161,13 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-last" => o.cfg.last_pieces = false,
             "--no-threats" => o.cfg.threats = false,
             "--no-reach" => o.cfg.reach = false,
+            "--no-model" => o.cfg.model_level = 99,
+            "--model-level" => o.cfg.model_level = val().parse().unwrap(),
+            "--model" => {
+                for (i, x) in val().split(',').enumerate() {
+                    o.cfg.model[i] = x.parse().unwrap();
+                }
+            }
             "--reach-hand" => o.cfg.reach_hand = val().parse().unwrap(),
             "--reach-work" => o.cfg.reach_work = val().parse().unwrap(),
             "--pn" => o.pn = true,
@@ -299,7 +306,7 @@ fn main() {
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
-            println!("options: --pn --pn-slack N --pn-rank N --pn-tt BITS --no-bounds --no-last --no-threats --no-reach --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
+            println!("options: --pn --pn-slack N --pn-rank N --pn-tt BITS --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }

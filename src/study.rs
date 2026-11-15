@@ -12,7 +12,7 @@ use crate::solver::*;
 pub fn root_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, cap: u64) {
     let text = std::fs::read_to_string(path).expect("cannot read the position file");
     let mut solver = Solver::new(cfg);
-    println!("pos,move,piece,size,grows,joined,gain,lead,front,touch,my_up,their_up,their_up_before,their_moves,my_moves,replies,my_ends,their_ends,static,win,nodes");
+    println!("pos,move,piece,size,grows,joined,gain,lead,front,touch,my_up,their_up,their_up_before,their_moves,my_moves,replies,my_ends,their_ends,their_best,my_next,my_long_ends,their_long_ends,their_reach,static,win,nodes");
     let mut list = Vec::new();
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
         if i < from || i >= to {
@@ -74,6 +74,27 @@ pub fn root_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
             let empty = child.empty();
             let my_ends = count(neighbours(shape_of(child.cells[me]).ends) & empty & !neighbours(shape_of(child.cells[me]).body));
             let their_ends = count(neighbours(shape_of(child.cells[opp]).ends) & empty & !neighbours(shape_of(child.cells[opp]).body));
+            // one move ahead for each side: the longest snake each could have after its next placement
+            let mut their_best = child.longest[opp] as u32;
+            child.for_each_move(t, opp, child.left[opp], |r| their_best = their_best.max(child.longest_after(opp, &t.placements[r as usize])));
+            let mut my_next = child.longest[me] as u32;
+            child.for_each_move(t, me, child.left[me], |r| my_next = my_next.max(child.longest_after(me, &t.placements[r as usize])));
+            // growth room of each side's longest snake alone
+            let long_ends = |player: usize| -> u32 {
+                let mut best = 0u128;
+                for j in 0..child.nsnakes[player] as usize {
+                    if count(child.snakes[player][j]) == child.longest[player] as u32 {
+                        best = child.snakes[player][j];
+                    }
+                }
+                let s = shape_of(child.cells[player]);
+                count(neighbours(best & s.ends) & empty & !neighbours(s.body))
+            };
+            let my_long_ends = long_ends(me);
+            let their_long_ends = long_ends(opp);
+            // can they still reach the length we have now (a cheap look at how alive they are)?
+            let mut work = 2000u32;
+            let their_reach = can_reach_alone(t, &child, opp, child.longest[me] as i32 + 1, &mut work) as u8;
             solver.clear();
             let v = solver.solve(&child, -1, 0, cap);
             let win = if v == UNKNOWN {
@@ -84,8 +105,8 @@ pub fn root_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
                 "0"
             };
             println!(
-                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-                i, m, p.piece, p.n, grows as u8, joined, gain, lead, is_front as u8, touch as u8, my_up, their_up, their_up_before, their_moves, my_moves, replies, my_ends, their_ends, score, win, solver.nodes
+                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                i, m, p.piece, p.n, grows as u8, joined, gain, lead, is_front as u8, touch as u8, my_up, their_up, their_up_before, their_moves, my_moves, replies, my_ends, their_ends, their_best, my_next, my_long_ends, their_long_ends, their_reach, score, win, solver.nodes
             );
         }
     }
