@@ -156,6 +156,30 @@ impl Pos {
         self.ply += 1;
     }
 
+    /// Adds a placement of `player` without passing the turn; returns the snake it is now part of.
+    /// For one-player look-ahead: the hash, the ply and the side to move are left alone.
+    #[inline]
+    pub fn place_for(&mut self, t: &Tables, player: usize, m: u16) -> BB {
+        let p = &t.placements[m as usize];
+        self.cells[player] |= p.cells;
+        self.left[player] &= !(1u8 << p.piece);
+        let mut joined = p.cells;
+        let mut kept = 0;
+        for j in 0..self.nsnakes[player] as usize {
+            let s = self.snakes[player][j];
+            if s & p.border != 0 {
+                joined |= s;
+            } else {
+                self.snakes[player][kept] = s;
+                kept += 1;
+            }
+        }
+        self.snakes[player][kept] = joined;
+        self.nsnakes[player] = (kept + 1) as u8;
+        self.longest[player] = self.longest[player].max(count(joined) as u8);
+        joined
+    }
+
     /// The longest snake of `player` if it placed p now.
     #[inline]
     pub fn longest_after(&self, player: usize, p: &Placement) -> u32 {
@@ -234,6 +258,38 @@ impl Pos {
                 }
             }
         }
+    }
+
+    /// Calls f for legal placements of `player`, largest pieces first, until f returns true.
+    /// With `touching` != 0 only placements that touch those own cells are produced.
+    #[inline]
+    pub fn find_move<F: FnMut(u16) -> bool>(&self, t: &Tables, player: usize, pieces: u8, touching: BB, mut f: F) -> bool {
+        if pieces == 0 {
+            return false;
+        }
+        let mut g = self.gen_ctx(player);
+        if touching != 0 {
+            g.free_new = 0;
+            g.next_own &= neighbours(touching);
+            if g.next_own == 0 {
+                return false;
+            }
+        }
+        for piece in (0..NPIECES).rev() {
+            if pieces >> piece & 1 == 0 {
+                continue;
+            }
+            for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
+                let mut anchors = legal_anchors(o, &g);
+                while anchors != 0 {
+                    if f(o.placement_at[first(anchors)] as u16) {
+                        return true;
+                    }
+                    anchors &= anchors - 1;
+                }
+            }
+        }
+        false
     }
 
     pub fn moves(&self, t: &Tables, out: &mut Vec<u16>) {

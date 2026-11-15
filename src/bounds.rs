@@ -129,6 +129,123 @@ pub fn upper_bound_ex(t: &Tables, pos: &Pos, player: usize, blocked: BB, mut rec
     upper
 }
 
+/// Can `player` still build a snake of at least `target` cells? The opponent is frozen: its moves
+/// only take placements away, so false is a proof for the real game too. `work` is the number of
+/// positions the search may still look at; when it runs out the answer is true (no proof).
+///
+/// Why extending one snake is enough: the final snake is connected, so its new pieces can be put in
+/// an order in which each touches what is already there (an old snake of it, or else the piece that
+/// was placed first in the game). Each such placement is legal now if it was legal in the game: the
+/// own cells around it are a subset of the final ones, and fewer tiles are in its way.
+pub fn can_reach(t: &Tables, pos: &Pos, player: usize, target: i32, cl: &Clusters, work: &mut u32) -> bool {
+    if pos.longest[player] as i32 >= target {
+        return true;
+    }
+    // the first piece goes into a cluster that could hold such a snake
+    let mut good: BB = 0;
+    if cl.overflow {
+        good = ALL;
+    } else {
+        for i in 0..cl.n {
+            if cl.upper[i] >= target {
+                good |= cl.cells[i];
+            }
+        }
+    }
+    good != 0 && reach_from(t, pos, player, target, 0, good, work)
+}
+
+/// The same with the clusters computed here.
+pub fn can_reach_alone(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32) -> bool {
+    let mut cl = Clusters::new();
+    upper_bound_ex(t, pos, player, 0, Some(&mut cl));
+    can_reach(t, pos, player, target, &cl, work)
+}
+
+/// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.
+fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good: BB, work: &mut u32) -> bool {
+    if *work == 0 {
+        return true;
+    }
+    *work -= 1;
+    let left = pos.left[player];
+    let ns = pos.nsnakes[player] as usize;
+    let mut len_of = [0i32; MAX_SNAKES];
+    for j in 0..ns {
+        len_of[j] = count(pos.snakes[player][j]) as i32;
+    }
+    let pieces = left.count_ones() as usize;
+    if pieces == 1 {
+        // the last piece: one look at its placements
+        return pos.find_move(t, player, left, snake, |m| {
+            let p = &t.placements[m as usize];
+            if snake == 0 && p.cells & good == 0 {
+                return false;
+            }
+            let mut len = p.n as i32;
+            for j in 0..ns {
+                if pos.snakes[player][j] & p.border != 0 {
+                    len += len_of[j];
+                }
+            }
+            len >= target
+        });
+    }
+    let mut rem = 0i32;
+    for p in 0..NPIECES {
+        if left >> p & 1 == 1 {
+            rem += PIECE_SIZE[p] as i32;
+        }
+    }
+    // A piece is a path: one end touches the snake being built, so it joins at most one more old
+    // snake. extra[r]: the most that r further pieces can add in old snakes.
+    let mut sorted = len_of;
+    sorted[..ns].sort_unstable_by(|a, b| b.cmp(a));
+    let mut extra = [0i32; MAX_SNAKES + 1];
+    for j in 0..ns {
+        extra[j + 1] = extra[j] + sorted[j];
+    }
+    pos.find_move(t, player, left, snake, |m| {
+        let p = &t.placements[m as usize];
+        if snake == 0 && p.cells & good == 0 {
+            return false;
+        }
+        let mut len = p.n as i32;
+        for j in 0..ns {
+            if pos.snakes[player][j] & p.border != 0 {
+                len += len_of[j];
+            }
+        }
+        if len >= target {
+            return true;
+        }
+        let later = pieces - 1;
+        if len + rem - p.n as i32 + extra[later.min(ns)] < target {
+            return false;
+        }
+        let mut child = *pos;
+        let joined = child.place_for(t, player, m);
+        if later > 1 && upper_bound(t, &child, player) < target {
+            return false;
+        }
+        reach_from(t, &child, player, target, joined, 0, work)
+    })
+}
+
+/// The longest snake `player` could build with the opponent frozen, by trying every sequence of
+/// placements. Slow; `verify` checks can_reach against it.
+pub fn one_player_optimum(t: &Tables, pos: &Pos, player: usize) -> i32 {
+    let mut best = pos.longest[player] as i32;
+    let mut moves = Vec::new();
+    pos.for_each_move(t, player, pos.left[player], |m| moves.push(m));
+    for m in moves {
+        let mut child = *pos;
+        child.place_for(t, player, m);
+        best = best.max(one_player_optimum(t, &child, player));
+    }
+    best
+}
+
 #[inline]
 pub fn bounds(t: &Tables, pos: &Pos, player: usize) -> Bounds {
     Bounds { lower: pos.longest[player] as i32, upper: upper_bound(t, pos, player) }

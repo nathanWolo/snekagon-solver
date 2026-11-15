@@ -74,3 +74,81 @@ test decided, (confirm) fixed length on fresh units.
   4.30 M nodes, of which 2 pieces left: 2.06 M, 3: 1.51 M, 4: 0.44 M, 5: 0.26 M. Nodes with two pieces
   left are now half of the tree, so a closed form or a tighter bound there (E3) is the next pot, and
   the cost of a node (E7) is worth more than before.
+- **Where v2 stands at ply 5** (tune, first 20 positions of `ply05`): 37.9 M nodes, 28.1 s: 1.9 M nodes
+  and 1.4 s a position. The reference reports about 0.18 M nodes and 0.54 s a position on its ply-5
+  bench units (its machine). By pieces left: 2: 21.9 M (the closed-form leaves), 3: 7.3 M, 4: 6.9 M,
+  5: 1.05 M, 6: 0.73 M. The side that must be refuted searches 6.6 moves a node at five pieces left
+  and 3 at three; the winner's nodes search 1.0 to 1.4.
+
+## 2026-11-14 E5: proof-number search (df-pn)
+
+- **Hypothesis** (written before the run): the tree is very uneven. The winner needs one move a node
+  and the loser, after threat zones, a handful. Depth-first proof-number search walks to the child that
+  is cheapest to refute, and with threat zones the number of replies a move leaves is exactly that
+  cost, so it should find the forcing lines that alpha-beta finds only when its static order happens to
+  put them first. Same node logic as v2 (game over, last pieces, length bounds, threat zones), two
+  questions a position ("does the mover win", then "does the opponent win"), its own table.
+  Expected: unknown sign at ply 7 (shallow trees, re-expansion costs); a gain that grows with depth if
+  the idea is right. The owner asked for a fast proof-number search by name.
+- **Risks:** a node is expanded again each time the search returns to it; wide winner's nodes get one
+  expansion per child before the search commits; proof numbers over-count in a graph with many
+  transpositions.
+- **Test:** flag `--pn` (off = v2, untouched). Labels on plies 9-11 first. Screen on ply 7 and ply 6
+  tune against v2; tune the two knobs (threshold slack, start numbers by move rank) on tune units only;
+  gate once on ply 6 (the harder file, because the question is what helps deep positions) with
+  `SPRT[0, 0.05]`; scaling check on ply 5 tune.
+- **First version (tune only):** correct on all 12,000 positions of plies 9-11 and the first 100 of
+  ply 7, and far slower than v2: 66.7 M nodes and 151 s against 4.3 M and 2.35 s on those 100. Every
+  child of a wide node is expanded once before the search commits, and a node is expanded again on
+  every return. Threshold slack is the big knob: with the child's delta threshold at twice the
+  second-best (`--pn-slack 1`) the first 30 positions take 9.0 M nodes against 52.5 M; start numbers by
+  move rank help a little (6.6 M). Alpha-beta: 1.76 M. Not gated; set aside for the two measurements
+  below, to be resumed as a hybrid (proof numbers above, alpha-beta below).
+
+## 2026-11-15 Pot sizing: where can the nodes go?
+
+- **Ordering oracle** (tune; `--oracle` solves each position twice, the second time trying the first
+  solve's best move first where the table still has it): ply 7 (100 positions) 4.30 M to 2.81 M nodes;
+  ply 6 (30) 5.96 M to 1.96 M; ply 5 (10) 15.1 M to 8.9 M. So better ordering is worth 1.5-3x here.
+- **Where the nodes are** (ply 5 profile above): 98% at five pieces left or fewer. A node with five
+  pieces left roots about 36 nodes, one with six about 51.
+- **Reading:** the reference's 10x lead in nodes at ply 5 cannot come from ordering alone; it has to
+  come from deciding nodes with five pieces left or fewer without searching them. E3 before E4.
+
+## 2026-11-15 E3: can the mover still reach the length it needs?
+
+- **Hypothesis** (written before the run): the cluster bound is loose near the end: it assumes every
+  snake of a cluster joins and every remaining piece fits. A snake grows only at its two ends, so
+  whether a player can still reach a length T is a small one-player search: place pieces that extend
+  one snake, with the opponent frozen (its moves only take placements away, so "cannot reach T even
+  alone" is a proof). At a node with at most five pieces left, before generating moves: if the mover
+  cannot reach the opponent's present length (plus one when a draw is not enough), the node fails low.
+  Expected: most loser-to-move nodes near the end are decided without a search; 2x or more fewer
+  nodes at ply 7, more at ply 5, at a cost of some microseconds a test.
+- **Risk:** the test costs as much as tens of nodes; it pays only if it cuts often.
+- **Test:** flag `--no-reach` restores v2 (identity). `verify` gains a check: along random games no
+  player ever reaches a length the test called unreachable earlier. Screen on ply 7 and ply 6 tune for
+  the piece limit and the work limit, gate `E3` on ply 6, scaling check on ply 5.
+- **Check built instead of the one planned:** `verify` compares the test, with no work limit, against
+  the best of every sequence of placements (hands of up to three pieces), for every target from the
+  present length to the optimum plus two. That is exact, where the planned check was only one-sided.
+  `verify 300 11`: 8,666 such checks pass.
+- **First version (tune):** the test for both players at five pieces left or fewer: nodes 4.30 M to
+  2.36 M on the first 100 ply-7 positions, time 2.36 s to 2.72 s. Slower: 1.14 M tests at about 1.2
+  microseconds, 41% deciding. By kind: the opponent's test with one piece in its hand decides 60%; a
+  hand of three pieces decides 10%.
+- **Second version (tune):** stop at the first placement that reaches the target, try the largest
+  pieces first, generate only placements that touch the snake being built, reuse the node's clusters,
+  and test a player only when it holds at most two pieces (at any depth). Ply 7, 100 positions: 2.40 M
+  nodes, 1.82 s. Ply 6, 60 positions: 5.17 M nodes and 4.18 s against 10.29 M and 5.93 s. Hands of
+  three: 4.82 M nodes but 4.46 s. Work limit 50 / 200 / 1000: 4.20 / 4.18 / 4.34 s. Kept: two pieces, 200.
+- **Identity:** `--no-reach` gives 4,301,306 nodes on the first 100 ply-7 positions, as v2 does.
+- **Correctness:** labels equal on all 12,000 positions of plies 9-11 and the first 1,000 of ply 8.
+- **Gate `E3`** (ply 6, gate units 38-67, `SPRT[0, 0.05]`): PASS at unit 30, LLR +11.6. Where it stopped:
+  +31.4% [+23.3%, +40.1%] (gate); total time 20.74 s against 27.74 s (0.75x); nodes 0.52x.
+- **Scaling check `E3-UP`** (ply 5, tune units 0-2): 31.6 s against 47.9 s (0.66x); nodes 0.38x.
+- **Verdict:** accepted. Frozen as v3.
+- **What it taught:** a bound has to be priced. The same idea lost time in its first form and won 25-34%
+  once a test cost a fraction of a microsecond. After E3 the first 100 ply-7 positions have 16 k nodes
+  with six pieces left and 261 k with five: the side being refuted at six pieces left still tries 16
+  moves a node. That is the next pot: more threats (so smaller zones) or better refutation order.

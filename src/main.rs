@@ -2,12 +2,14 @@ mod bounds;
 mod geom;
 mod naive;
 mod pieces;
+mod pns;
 mod pos;
 mod solver;
 
 use geom::*;
 use pieces::*;
 use pos::*;
+use pns::*;
 use solver::*;
 use std::io::Write;
 use std::time::Instant;
@@ -50,7 +52,7 @@ fn perft(t: &Tables, pos: &Pos, depth: u32) -> u64 {
 /// Random games; at every position the fast code is compared with the naive rules.
 fn verify(t: &Tables, games: usize, seed: u64) {
     let mut rng = Rng(seed);
-    let (mut positions, mut placements_checked, mut threat_checks) = (0u64, 0u64, 0u64);
+    let (mut positions, mut placements_checked, mut threat_checks, mut reach_checks) = (0u64, 0u64, 0u64, 0u64);
     let mut moves = Vec::new();
     for _ in 0..games {
         let mut pos = Pos::initial();
@@ -107,6 +109,19 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                     threat_checks += 1;
                 }
             }
+            // the reach test against every sequence of placements, where that is affordable
+            for player in 0..2 {
+                let k = pos.left[player].count_ones();
+                if k == 0 || k > 3 || (k == 3 && rng.below(40) != 0) || (k == 2 && rng.below(3) != 0) {
+                    continue;
+                }
+                let optimum = bounds::one_player_optimum(t, &pos, player);
+                for target in pos.longest[player] as i32 + 1..=optimum + 2 {
+                    let mut work = u32::MAX;
+                    assert_eq!(bounds::can_reach_alone(t, &pos, player, target, &mut work), target <= optimum, "reach test wrong for {} at {}", target, pos.to_text());
+                    reach_checks += 1;
+                }
+            }
             positions += 1;
             let m = if moves.is_empty() { PASS } else { moves[rng.below(moves.len())] };
             pos.play(t, m);
@@ -115,7 +130,7 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             assert!(pos.longest[player] as i32 <= prev_upper[player], "final snake above the bound");
         }
     }
-    println!("verify ok: {} games, {} positions, {} placement checks, {} threat-bound checks", games, positions, placements_checked, threat_checks);
+    println!("verify ok: {} games, {} positions, {} placement checks, {} threat-bound checks, {} reach checks", games, positions, placements_checked, threat_checks, reach_checks);
 }
 
 struct Opts {
@@ -125,11 +140,14 @@ struct Opts {
     to: usize,
     quiet: bool,
     profile: bool,
+    pn: bool,
+    oracle: bool,
+    pn_cfg: PnConfig,
     rest: Vec<String>,
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, oracle: false, pn_cfg: PnConfig::default(), rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -141,6 +159,14 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-bounds" => o.cfg.bounds = false,
             "--no-last" => o.cfg.last_pieces = false,
             "--no-threats" => o.cfg.threats = false,
+            "--no-reach" => o.cfg.reach = false,
+            "--reach-hand" => o.cfg.reach_hand = val().parse().unwrap(),
+            "--reach-work" => o.cfg.reach_work = val().parse().unwrap(),
+            "--pn" => o.pn = true,
+            "--oracle" => o.oracle = true,
+            "--pn-slack" => o.pn_cfg.slack = val().parse().unwrap(),
+            "--pn-rank" => o.pn_cfg.rank_div = val().parse().unwrap(),
+            "--pn-tt" => o.pn_cfg.tt_bits = val().parse().unwrap(),
             "--tt" => o.cfg.tt_bits = val().parse().unwrap(),
             "--nodes" => o.nodes = val().parse().unwrap(),
             "--from" => o.from = val().parse().unwrap(),
@@ -159,8 +185,10 @@ fn parse_opts(args: &[String]) -> Opts {
 fn bench(t: &Tables, o: &Opts) {
     let path = &o.rest[0];
     let text = std::fs::read_to_string(path).expect("cannot read the position file");
-    let mut solver = Solver::new(o.cfg);
+    let mut solver = Solver::new(if o.pn { Config { tt_bits: 4, ..o.cfg } } else { o.cfg });
+    let mut pn = if o.pn { Some(PnSolver::new(o.pn_cfg, o.cfg)) } else { None };
     let (mut total_nodes, mut total_us, mut wrong, mut unknown, mut n) = (0u64, 0u128, 0u32, 0u32, 0u32);
+    let mut oracle_first = 0u64;
     let out = std::io::stdout();
     let mut out = out.lock();
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
@@ -170,9 +198,29 @@ fn bench(t: &Tables, o: &Opts) {
         let (expected, rest) = line.trim().split_once(char::is_whitespace).expect("line needs an expected value and a position");
         let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
         solver.clear();
+        if let Some(p) = pn.as_mut() {
+            p.clear();
+        }
         let start = Instant::now();
-        let v = solver.solve(&pos, -1, 1, o.nodes);
+        let v = match pn.as_mut() {
+            Some(p) => p.solve(&pos, o.nodes),
+            None => solver.solve(&pos, -1, 1, o.nodes),
+        };
+        if o.oracle && pn.is_none() {
+            // measurement: solve again with the first solve's best moves as the first moves
+            let first = solver.nodes;
+            solver.clear();
+            solver.hint = true;
+            let v2 = solver.solve(&pos, -1, 1, o.nodes);
+            solver.hint = false;
+            assert!(v2 == v);
+            oracle_first += first;
+        }
         let us = start.elapsed().as_micros();
+        let nodes = match pn.as_ref() {
+            Some(p) => p.nodes,
+            None => solver.nodes,
+        };
         let ok = if v == UNKNOWN {
             unknown += 1;
             "unknown"
@@ -182,16 +230,21 @@ fn bench(t: &Tables, o: &Opts) {
             wrong += 1;
             "WRONG"
         };
-        total_nodes += solver.nodes;
+        total_nodes += nodes;
         total_us += us;
         n += 1;
         if !o.quiet {
-            writeln!(out, "{} {} {} {} {} {} {}", i, pos.ply, expected, v, solver.nodes, us, ok).unwrap();
+            writeln!(out, "{} {} {} {} {} {} {}", i, pos.ply, expected, v, nodes, us, ok).unwrap();
         }
     }
     writeln!(out, "# positions {} nodes {} seconds {:.3} wrong {} unknown {}", n, total_nodes, total_us as f64 / 1e6, wrong, unknown).unwrap();
+    if o.oracle {
+        writeln!(out, "# oracle: first solve {} nodes, second solve (reported above) with its best moves first", oracle_first).unwrap();
+    }
     if o.profile {
         writeln!(out, "# nodes by pieces left: {:?}", solver.by_left).unwrap();
+        writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
+        writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
     }
     if wrong > 0 {
         std::process::exit(1);
@@ -237,7 +290,7 @@ fn main() {
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
-            println!("options: --no-bounds --no-last --no-threats --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
+            println!("options: --pn --pn-slack N --pn-rank N --pn-tt BITS --no-bounds --no-last --no-threats --no-reach --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }

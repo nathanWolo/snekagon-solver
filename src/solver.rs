@@ -15,13 +15,19 @@ pub struct Config {
     pub last_pieces: bool,
     /// Skip moves that leave a deciding opponent placement playable.
     pub threats: bool,
+    /// Near the end, ask whether each side can still reach the length it needs.
+    pub reach: bool,
+    /// The reach test is run for a player with at most this many pieces in hand.
+    pub reach_hand: u32,
+    /// Positions one reach test may look at before it gives up.
+    pub reach_work: u32,
     /// log2 of the number of table entries.
     pub tt_bits: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, tt_bits: 22 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, tt_bits: 22 }
     }
 }
 
@@ -44,8 +50,8 @@ const NO_BOUND: i32 = 2;
 
 /// Opponent placements that would decide the game by the bounds if played now. A move of ours that
 /// covers no cell of a threat's zone leaves it playable and is worth at most the threat's value.
-struct Threats {
-    n: usize,
+pub(crate) struct Threats {
+    pub(crate) n: usize,
     zone: [BB; MAX_THREATS],
     value: [i32; MAX_THREATS],
     tried: [u16; MAX_TRIED],
@@ -53,12 +59,12 @@ struct Threats {
 }
 
 impl Threats {
-    fn new() -> Threats {
+    pub(crate) fn new() -> Threats {
         Threats { n: 0, zone: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0 }
     }
     /// Upper bound on our value for a move covering `cells`.
     #[inline]
-    fn bound_for(&self, cells: BB) -> i32 {
+    pub(crate) fn bound_for(&self, cells: BB) -> i32 {
         let mut b = NO_BOUND;
         for i in 0..self.n {
             if cells & self.zone[i] == 0 && self.value[i] < b {
@@ -84,7 +90,7 @@ const KILLER1: u64 = 1 << 29;
 const KILLER2: u64 = 1 << 28;
 
 pub struct Solver {
-    t: &'static Tables,
+    pub(crate) t: &'static Tables,
     pub cfg: Config,
     tt: Vec<[Entry; 2]>,
     mask: usize,
@@ -92,8 +98,12 @@ pub struct Solver {
     pub nodes: u64,
     /// Nodes by the number of pieces both players still hold (a profile, not used by the search).
     pub by_left: [u64; 16],
+    /// Reach tests by kind (0 the mover, 1 the opponent) and pieces left: [tests, decided].
+    pub reach_by: [[[u64; 2]; 16]; 2],
     node_limit: u64,
     aborted: bool,
+    /// Measurement only: take the first move from the previous solve's table entries.
+    pub hint: bool,
     killers: [[u16; 2]; MAX_PLY],
     bufs: Vec<Vec<u64>>,
     replies: Vec<(u32, BB)>,
@@ -118,8 +128,10 @@ impl Solver {
             gen: 1,
             nodes: 0,
             by_left: [0; 16],
+            reach_by: [[[0; 2]; 16]; 2],
             node_limit: u64::MAX,
             aborted: false,
+            hint: false,
             killers: [[PASS; 2]; MAX_PLY],
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
             replies: Vec::with_capacity(1024),
@@ -186,7 +198,7 @@ impl Solver {
     /// The exact value when each player has at most one piece left: the mover places its piece (or
     /// passes), then the opponent takes its longest extension that is still legal. A placement only
     /// takes opponent placements away (the cells it covers, and new snakes that would now touch it).
-    fn last_pieces(&mut self, pos: &Pos) -> i32 {
+    pub(crate) fn last_pieces(&mut self, pos: &Pos) -> i32 {
         let t = self.t;
         let me = pos.stm as usize;
         let opp = me ^ 1;
@@ -266,7 +278,7 @@ impl Solver {
     /// Adds every opponent placement after which our value is at most alpha by the bounds.
     /// `mine`: our clusters. A placement lowers our bound only inside the clusters it covers, so it
     /// has to cover every cluster whose bound is too high: the cheap test before the exact one.
-    fn scan_threats(&self, pos: &Pos, mine: &Clusters, alpha: i32, th: &mut Threats) {
+    pub(crate) fn scan_threats(&self, pos: &Pos, mine: &Clusters, alpha: i32, th: &mut Threats) {
         let t = self.t;
         let me = pos.stm as usize;
         let opp = me ^ 1;
@@ -380,13 +392,26 @@ impl Solver {
             if hi <= alpha {
                 return hi;
             }
+        } else if self.hint {
+            let b = &self.tt[(pos.hash as usize) & self.mask];
+            let before = self.gen.wrapping_sub(1);
+            if b[0].key == pos.hash && b[0].gen == before {
+                tt_move = b[0].mv;
+            } else if b[1].key == pos.hash && b[1].gen == before {
+                tt_move = b[1].mv;
+            }
         }
 
         // 2. the snake-length bounds
         let mut my_clusters = Clusters::new();
+        let mut their_clusters = Clusters::new();
+        let reach_on = self.cfg.reach && self.cfg.bounds;
+        let test_me = reach_on && pos.left[me].count_ones() <= self.cfg.reach_hand;
+        let test_them = reach_on && pos.left[opp].count_ones() <= self.cfg.reach_hand;
         if self.cfg.bounds {
             let mine = Bounds { lower: pos.longest[me] as i32, upper: upper_bound_ex(t, pos, me, 0, Some(&mut my_clusters)) };
-            let theirs = bounds(t, pos, opp);
+            let rec = if test_them { Some(&mut their_clusters) } else { None };
+            let theirs = Bounds { lower: pos.longest[opp] as i32, upper: upper_bound_ex(t, pos, opp, 0, rec) };
             let blo = if mine.lower > theirs.upper {
                 1
             } else if mine.lower >= theirs.upper {
@@ -412,6 +437,35 @@ impl Solver {
         }
         alpha = alpha.max(lo);
         beta = beta.min(hi);
+
+        // 2b. near the end: can each side still reach the length it needs, even unopposed?
+        if test_me || test_them {
+            let mine_now = pos.longest[me] as i32;
+            let theirs_now = pos.longest[opp] as i32;
+            let total = (pos.left[me].count_ones() + pos.left[opp].count_ones()) as usize;
+            // to score above alpha the mover must end at least this long
+            let need = theirs_now + if alpha >= 0 { 1 } else { 0 };
+            if test_me && mine_now < need {
+                let mut work = self.cfg.reach_work;
+                self.reach_by[0][total][0] += 1;
+                if !can_reach(t, pos, me, need, &my_clusters, &mut work) {
+                    self.reach_by[0][total][1] += 1;
+                    self.store(pos.hash, lo, alpha, PASS, 1);
+                    return alpha;
+                }
+            }
+            // to hold the mover below beta the opponent must end at least this long
+            let need = mine_now + if beta <= 0 { 1 } else { 0 };
+            if test_them && theirs_now < need {
+                let mut work = self.cfg.reach_work;
+                self.reach_by[1][total][0] += 1;
+                if !can_reach(t, pos, opp, need, &their_clusters, &mut work) {
+                    self.reach_by[1][total][1] += 1;
+                    self.store(pos.hash, beta, hi, PASS, 1);
+                    return beta;
+                }
+            }
+        }
         let (alpha0, beta0) = (alpha, beta);
 
         // 3. threats: the opponent's refutations one ply down are the natural candidates
