@@ -1229,3 +1229,34 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
 - **Test:** screen on proof positions 0-23, three runs an arm, interleaved, one thread, under
   the lock. Gate on fresh proof units through `tools/run.py --set proof4` if the screen shows
   2% or more. **Bar:** `SPRT[0, 0.05]`, wrong values 0, node counts identical.
+
+## 2026-11-15 E24 result: sixteen single-thread workers beat one job of sixteen threads, unevenly
+
+- **Reserved jobs g to j** (`frozen/climb-base.exe`, one run each, every run under the lock;
+  seconds of wall-clock; `work/e24c/`):
+
+  | Job | One job of 16 threads | 16 workers, depth 1 | 16 workers, depth 2 | Beside it |
+  | --- | --- | --- | --- | --- |
+  | g | 92.4 | 82.6 | 102.5 | nothing |
+  | h | 98.4 | 96.2 | 87.3 | nothing |
+  | i | 127.6 | 114.6 | 108.5 | the build-tools installer, from the second run on |
+  | j | 126.0 | 121.0 | 93.9 | the installer (first run), two compiles of mine (the others) |
+
+- **Clean jobs only** (a, b, c from the first batch, g, h): one job of 16 threads 429.0 s;
+  16 workers at depth 1 379.7 s (0.89x); at depth 2 363.8 s (0.85x). With i and j: 682.6,
+  615.3 (0.90x), 566.2 (0.83x).
+- **By job the ratio runs from 0.52x to 1.11x.** The bar of the hypothesis (10% on each job) is
+  not met; on the total both settings are 10-17% ahead of the shared-table job. Depth 1
+  against depth 2 is not decided: they trade places from job to job (g: 82.6 against 102.5; c:
+  78.0 against 45.5), and one run a job cannot tell the setting from the run. Depth 2 throws
+  work away (55 to 152 jobs stopped a solve), depth 1 none.
+- **Verdict:** a long proof should use single-thread workers, not the shared table (this is what
+  the paused proof used: `--job-threads 16`). Which depth, and whether the spread between jobs
+  can be removed (work thrown away, workers idle at the end of a root), is the driver agent's
+  question. Not known yet: how much two runs of the same setting differ; that A/A read comes
+  before the driver's gate.
+- **Mistake, twice:** timed runs with something beside them. The installer was started outside
+  the lock because the owner was waiting for its prompt (right call, known cost); my two
+  compiles during job j were not needed then. Compiles are allowed beside one-thread timings;
+  beside a 16-thread timing they take a sixteenth of the machine. Rule from here: no compile
+  while a `prove` timing of mine is running.
