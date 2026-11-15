@@ -450,13 +450,17 @@ pub fn new_anchors(o: &Orientation, g: &Gen) -> BB {
 /// The anchor cells where orientation `o` grows an own snake.
 #[inline(always)]
 pub fn grow_anchors(o: &Orientation, g: &Gen) -> BB {
-    let mut grow = g.allowed[o.inner[0] as usize];
     let mut touch = g.next_own;
     for k in 1..o.size as usize {
-        grow &= (g.allowed[o.inner[k] as usize] & o.win[k]) >> o.shift[k];
         touch |= (g.next_own & o.win[k]) >> o.shift[k];
     }
-    grow &= touch;
+    let mut grow = g.allowed[o.inner[0] as usize] & touch;
+    for k in 1..o.size as usize {
+        if grow == 0 {
+            return 0;
+        }
+        grow &= (g.allowed[o.inner[k] as usize] & o.win[k]) >> o.shift[k];
+    }
     if grow != 0 {
         for &(q, r) in &o.wedge {
             grow &= !shift_in(g.own, q, r);
