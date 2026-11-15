@@ -98,11 +98,12 @@ struct Opts {
     from: usize,
     to: usize,
     quiet: bool,
+    profile: bool,
     rest: Vec<String>,
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -117,6 +118,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--from" => o.from = val().parse().unwrap(),
             "--to" => o.to = val().parse().unwrap(),
             "--quiet" => o.quiet = true,
+            "--profile" => o.profile = true,
             _ => o.rest.push(a.to_string()),
         }
         i += 1;
@@ -160,6 +162,9 @@ fn bench(t: &Tables, o: &Opts) {
         }
     }
     writeln!(out, "# positions {} nodes {} seconds {:.3} wrong {} unknown {}", n, total_nodes, total_us as f64 / 1e6, wrong, unknown).unwrap();
+    if o.profile {
+        writeln!(out, "# nodes by pieces left: {:?}", solver.by_left).unwrap();
+    }
     if wrong > 0 {
         std::process::exit(1);
     }

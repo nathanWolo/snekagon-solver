@@ -45,6 +45,8 @@ pub struct Solver {
     mask: usize,
     gen: u8,
     pub nodes: u64,
+    /// Nodes by the number of pieces both players still hold (a profile, not used by the search).
+    pub by_left: [u64; 16],
     node_limit: u64,
     aborted: bool,
     killers: [[u16; 2]; MAX_PLY],
@@ -69,6 +71,7 @@ impl Solver {
             mask: buckets - 1,
             gen: 1,
             nodes: 0,
+            by_left: [0; 16],
             node_limit: u64::MAX,
             aborted: false,
             killers: [[PASS; 2]; MAX_PLY],
@@ -139,6 +142,7 @@ impl Solver {
             self.aborted = true;
             return 0;
         }
+        self.by_left[((pos.left[0].count_ones() + pos.left[1].count_ones()) as usize).min(15)] += 1;
         if pos.is_over() {
             return game_result(pos);
         }
