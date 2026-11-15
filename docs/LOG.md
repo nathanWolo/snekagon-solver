@@ -1424,3 +1424,16 @@ that branch). Four pots, ranked:
   (5-6 left). Expected: the node gain of 0.55x turned into 0.7x time or better on proof
   positions. An Opus agent has it (branch `climb/threats`, from `climb/search-pf` with
   `parallel-v9` merged). The rule gets its own independent check before any gate.
+
+## 2026-11-15 Second batch of agents (all Opus)
+
+- **`climb/threats` (E29):** make reach threats pay, on top of the search branch.
+- **`climb/order` (study, nothing ships):** how much of the wrong-move pot a learned order can
+  get on positions it has not seen, at 7 and at 5 pieces left, with reach threats on and off,
+  and what it may cost per node. This is the owner's GPU question turned into a measurement.
+  Data rule set in the brief: 24 of the 74 parents of the proof benchmark are never looked
+  at, so that a later gate of a learned order can use positions whose parents were not in
+  training.
+- **`climb/verify`:** independent check of the search branch's eight changes (reasoning, and
+  old and new code run side by side).
+- **Still out from the first batch:** `climb/driver`.
