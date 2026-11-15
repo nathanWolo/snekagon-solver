@@ -154,6 +154,7 @@ struct Opts {
     out: Option<String>,
     plain: bool,
     upper_first: bool,
+    wide: bool,
     /// `bench`: the window every position is searched with (one thread).
     window: (i32, i32),
     /// `bench`: only positions with this label.
@@ -162,7 +163,7 @@ struct Opts {
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, window: (-1, 1), only: None, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, window: (-1, 1), only: None, rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -196,6 +197,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--out" => o.out = Some(val()),
             "--plain" => o.plain = true,
             "--upper-first" => o.upper_first = true,
+            "--wide" => o.wide = true,
             "--window" => {
                 let v = val();
                 let (a, b) = v.split_once(',').expect("--window A,B");
@@ -227,7 +229,7 @@ fn parse_opts(args: &[String]) -> Opts {
 fn prove_cmd(t: &Tables, o: &Opts) {
     let path = &o.rest[0];
     let text = std::fs::read_to_string(path).expect("cannot read the position file");
-    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first });
+    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first, wide: o.wide });
     let (mut total_nodes, mut total_us, mut wrong, mut n) = (0u64, 0u128, 0u32, 0u32);
     let (mut jobs, mut stopped, mut thread_s) = (0u64, 0u64, 0f64);
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {

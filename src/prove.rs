@@ -45,6 +45,10 @@ pub struct ProveCfg {
     pub plain: bool,
     /// Ask "can the mover win" before "can the mover at least draw".
     pub upper_first: bool,
+    /// One search with the full window instead of the two questions. A node whose window is wide
+    /// has one move under way at a time, so no move is searched with a window that has since moved.
+    /// Cheaper for a drawn position (LOG, the window study); the workers are idle more.
+    pub wide: bool,
 }
 
 pub struct ProveResult {
@@ -80,6 +84,7 @@ const ROOT: usize = 0;
 /// from it. So a search begins with the killers of the positions next to it, as in one thread.
 type Killers = [[u16; 2]; MAX_PLY];
 const MAX_BUDGET: u32 = 40;
+const NEVER: u32 = 1000;
 /// Jobs smaller than this many nodes are not kept.
 const MIN_RECORD: u64 = 2000;
 
@@ -292,6 +297,9 @@ impl<'a> Driver<'a> {
     /// What it costs to work on a move of node `n` that has `ahead` moves under way before it.
     fn cost(&self, n: usize, ahead: usize) -> u32 {
         let node = &self.nodes[n];
+        if ahead > 0 && node.beta - node.alpha > 1 {
+            return NEVER; // a wide window: the next move waits for this one's value
+        }
         if self.c.plain {
             // plain young-brothers-wait: the first move alone, then any number
             return if ahead == 0 || node.finished >= 1 { 0 } else { 99 };
@@ -512,8 +520,8 @@ impl<'a> Driver<'a> {
         }
     }
 
-    /// One pass: the value of `root` within the window (alpha, beta), beta = alpha + 1. With a window
-    /// this narrow no node's window moves while its moves are under way.
+    /// One pass: the value of `root` within the window (alpha, beta). With beta = alpha + 1 no
+    /// node's window moves while its moves are under way; with a wider one, `cost` sees to that.
     fn pass(&mut self, root: &Pos, alpha: i32, beta: i32, queue: &Queue, rx: &mpsc::Receiver<Done>) -> (i32, u16) {
         self.nodes.clear();
         self.free.clear();
@@ -710,8 +718,14 @@ impl Prover {
                 });
             }
             drop(tx);
-            let passes = if c.upper_first { [(0, 1), (-1, 0)] } else { [(-1, 0), (0, 1)] };
-            for (a, b) in passes {
+            let passes: &[(i32, i32)] = if c.wide {
+                &[(-1, 1)]
+            } else if c.upper_first {
+                &[(0, 1), (-1, 0)]
+            } else {
+                &[(-1, 0), (0, 1)]
+            };
+            for &(a, b) in passes {
                 if lo >= hi || lo >= b || hi <= a {
                     continue; // already answered
                 }
@@ -719,7 +733,7 @@ impl Prover {
                 let (l, h) = bounds_of(a, b, v);
                 lo = lo.max(l);
                 hi = hi.min(h);
-                if v >= b && mv != PASS {
+                if (v >= b || (c.wide && v > a)) && mv != PASS {
                     best = mv;
                 }
                 if !c.quiet {
