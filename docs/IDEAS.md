@@ -6,9 +6,9 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 ## Open, by expected gain for the effort
 
 1. **More from what the search already knows.** E14 (cover the reply that refuted the last move)
-   was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Three follow-ups
-   failed (E15-E17, below). Not yet tried: the same rule for the second killer; more than two killers
-   a ply; a per-cell count of where refuting replies land, as a score.
+   was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Six follow-ups of the
+   same kind failed on node counts (E15-E17, E19-E21, below), a history table among them. Rules of
+   this kind look used up; what is left is a per-cell count of where refuting replies land.
 2. **Cheapest win first.** A root pays 21-55% of its nodes before the first winning move and the win
    it finds costs about twice the cheapest (LOG, "a second look at the best few moves"). The fitted
    model is at the limit of its eight features (a refit on five times the data gave the same
@@ -81,6 +81,11 @@ The sizes to quote are the ladder's (LOG, "Confirmation"), not the gates'.
 - **E15 the last known refuting reply used before the first move**: nodes +0% to +4%.
 - **E16 a counter-move table**: nodes +2% to +10% after the killers, twice the nodes before them.
 - **E17 moves that overlap a blocked killer first**: nodes +4% to +26%.
+- **E19 the answer rule with the reply's whole zone** (cells next to a reply that starts a new snake
+  too): nodes -0.1% at ply 7, +5.3% at ply 6.
+- **E20 the answer bonus, halved, for the second killer**: nodes +4% and +14%.
+- **E21 a history table of cutting moves in the score**: best weight -5.3% at ply 7 and +2.1% at
+  ply 6; larger weights worse on both. Reopen if the score it is added to changes.
 - **Reach test for hands of three, again on v8**: nodes -7%, time +13%. The pot is 7% at most.
 - **Re-ranking the first K moves by look-ahead features**: 0.65x to 1.77x across files, no gain.
 - **Enhanced transposition cutoffs.** The reference tried it and found no gain. Not tried here.

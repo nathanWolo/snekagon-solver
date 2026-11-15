@@ -793,3 +793,33 @@ test decided, (confirm) fixed length on fresh units.
 - **For the solve of ply 2** (running): its second pass asks of each red move "does blue at least
   draw", which is the question a wide search would ask after its first drawing move, so nothing
   is lost there.
+
+## 2026-11-15 E19, E20, E21: three more order ideas, dropped at the screen
+
+Screened on exact node counts while the ply-2 solve was running (one thread; the counts do not
+depend on load). Tune positions: ply 7, 0-589 (v9: 8,076,471 nodes) and ply 6, 0-199 (7,136,589).
+The bar, as for E15-E17: 5% fewer nodes on both, or no gate. Each was built behind an option on a
+copy of the search, the option off gave v9's counts exactly, and the source was reverted.
+
+- **E19: the answer rule with the whole zone.** Hypothesis: E14 prefers moves that cover a cell of
+  the reply that refuted the last move. A reply that starts a new snake is also made illegal by a
+  move next to it, so those moves should get the bonus too (the zone the threat rule uses).
+  Result: ply 7 8,069,607 (-0.1%), ply 6 7,512,568 (+5.3%). Dropped.
+- **E20: the same bonus, halved, for the second killer one ply down.** Result: ply 7 8,402,919
+  (+4.0%), ply 6 8,162,263 (+14.4%). Dropped. With the zone as well: +4.4% and +14.9%.
+- **E21: a history table.** Hypothesis: the killers hold the last two moves that cut at a ply; a
+  table by player and placement of how often a move cut anywhere (decayed) adds what they forget,
+  as in chess engines. Added to the move score with a weight.
+
+  | Weight | Ply 7 | Ply 6 |
+  | --- | --- | --- |
+  | 4 | 7,645,662 (-5.3%) | 7,287,587 (+2.1%) |
+  | 16 | 8,002,285 (-0.9%) | 7,521,289 (+5.4%) |
+  | 64 | 8,208,743 (+1.6%) | 7,555,596 (+5.9%) |
+  | 256 | 9,136,107 (+13.1%) | 8,424,616 (+18.0%) |
+  | 64, cuts counted by pieces left | 8,032,426 (-0.5%) | 7,579,846 (+6.2%) |
+
+  Dropped: the only setting that helps one set hurts the other.
+- **What they taught:** six order ideas after E14 have now failed on node counts (E15-E17, E19-E21).
+  The order above the model is at a local best for rules of this kind; the next gain in nodes
+  needs a different kind of information (IDEAS, "cheapest win first"), or better bounds.
