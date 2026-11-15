@@ -980,6 +980,13 @@ impl Solver {
         // 3. threats: the opponent's refutations one ply down are the natural candidates
         let threats_on = self.cfg.threats && self.cfg.bounds && pos.left[opp] != 0;
         let mut th = Threats::new();
+        if self.cfg.prefetch && self.cfg.staged {
+            // the likely first move: its child's entry loads while the threats are tried
+            let cand = if tt_move != PASS { tt_move } else { self.killers[ply][0] };
+            if cand != PASS {
+                self.prefetch(self.hash_after(pos, cand));
+            }
+        }
         if threats_on {
             self.try_threat(pos, self.killers[ply + 1][0], &mut th);
             self.try_threat(pos, self.killers[ply + 1][1], &mut th);
