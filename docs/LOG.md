@@ -1128,3 +1128,31 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
   (`--depth 0`, what the run did), 16 single-thread workers at depth 1 and at depth 2, four
   workers of four threads at depth 1. One at a time on a quiet machine, `--tt 27`.
 - **Bar:** at least 10% less wall-clock than the job of 16 threads on each of the three.
+
+## 2026-11-15 E25, E26, E27: three cheap node-speed tries (hypotheses, written before the timing)
+
+Asked by the owner: the search visits 1.4-2.1 M nodes a second on one thread, engines for chess
+or Ultimate Tic Tac Toe 10 M and more; is there low-hanging fruit? Where the time is: a node here
+carries proofs (IDEAS, Open 4). A profile of three proof positions (v9, 9.94 M nodes): 46% of the
+nodes have five pieces left, 20% three, 19% four, 11% two; 6.35 M reach tests, 4.31 M of them
+decide their node; at five pieces left 32% of the nodes end on the table, 49% on a reach test.
+`perft 3` counts 316 M placements in 0.31 s: generating is not the cost.
+
+- **E25, prefetch** (`--prefetch`): ask for a child's table entry when its move is played, and for
+  the next move's entry while this one is searched (from the fourth move on, where the order is
+  fixed). Same nodes. Expected: 2-5% less time, more at depth where the table is far larger than
+  the cache (the same build makes 1.9 M nodes a second at ply 6 and 1.4 M at ply 5).
+- **E26, no table at the lowest levels** (`--tt-skip L`): a node with at most L pieces left
+  neither reads nor writes the table. At three pieces left 9% of the lookups hit. Expected:
+  about even at L = 3 (a lookup saved on 20% of the nodes against 6% more nodes at ply 7), a
+  loss at L = 4; worth one screen because it also keeps cheap entries out of the table.
+- **E27, a profile-guided build:** same source, the compiler told which branches are taken
+  (typically 5-15%). **Blocked:** the GNU toolchain (`stable-x86_64-pc-windows-gnu`) ships
+  without the profiler runtime (`can't find crate for profiler_builtins`), and the MSVC toolchain
+  that is installed cannot link here (no Visual Studio build tools). The LLVM tools component
+  was installed on the owner's word and is not needed otherwise. Open again if the owner
+  installs the build tools.
+- **Test:** screens on tune units, one thread, alone on a quiet machine: ply 6 positions 0-199,
+  ply 5 positions 0-29, proof positions 0-23. Three runs an arm, interleaved. Then the gate on
+  fresh proof positions through `tools/run.py` (unit: 2 positions) if a screen shows 2% or more.
+- **Bar:** `SPRT[0, 0.05]` as before; the guard on total time.
