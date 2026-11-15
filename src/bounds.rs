@@ -162,6 +162,27 @@ pub fn can_reach_alone(t: &Tables, pos: &Pos, player: usize, target: i32, work: 
     can_reach(t, pos, player, target, &cl, work)
 }
 
+/// The same without clusters. When the target is more than the cells in hand, the final snake holds
+/// an old snake; its new pieces can be ordered outward from that snake, so the first piece touches an
+/// own snake and each later piece touches what has been built.
+pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32) -> bool {
+    if pos.longest[player] as i32 >= target {
+        return true;
+    }
+    let left = pos.left[player];
+    let mut rem = 0i32;
+    for p in 0..NPIECES {
+        if left >> p & 1 == 1 {
+            rem += PIECE_SIZE[p] as i32;
+        }
+    }
+    if target > rem {
+        pos.cells[player] != 0 && reach_from(t, pos, player, target, pos.cells[player], ALL, work)
+    } else {
+        reach_from(t, pos, player, target, 0, ALL, work)
+    }
+}
+
 /// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.
 fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good: BB, work: &mut u32) -> bool {
     if *work == 0 {

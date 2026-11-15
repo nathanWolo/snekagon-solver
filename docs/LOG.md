@@ -372,3 +372,30 @@ test decided, (confirm) fixed length on fresh units.
 - **Verdict:** accepted. Frozen as v5 (`c01a8bd36dee`, commit `68d5e9e`).
 - **What it taught:** the prediction from the timing study (12%) was within a point of the result. A
   section timer in a study build is cheap and sizes a speed idea before it is written.
+
+## 2026-11-15 Long solve: the position after four moves that the reference reports as a blue win
+
+- **What:** `1:60 4B:16,27,28,39 4A:7,8,9,20 4I:15,25,35,45`, red to move. The reference reports that
+  all 956 red replies lose. `frozen/par.exe bench work/long/ply4_blue_wins.txt --threads 8 --tt 24`
+  (branch `parallel`, built from v4), nothing else running.
+- **Result:** value -1 for red (blue wins), as published. 768.2 M nodes, 134.5 s wall-clock on 8
+  threads (about 18 thread-minutes). One run.
+
+## 2026-11-15 E10: ask the exact question first where it applies, and skip that side's cluster bound
+
+- **Hypothesis** (written before the run): at nodes where the reach test applies to a player (a hand
+  of one or two pieces), that player's cluster bound is redundant: the exact one-player test answers
+  the same question and is run anyway unless the cluster bound cuts, which it does at only 12% of
+  the nodes with three or four pieces left. The two cluster bounds are 27% of the time, 82% of that
+  at those levels. So: ask the exact question first, compute a cluster bound only for a side with no
+  exact test, and compute the mover's clusters only when a threat scan needs them. The reach test
+  loses its cluster filter for the first piece; instead, when the target is more than the cells in
+  hand, the first piece must touch an own snake (the final snake holds an old snake, and its pieces
+  can be ordered outward from it).
+- **Expected:** about 18% of v4's time, so about 20% less time than v5 at ply 6, if a reach test without
+  the cluster filter costs no more than before. Node counts change a little (the rare cases where a
+  cluster bound tightened the window).
+- **Risks:** a wrong value is the unforgivable result: `verify` gets the new test against brute
+  force, and the labels are checked on every set.
+- **Test:** flag off gives v5's node counts exactly. Screen on ply 6 tune. Gate `E10`: time against v5,
+  ply 6, `SPRT[0, 0.05]`, unused gate units.

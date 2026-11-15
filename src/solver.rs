@@ -32,11 +32,13 @@ pub struct Config {
     pub tt_bits: u32,
     /// Search the table move or a killer before the move list is generated.
     pub staged: bool,
+    /// Where the reach test applies to a player, ask it first and skip that player's cluster bound.
+    pub lazy: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22, staged: true }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22, staged: true, lazy: true }
     }
 }
 
@@ -424,11 +426,97 @@ impl Solver {
 
         // 2. the snake-length bounds
         let mut my_clusters = Clusters::new();
-        let mut their_clusters = Clusters::new();
+        let mut have_clusters = false;
         let reach_on = self.cfg.reach && self.cfg.bounds;
         let test_me = reach_on && pos.left[me].count_ones() <= self.cfg.reach_hand;
         let test_them = reach_on && pos.left[opp].count_ones() <= self.cfg.reach_hand;
-        if self.cfg.bounds {
+        let lazy = self.cfg.lazy && (test_me || test_them);
+        if lazy {
+            // 2'. Near the end the exact question comes first: can each side still reach the length
+            // it needs, even unopposed? A side that has this test needs no cluster bound.
+            let mine_now = pos.longest[me] as i32;
+            let theirs_now = pos.longest[opp] as i32;
+            let (a, b) = (alpha.max(lo), beta.min(hi));
+            if test_me {
+                // to score above a the mover must end at least this long
+                let need = theirs_now + if a >= 0 { 1 } else { 0 };
+                if mine_now < need {
+                    let mut work = self.cfg.reach_work;
+                    self.reach_by[0][level][0] += 1;
+                    if !can_reach_touching(t, pos, me, need, &mut work) {
+                        self.reach_by[0][level][1] += 1;
+                        self.store(pos.hash, lo, a, PASS, 1);
+                        return a;
+                    }
+                }
+            }
+            if test_them {
+                // to hold the mover below b the opponent must end at least this long
+                let need = mine_now + if b <= 0 { 1 } else { 0 };
+                if theirs_now < need {
+                    let mut work = self.cfg.reach_work;
+                    self.reach_by[1][level][0] += 1;
+                    if !can_reach_touching(t, pos, opp, need, &mut work) {
+                        self.reach_by[1][level][1] += 1;
+                        self.store(pos.hash, b, hi, PASS, 1);
+                        return b;
+                    }
+                }
+            }
+            if !test_me {
+                let upper = upper_bound_ex(t, pos, me, 0, Some(&mut my_clusters));
+                have_clusters = true;
+                hi = hi.min(if upper < theirs_now {
+                    -1
+                } else if upper <= theirs_now {
+                    0
+                } else {
+                    1
+                });
+            }
+            if !test_them {
+                let upper = upper_bound(t, pos, opp);
+                lo = lo.max(if mine_now > upper {
+                    1
+                } else if mine_now >= upper {
+                    0
+                } else {
+                    -1
+                });
+            }
+            if lo >= hi || lo >= beta {
+                self.prof[level][1] += 1;
+                return lo;
+            }
+            if hi <= alpha {
+                self.prof[level][1] += 1;
+                return hi;
+            }
+            alpha = alpha.max(lo);
+            beta = beta.min(hi);
+            // a cluster bound may have moved the window: then the question is stricter
+            if test_me && alpha >= 0 && a < 0 && mine_now < theirs_now + 1 {
+                let mut work = self.cfg.reach_work;
+                self.reach_by[0][level][0] += 1;
+                if !can_reach_touching(t, pos, me, theirs_now + 1, &mut work) {
+                    self.reach_by[0][level][1] += 1;
+                    self.store(pos.hash, lo, alpha, PASS, 1);
+                    return alpha;
+                }
+            }
+            if test_them && beta <= 0 && b > 0 && theirs_now < mine_now + 1 {
+                let mut work = self.cfg.reach_work;
+                self.reach_by[1][level][0] += 1;
+                if !can_reach_touching(t, pos, opp, mine_now + 1, &mut work) {
+                    self.reach_by[1][level][1] += 1;
+                    self.store(pos.hash, beta, hi, PASS, 1);
+                    return beta;
+                }
+            }
+        }
+        let mut their_clusters = Clusters::new();
+        if self.cfg.bounds && !lazy {
+            have_clusters = true;
             let mine = Bounds { lower: pos.longest[me] as i32, upper: upper_bound_ex(t, pos, me, 0, Some(&mut my_clusters)) };
             let rec = if test_them { Some(&mut their_clusters) } else { None };
             let theirs = Bounds { lower: pos.longest[opp] as i32, upper: upper_bound_ex(t, pos, opp, 0, rec) };
@@ -461,7 +549,7 @@ impl Solver {
         beta = beta.min(hi);
 
         // 2b. near the end: can each side still reach the length it needs, even unopposed?
-        if test_me || test_them {
+        if !lazy && (test_me || test_them) {
             let mine_now = pos.longest[me] as i32;
             let theirs_now = pos.longest[opp] as i32;
             let total = (pos.left[me].count_ones() + pos.left[opp].count_ones()) as usize;
@@ -688,6 +776,10 @@ impl Solver {
                     if !scanned {
                         scanned = true;
                         self.prof[level][7] += 1;
+                        if !have_clusters {
+                            have_clusters = true;
+                            upper_bound_ex(t, pos, me, 0, Some(&mut my_clusters));
+                        }
                         self.scan_threats(pos, &my_clusters, alpha, &mut th);
                     }
                 }

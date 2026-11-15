@@ -120,6 +120,8 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                 for target in pos.longest[player] as i32 + 1..=optimum + 2 {
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_alone(t, &pos, player, target, &mut work), target <= optimum, "reach test wrong for {} at {}", target, pos.to_text());
+                    let mut work = u32::MAX;
+                    assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "touching reach test wrong for {} at {}", target, pos.to_text());
                     reach_checks += 1;
                 }
             }
@@ -162,6 +164,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-threats" => o.cfg.threats = false,
             "--no-reach" => o.cfg.reach = false,
             "--no-staged" => o.cfg.staged = false,
+            "--no-lazy" => o.cfg.lazy = false,
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
             "--model" => {

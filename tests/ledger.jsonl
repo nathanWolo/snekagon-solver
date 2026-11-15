@@ -6,3 +6,4 @@
 {"time": "2026-11-15T01:04:57-07:00", "key": "LADDER-6", "set": "ply06", "kind": "confirm", "from": 192, "to": 212}
 {"time": "2026-11-15T01:07:57-07:00", "key": "LADDER-5", "set": "ply05", "kind": "confirm", "from": 17, "to": 20}
 {"time": "2026-11-15T01:16:30-07:00", "key": "E9", "set": "ply06", "kind": "gate", "from": 108, "to": 138}
+{"time": "2026-11-15T01:20:57-07:00", "key": "E10", "set": "ply06", "kind": "gate", "from": 138, "to": 168}
