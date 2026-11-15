@@ -133,7 +133,12 @@ def main():
     if a.kind in ("gate", "confirm", "heldout") and not a.hypothesis:
         sys.exit("a deciding read needs --hypothesis")
     base_exe = BASE
-    cand_exe = BASE if a.kind == "aa" else a.cand
+    cand_exe = BASE
+    if a.kind != "aa":
+        # a private copy, so that a rebuild during the run cannot change the candidate
+        os.makedirs(os.path.join(ROOT, "work"), exist_ok=True)
+        cand_exe = os.path.join(ROOT, "work", f"cand-{a.key}.exe")
+        shutil.copyfile(a.cand, cand_exe)
     base_args, cand_args = a.base_args.split(), a.cand_args.split()
 
     if a.kind in ("aa", "known", "tune"):

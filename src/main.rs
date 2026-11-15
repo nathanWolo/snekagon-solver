@@ -113,6 +113,7 @@ fn parse_opts(args: &[String]) -> Opts {
         };
         match a {
             "--no-bounds" => o.cfg.bounds = false,
+            "--no-last" => o.cfg.last_pieces = false,
             "--tt" => o.cfg.tt_bits = val().parse().unwrap(),
             "--nodes" => o.nodes = val().parse().unwrap(),
             "--from" => o.from = val().parse().unwrap(),
@@ -209,7 +210,7 @@ fn main() {
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
-            println!("options: --no-bounds --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
+            println!("options: --no-bounds --no-last --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }

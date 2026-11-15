@@ -11,13 +11,15 @@ use crate::pos::*;
 pub struct Config {
     /// Use the snake-length bounds to decide nodes.
     pub bounds: bool,
+    /// Value the last pieces (at most one in each hand) without a search.
+    pub last_pieces: bool,
     /// log2 of the number of table entries.
     pub tt_bits: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, tt_bits: 22 }
+        Config { bounds: true, last_pieces: true, tt_bits: 22 }
     }
 }
 
@@ -51,6 +53,7 @@ pub struct Solver {
     aborted: bool,
     killers: [[u16; 2]; MAX_PLY],
     bufs: Vec<Vec<u64>>,
+    replies: Vec<(u32, BB)>,
 }
 
 /// The result of a finished game for the side to move.
@@ -76,6 +79,7 @@ impl Solver {
             aborted: false,
             killers: [[PASS; 2]; MAX_PLY],
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
+            replies: Vec::with_capacity(1024),
         }
     }
 
@@ -136,6 +140,58 @@ impl Solver {
         }
     }
 
+    /// The exact value when each player has at most one piece left: the mover places its piece (or
+    /// passes), then the opponent takes its longest extension that is still legal. A placement only
+    /// takes opponent placements away (the cells it covers, and new snakes that would now touch it).
+    fn last_pieces(&mut self, pos: &Pos) -> i32 {
+        let t = self.t;
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let occ = pos.occupied();
+        let opp_now = pos.longest[opp] as u32;
+        let mut replies = std::mem::take(&mut self.replies);
+        replies.clear();
+        if pos.left[opp] != 0 {
+            pos.for_each_move(t, opp, pos.left[opp], |m| {
+                let p = &t.placements[m as usize];
+                let len = pos.longest_after(opp, p);
+                if len > opp_now {
+                    // a reply that grows a snake is stopped only by covering it; a new snake also by touching it
+                    let blocked_by = if p.border & occ != 0 { p.cells } else { p.cells | p.border };
+                    replies.push((len, blocked_by));
+                }
+            });
+            replies.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+        }
+        let opp_after = |ours: BB| -> u32 {
+            for &(len, blocked_by) in replies.iter() {
+                if blocked_by & ours == 0 {
+                    return len;
+                }
+            }
+            opp_now
+        };
+        let mut best = -2;
+        if pos.left[me] != 0 {
+            pos.for_each_move(t, me, pos.left[me], |m| {
+                if best == 1 {
+                    return;
+                }
+                let p = &t.placements[m as usize];
+                let mine = pos.longest_after(me, p) as i32;
+                let v = (mine - opp_after(p.cells) as i32).signum();
+                if v > best {
+                    best = v;
+                }
+            });
+        }
+        if best == -2 {
+            best = (pos.longest[me] as i32 - opp_after(0) as i32).signum();
+        }
+        self.replies = replies;
+        best
+    }
+
     fn search(&mut self, pos: &Pos, mut alpha: i32, mut beta: i32) -> i32 {
         self.nodes += 1;
         if self.nodes > self.node_limit {
@@ -150,6 +206,11 @@ impl Solver {
         let t = self.t;
         let me = pos.stm as usize;
         let opp = me ^ 1;
+
+        // 0. the last pieces: the exact value without a search
+        if self.cfg.last_pieces && pos.left[me].count_ones() <= 1 && pos.left[opp].count_ones() <= 1 {
+            return self.last_pieces(pos);
+        }
 
         // 1. what the table knows: the value lies in [lo, hi]
         let (mut lo, mut hi) = (-1, 1);
