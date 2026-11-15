@@ -760,7 +760,8 @@ impl<'a> Driver<'a> {
                     }
                     break;
                 };
-                if self.c.hint {
+                // the pick costs a move list; deeper jobs are too many and too small for it
+                if self.c.hint && (self.nodes[j].pos.ply as u32) <= self.nodes[ROOT].pos.ply as u32 + 2 {
                     let m = self.pick(j);
                     if m != PASS {
                         let ply = (self.nodes[j].pos.ply as usize).min(MAX_PLY - 1);
