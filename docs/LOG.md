@@ -1437,3 +1437,32 @@ that branch). Four pots, ranked:
 - **`climb/verify`:** independent check of the search branch's eight changes (reasoning, and
   old and new code run side by side).
 - **Still out from the first batch:** `climb/driver`.
+
+## 2026-11-15 E28 before its gate: the coordinator's checks and the independent verifier
+
+- **Coordinator's runs** (plain MSVC build of `8507875`, every run under the lock): node counts
+  as the base on the three identity sets (8,076,471; 7,136,589; 13,150,272), also with
+  prefetch on by default (`36892b4`); every label right on ply 8 (4,000 positions) and on the
+  reference's five bench files (126 positions, node counts as the base file by file);
+  `verify 100` passes; ply 6 positions 0-199 on 16 threads: all right. The profiled builds
+  give 1,724,647 nodes on ply 7 positions 0-99.
+- **Independent verifier** (Opus, branch `climb/verify`, commits `5abb59f` and `005f91a`): a
+  build with `--features shadow` in which every changed routine also runs the body it had at
+  `f4e5efc` and stops on any difference. Runs: `verify 200`, proof positions 0-11, ply 6
+  0-199 (also with 8 threads), ply 7 0-589, `bench_ply5_other_openings`, ply 8 (all). No
+  mismatch in: 5.0e9 comparisons of the grow anchors, 50 M of `find_move` with a touching set,
+  62 M of the last-piece generator, 86 M of the early-stopping bound, 74 M threat-scan and
+  13 M killer-threat decisions, 52 M reach-test answers (and work left), 32 M reach-test "no"
+  answers against the brute-force optimum, 6.1 M witness answers checked three ways and
+  19.7 M recorded witnesses replayed.
+- **Its verdict:** six commits proven, the two prefetch changes cannot change an answer (a
+  masked index, nothing read). The argument that settles the witness: a reach test prunes
+  only when it answers no; a witness can only turn an answer into yes, which skips a cut; so
+  even a wrong witness could cost nodes, never a value. And the witness's claim itself holds:
+  the legality of a growing placement depends only on the own cells and on its cells being
+  empty, a new snake also on its border, and the border is among the cells a witness needs
+  empty; the own cells, the whole hand and the length are compared on reuse. The witness
+  store belongs to a thread's solver (not shared in the parallel solve).
+- **Not checked by it:** runs with prefetch on under the shadow build (argued only),
+  `--reach-hand` above 2, the proof-number and driver code paths.
+- **The shadow build stays** on `climb/verify` as a tool for the next change to these routines.
