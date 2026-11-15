@@ -27,6 +27,11 @@ Update this section in the same change that freezes a version.
   `parallel` (built from v4) onto v9. Exact; 3.4x wall-clock on 8 threads; on v4 the plumbing cost
   about 2% with one thread, which is why it is not merged. A built copy is `frozen/par-v9.exe`.
   Merging is the owner's call (asked 2026-11-15).
+- **Proof driver:** also on `parallel-v9`: `snek prove FILE --threads N --job-threads T --depth D
+  --out RESULTS` (`src/prove.rs`, a built copy is `frozen/prove.exe`). A coordinator searches the
+  first D plies and hands positions to workers; every result goes to RESULTS and a later run
+  starts from it. Exact; faster than the shared-table solve on the ply-4 position, slower on the
+  drawn ply-3 position (LOG, E18). Long solves and their results files are in `work/long/`.
 - **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Exact and 28-60x slower than alpha-beta here;
   `docs/IDEAS.md` (graveyard) says why and what would reopen it.
 - **State:** the end of `docs/LOG.md`, and the table in `docs/SHIPLOG.md`.

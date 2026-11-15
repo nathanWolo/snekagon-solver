@@ -32,6 +32,14 @@ machine, and were not reproduced here.
 - **Bounds that answer the same question are paid twice.** The cluster bound cut one node in eight
   where the exact reach test also applied, and the exact test ran at the other seven anyway (E10).
 - **Each earlier ply costs about ten times more** (v0: ply 9 0.5 ms, ply 8 6 ms, ply 7 50 ms).
+- **A drawn position is two proofs, and which question is asked matters more than who schedules
+  the work.** On the drawn ply-3 position one search with the wide window took 140 s; the same
+  engine asked "can the mover draw" and then "can the mover win" took 195 s. The narrow pass asks
+  "does the opponent at least draw" after every move, where the wide search proved "the opponent
+  wins" after the losing ones, and the win is the proof it finds faster (E18).
+- **Drawing moves searched side by side each pay for the exact proof.** A parallel driver with the
+  wide window had several drawing moves of the root under way before the first raised alpha:
+  7.4 billion nodes where 1.8 billion do (E18).
 
 ## About measuring
 
@@ -72,6 +80,13 @@ machine, and were not reproduced here.
 - On Windows a running executable cannot be rebuilt. Copy it before a long background run (the runner
   already does); build experiments into `work/target`.
 - Git Bash heredocs mangle backslashes: patch scripts are written as files.
+- **In a parallel tree search, hand out the least speculative job first.** Young-brothers-wait let
+  the free workers pile onto the alternatives of one node that needs a single good move, ahead of
+  root moves that had to be searched anyway. Costing each job by how many older moves it runs
+  beside took the ply-4 position from 748 M nodes to 530 M, below the shared-table solve (E18).
+- **Before blaming a new driver, run the old engine on the same questions.** The driver was 1.4x
+  slower than the shared-table solve on the ply-3 position. Giving the old engine the driver's two
+  narrow windows reproduced the whole gap in one run: the loss was in the questions (E18).
 
 ## Open questions for the owner
 
@@ -81,3 +96,6 @@ machine, and were not reproduced here.
 - The reference solver was not run here (downloaded code). A same-machine comparison needs the owner
   to build and run it; the commands are in `docs/research/rules-and-prior-work.md`.
 - The project lives in a folder the app made for this session and needs a permanent home.
+- The proof driver (`prove`, branch `parallel-v9`) is exact and restartable but not faster than the
+  shared-table solve on a drawn position (E18). Keep it on the branch, or merge it with the
+  parallel solve?

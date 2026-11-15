@@ -15,10 +15,16 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    weights), and re-ranking by look-ahead features gave nothing. It needs information of another
    kind.
 3. **Merge the parallel solve** (branch `parallel-v9`): exact, 3.4x wall-clock on 8 threads, about 2%
-   with one thread on v4. Owner's call. Its nodes grow 1.9x at 8 threads: the waste is threads on
-   alternatives at winner's nodes. A driver that hands whole subtrees (the children of a node that
-   must all be refuted) to single threads with private tables would waste less and could be stopped
-   and resumed; a solve of the start position needs that anyway.
+   with one thread on v4. Owner's call. The proof driver on the same branch (`prove`, E18) hands
+   whole positions to workers and keeps every result in a file, so a solve can be stopped and
+   resumed. It beats the shared-table solve where every root move must be refuted (42.8 s against
+   51.9 s) and loses on a drawn position (191 s against 140 s), because it asks two narrow
+   questions.
+3a. **Ask the stronger question first** (the fix for the driver's loss). At a node that needs "at
+   least a draw", "a win" is often true and its proof is found faster. Try the first move with the
+   decisive window and a node budget before the narrow one; or keep the wide window and search one
+   move at a time until alpha has risen. Size: the 1.4x between 195 s and 140 s on the drawn ply-3
+   position. Also worth a study: why the win proof is cheaper (threat zones in the decisive window).
 4. **Node speed, what is left** (v8, share of time): reach tests 29%, threat scans 16%, last pieces
    10%, killer threats 6%, generating 5%, the rest (table, copy, play) 28%. The generator's
    per-orientation cost is behind most of these. A witness kept from a reach test that said "yes"
@@ -48,6 +54,8 @@ The sizes to quote are the ladder's (LOG, "Confirmation"), not the gates'.
 ## Kept apart
 
 - **E8 parallel solve**: see Open 3.
+- **E18 proof driver** (`src/prove.rs` on `parallel-v9`): exact, restartable, not a speed gain yet.
+  See Open 3 and 3a.
 
 ## Dropped (the graveyard)
 

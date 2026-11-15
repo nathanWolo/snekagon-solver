@@ -706,3 +706,59 @@ test decided, (confirm) fixed length on fresh units.
   5.05x at ply 6) the whole climb is about 6.8x at ply 7 and 12x at ply 6. Those two products
   multiply readings from different units and are rough.
 - **Confirm units left:** none at ply 7 and one at ply 6. A later confirmation needs new positions.
+
+## 2026-11-15 E18: a proof driver that can be stopped and resumed (`prove`, branch `parallel-v9`)
+
+- **Hypothesis.** A coordinator that searches the first plies and hands whole positions to
+  single-thread workers wastes fewer nodes than the shared-table solve (whose nodes grow 1.9x at 8
+  threads), and its results can be kept in a file so that a long solve survives a stop. Expected:
+  up to 2x better use of 16 threads on positions of several minutes. Bar: exact on the labelled
+  sets; faster than `frozen/par-v9.exe` on the ply-4 and ply-3 positions of the long solves.
+  (Process note: this was in my working notes, not in this log, before the build.)
+- **Built** (commit `a787b1f` on `parallel-v9`, `src/prove.rs`; a built copy is
+  `frozen/prove.exe`): `snek prove FILE --threads N --job-threads T --depth D --out RESULTS`.
+  The coordinator searches D plies with the solver's move order, threat zones, killers and the
+  answer rule of E14; positions below are jobs for N workers on one shared table; every finished
+  job and every finished coordinator node is appended to RESULTS, which a later run reads first.
+  The search itself is untouched: one thread still gives v9's node counts (8,076,471 at ply 7).
+- **Correct:** every label on ply 8 (4,000), ply 7 (590), ply 6 (200) and the five bench files
+  (126), in each of the forms below. A results file cut to its first 150 lines is picked up and
+  the proof finished with the same value; a complete file answers at once.
+- **What was learned on the way** (16 threads, one run each, nothing else running):
+
+  | Step | Bench files (5) | Ply-4 position (-1) | Ply-3 position (0) |
+  | --- | --- | --- | --- |
+  | Shared-table solve `par-v9`, one wide window (the reference point) | 18.8 s | 51.9 s, 622 M nodes | 139.8 s, 1,766 M |
+  | 1. Driver, young brothers wait, wide window | 19.5 s | 58.1 s, 748 M | not run |
+  | 2. Least speculative job first | not run | 43.5 s, 530 M | 528 s, 7,410 M |
+  | 3. Two passes with windows of one step | 19.8 s | 45.1 s, 546 M | 191 s, 2,580 M |
+  | 4. Killers travel with the tree | 18.6 s | 42.8 s, 556 M | 222 s, 2,977 M |
+  | Shared-table search asked the same two narrow questions (1 job of 16 threads, depth 0) | not run | not run | 194.8 s, 2,526 M |
+  | Root moves one at a time, each a job of 16 threads (depth 1) | 47.2 s | 61.4 s, 895 M | not run |
+
+  Depth: 2 for the bench files and the ply-4 position, 3 for the ply-3 position (depth 2 there:
+  222 s at step 3).
+- **Step 2, why:** plain young-brothers-wait let all free workers pile onto the alternatives of
+  the oldest node that needs one good move, ahead of root moves that had to be searched anyway.
+  Now a job costs 1, 2, 3 ... for each node on its path where it runs beside 1, 2-3, 4-7 ...
+  older moves that may still cut, and the cheapest job goes first. Nodes on the ply-4 position
+  fell from 748 M to 530 M, below the shared-table solve.
+- **Step 3, why:** with the window (-1, 1) at a drawn root, several drawing moves were under way
+  at once, each with the window it was given before the first of them raised alpha, so each got
+  the full exact proof that only one needs. 7.4 billion nodes. Two passes ("can the mover at
+  least draw", "can the mover win") have no window that can move.
+- **The finding that matters:** on the drawn ply-3 position the two passes cost 1.4x a single
+  wide search with the same engine (194.8 s against 139.8 s), and the driver equals the engine
+  when both ask the same questions (191 s against 194.8 s). So the driver's scheduling is not
+  the loss; the narrow question is. The second pass (blue cannot win, 183 s of the 195) asks of
+  each blue move "does red at least draw". The wide search asked "does red win" of the blue
+  moves it met before the drawing one, and that proof is found faster. Not tested why; the
+  threat zones are sharper in the decisive window, which is the first thing to look at.
+- **Verdict against the bar:** exact: yes. Faster than `par-v9`: yes on the ply-4 position
+  (42.8 s against 51.9 s), no on the ply-3 position (191-222 s against 139.8 s). Kept on the
+  branch for what it adds (a solve that can be stopped and resumed, with progress by root move);
+  not a speed gain as it stands. One run per cell: the differences of 5-10% between steps 3 and
+  4 are inside what two runs of a parallel search differ by, the large ones are not.
+- **What would make it a gain:** ask the stronger question first where it is likely to be true
+  (at a node that needs "at least a draw", try "a win" on the first move with a small budget);
+  or a wide window with one move at a time until alpha has risen. Both are in `IDEAS.md`.
