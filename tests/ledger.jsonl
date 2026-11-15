@@ -2,3 +2,6 @@
 {"time": "2026-11-14T23:17:32-07:00", "key": "E2", "set": "ply07", "kind": "gate", "from": 89, "to": 119}
 {"time": "2026-11-14T23:47:47-07:00", "key": "E3", "set": "ply06", "kind": "gate", "from": 38, "to": 68}
 {"time": "2026-11-15T00:25:16-07:00", "key": "E4", "set": "ply06", "kind": "gate", "from": 68, "to": 108}
+{"time": "2026-11-15T01:00:25-07:00", "key": "LADDER-7", "set": "ply07", "kind": "confirm", "from": 296, "to": 326}
+{"time": "2026-11-15T01:04:57-07:00", "key": "LADDER-6", "set": "ply06", "kind": "confirm", "from": 192, "to": 212}
+{"time": "2026-11-15T01:07:57-07:00", "key": "LADDER-5", "set": "ply05", "kind": "confirm", "from": 17, "to": 20}

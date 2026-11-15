@@ -1,0 +1,33 @@
+{
+ "time": "2026-11-15T01:07:57-07:00",
+ "key": "LADDER-5",
+ "kind": "ladder",
+ "set": "ply05",
+ "units": [
+  17,
+  20
+ ],
+ "versions": {
+  "v2": {
+   "exe": "a146108981b9",
+   "args": "",
+   "seconds": 43.0315,
+   "nodes": 84249021,
+   "report": "ratio        +168.46%   interval [+93.90%, +271.69%]"
+  },
+  "v3": {
+   "exe": "ae34f6c8332c",
+   "args": "",
+   "seconds": 31.0307,
+   "nodes": 36180811,
+   "report": "ratio        +91.49%   interval [+29.30%, +183.57%]"
+  },
+  "v4": {
+   "exe": "66c7f2a9e5ee",
+   "args": "",
+   "seconds": 15.7008,
+   "nodes": 17901061,
+   "report": "ratio        +0.00%   interval [+0.00%, +0.00%]"
+  }
+ }
+}

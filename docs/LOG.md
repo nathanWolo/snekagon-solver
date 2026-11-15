@@ -285,3 +285,82 @@ test decided, (confirm) fixed length on fresh units.
   shared inside the proof of the first move, not spread over alternatives; (2) a cap that "cannot be
   reached" was reached; (3) plumbing that is never executed still costs a point or two in a hot
   function, and compiling the function twice recovers only part of it.
+
+## 2026-11-15 Where v4 stands on the reference's bench files
+
+- **What:** the reference repository's five files of positions after five moves (`tests/set1/bench_ply5_*.txt`,
+  126 positions), solved by `frozen/base.exe` (v4, one thread, empty table per position) and by
+  `frozen/par.exe --threads 8` (branch `parallel`), one job at a time on a quiet machine. One pass each,
+  so the seconds are a single reading (timing noise here is 1-2%).
+- **Correctness:** the first four files hold wins for the side to move and the fifth 27 losses and 3
+  draws, as the reference reports. Both builds gave exactly those values on all 126 positions.
+
+  | File | Positions | v4, one thread | Parallel, 8 threads (wall-clock) | Reference v4 as published (its machine) |
+  | --- | --- | --- | --- | --- |
+  | `ply5_blue_wins` | 24 | 29.9 M nodes, 28.1 s | 7.1 s (52.7 M) | 4.40 M nodes, 13 thread-s |
+  | `ply5_blue_wins_holdout` | 24 | 32.4 M, 29.9 s | 6.7 s (49.8 M) | 4.31 M, 14 |
+  | `ply5_random_units` | 24 | 23.1 M, 21.4 s | 5.9 s (41.9 M) | 6.16 M, 18 |
+  | `ply5_other_openings` | 24 | 16.4 M, 13.1 s | 3.1 s (25.4 M) | 7.45 M, 15 |
+  | `ply5_ublock_refutations` | 30 | 85.0 M, 106.3 s | 22.6 s (130.0 M) | 37.37 M, 137 |
+  | **All** | 126 | 186.9 M, 198.8 s | 45.5 s (299.8 M) | 59.7 M, 197 |
+
+- **Reading it:** in thread-seconds v4 is level with the reference's published figures (198.8 against
+  197), on a different machine: theirs was a Ryzen 7 250 "with other work running", ours a quiet
+  Ryzen 7 5800XT, so this says "same order", not "faster" or "slower". The reference solver was not
+  run here. The make-up differs: the reference searches 3.1 times fewer nodes (6.8 times fewer on
+  `blue_wins`, 2.3 times fewer on the refutations) and pays about three times more for a node. So its
+  pruning and ordering are ahead of ours where the mover wins, and our node is cheaper.
+- **What it says to do next:** the gap is largest on positions the mover wins, which is where the
+  order of moves decides the cost (IDEAS, Open 1), and the reference also runs its exact one-player
+  bound at up to five pieces left where ours stops at hands of two (Open 3 and 4).
+- **Wall-clock:** the parallel build solves the 126 positions in 45.5 s on 8 cores, 4.4 times less
+  than one thread, for 1.6 times the nodes.
+
+## 2026-11-15 Confirmation: every frozen version on the same unused units
+
+- **What:** `tools/ladder.py` on unused confirm units, each version twice in alternating order, quiet
+  machine, one thread. Fixed length, so these are the sizes to quote (a gate reads high). Keys
+  `LADDER-7`, `LADDER-6`, `LADDER-5`; all values correct.
+
+  | Version | Ply 7, 300 positions | Ply 6, 200 positions | Ply 5, 30 positions |
+  | --- | --- | --- | --- |
+  | v0 | 13.17 s, 39.7 M nodes | 50.96 s, 153.4 M | not run |
+  | v1 | 9.06 s, 26.1 M | 35.42 s, 105.8 M | not run |
+  | v2 | 5.92 s, 10.7 M | 22.64 s, 43.5 M | 43.03 s, 84.2 M |
+  | v3 | 4.48 s, 5.7 M | 16.57 s, 20.9 M | 31.03 s, 36.2 M |
+  | v4 | 3.99 s, 4.7 M | 10.10 s, 12.6 M | 15.70 s, 17.9 M |
+
+- **v4 against v0:** 3.30 times faster at ply 7 (per-unit ratio +251% [+210%, +298%]) and 5.05 times at
+  ply 6 (+420% [+308%, +562%]). At ply 5 v4 is 2.74 times faster than v2 (+168% [+94%, +272%], three
+  units only). The gain grows with the depth of the position: each step cuts the tree, not the node.
+- **v4 against v3** (the size of E4, whose gate ran on a loaded machine): 1.12 times at ply 7 (+18%
+  [+7%, +31%]), 1.64 times at ply 6 (+70% [+34%, +116%]), 1.98 times at ply 5 (+91% [+29%, +184%]).
+  The tune read at ply 5 (0.92x on three units) was low; this one has three units too, so the size at
+  ply 5 is still loose, but the sign is not.
+
+## 2026-11-15 Study: where a node's time goes
+
+- **What:** a study build with a cycle counter around each section of `search` (script
+  `timing_patch.py`, not committed), on the first 100 ply-6 tune positions (5.46 M nodes, 4.4 s).
+- **Share of the time:** bounds 27%, reach tests 25%, threat scans 16%, generating and scoring moves
+  14%, the closed-form leaves 8%, picking 3%, killer threats 3%, copy and play 2%, table 1.5%.
+  The bounds cost about 1,300 cycles a node with three pieces left: more than everything else there.
+- **The first move:** at nodes that search, the first move cuts 75% of the time (94-97% of the nodes
+  that cut at all, below the root), and that move is the first killer in 91% of those cases
+  (1.23 M of 1.33 M), the table move almost never (1,065).
+- **What it says:** (1) the move list is generated and scored at every searching node, and thrown
+  away at three in four: try the killer first. (2) Bounds and reach tests are half the time: both
+  recompute everything at every node. (3) A scan recomputes the whole bound for each candidate
+  placement although only the cluster it covers can change.
+
+## 2026-11-15 E9: try the table move and the killers before generating the moves
+
+- **Hypothesis** (written before the run): three in four searching nodes cut on their first move, and
+  that move is a killer or the table move in 97% of those cases. Checking those up to three moves
+  for legality one at a time and searching the first of them before the list is built removes the
+  generation, scoring and picking (17.5% of the time) at those nodes. The order of search is
+  unchanged, so the node counts must be identical to v4.
+- **Expected:** 0.73 x 17.5% = about 12% less time at ply 6, minus the legality checks.
+- **Test:** identity: node counts equal to v4 on the tune files of plies 5-7. Gate `E9`: time against
+  v4, ply 6, `SPRT[0, 0.05]` on the log ratio, unused gate units. Same nodes, so the noise is the
+  timing noise (1-2% a unit) and the gate should decide in under 20 units.

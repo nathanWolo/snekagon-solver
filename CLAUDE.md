@@ -19,10 +19,18 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 
 Update this section in the same change that freezes a version.
 
-- **Base for new work:** `frozen/base.exe`; its id, commit and date are in `frozen/BASE.txt` and `docs/SHIPLOG.md`.
-- **State:** see the top of `docs/LOG.md` and the table in `docs/SHIPLOG.md`.
-- **What a gate resolves:** timing noise is about 1-2% per unit (A/A, 2026-11-14). A change of 5% is
-  decided in 30 units when it acts on most positions. See `docs/TESTING.md`.
+- **Base for new work:** `frozen/base.exe` = v4 (alpha-beta with a table, length bounds, the last
+  pieces in closed form, threat zones, the reach test, model ordering). Id, commit and date:
+  `frozen/BASE.txt` and `docs/SHIPLOG.md`. Branch `main`.
+- **Parallel solve:** branch `parallel` (`bench --threads N`, `src/par.rs`). Exact; 3.9x wall-clock
+  on 8 cores; about 2% slower than v4 with one thread, which is why it is not merged. A built copy is
+  `frozen/par.exe`. Merging is the owner's call (asked 2026-11-15).
+- **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Exact and 28-60x slower than alpha-beta here;
+  `docs/IDEAS.md` (graveyard) says why and what would reopen it.
+- **State:** the end of `docs/LOG.md`, and the table in `docs/SHIPLOG.md`.
+- **What a gate resolves:** timing noise is about 1-2% per unit (A/A). A pruning change has sd 0.2
+  per unit and an ordering change 0.45; 30-40 units decide a change of 25% or more. Plan with
+  `python tools/hc.py plan` on the screen's records.
 
 ## Standing rules
 
@@ -45,6 +53,7 @@ The contract is `docs/TESTING.md`. In short:
 1. Write the hypothesis, expected size and bar in `docs/LOG.md`.
 2. Make the one change in `src/` (behind a flag when cheap), `cargo build --release`.
 3. Correctness: `target/release/snek verify 100` and the labels (the runner checks them on every unit).
+   With a flag: the flag off must give the base's node counts exactly.
 4. Screen: `python tools/run.py KEY-S tune --set plyNN --units 20` (node counts are exact; times are not).
 5. Gate once: `python tools/run.py KEY gate --set plyNN --hypothesis "..."`.
 6. Pass: commit, `python tools/run.py KEY freeze`, update docs. Fail or undecided: `git checkout src/`, log it.
@@ -56,6 +65,11 @@ The contract is `docs/TESTING.md`. In short:
   and compare with `tests/set1/MANIFEST.txt`.
 - Shell quirks: Git Bash heredocs mangle backslashes; write scripts as files.
 - Leave no processes behind. Kill only your own.
+- A timed run needs a quiet machine: no builds, studies or other solves beside it.
+- Build experiments that must not disturb a running `target/release/snek.exe` with
+  `cargo build --release --target-dir work/target`.
+- Several versions on the same fresh units: `python tools/ladder.py KEY --set plyNN --units N v3=frozen/v3-....exe v4=frozen/base.exe`.
+- Profile counters: `cargo build --release --features profile` on branch `parallel`; on `main` they are always on.
 
 ## Where things are
 
@@ -67,4 +81,5 @@ The contract is `docs/TESTING.md`. In short:
 | What we have learned | `docs/LESSONS.md` |
 | The backlog | `docs/IDEAS.md` |
 | Every frozen version | `docs/SHIPLOG.md`, `frozen/` |
-| Code | `src/` (`geom`, `pieces`, `pos`, `bounds`, `solver`, `naive`, `main`) |
+| Code | `src/` (`geom`, `pieces`, `pos`, `bounds`, `solver`, `pns`, `study`, `naive`, `main`; `par` on branch `parallel`) |
+| What predicts a good move | `tools/rootstudy.py`, `tools/rootfit.py`, `tools/rootcost.py` on the output of `snek rootmoves` |

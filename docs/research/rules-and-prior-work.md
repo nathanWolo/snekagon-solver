@@ -112,3 +112,24 @@ Measured on a Ryzen 7 250 (16 threads) with other work running. So v4 spends abo
   figure above is as reported in that repository's README and data files.
 - The piece shapes were read from that repository's `RULES.md` and reference implementation, which read
   them off the print-and-play sheet. I did not see the sheet.
+
+## Running the reference solver yourself (for a same-machine comparison)
+
+Not done here: it is downloaded code, and an attempt to build it was declined. If you want the
+comparison, in WSL (or any Linux shell with g++ 11 or later), from a checkout of
+`github.com/BoltKey/snekagon-lab` at commit `61eb3a4`:
+
+```bash
+g++ -O3 -march=native -std=c++20 -pthread -o build/snek src/main.cpp
+```
+
+```bash
+BENCH_FRESH=1 ./build/snek benchset bench/ply5_blue_wins.txt 1
+```
+
+The second command solves the 24 positions of one bench file on one thread from an empty table (as
+its README describes). Our figures for the same five files are in `docs/LOG.md` under "Where v4
+stands on the reference's bench files"; the files themselves are rebuilt by `tools/mktests.py` as
+`tests/set1/bench_*.txt` and run with `frozen/base.exe bench tests/set1/bench_ply5_blue_wins.txt`.
+Read the script and the build line before running them: I have read the sources as data but have
+not executed them.

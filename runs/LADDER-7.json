@@ -1,0 +1,47 @@
+{
+ "time": "2026-11-15T01:00:25-07:00",
+ "key": "LADDER-7",
+ "kind": "ladder",
+ "set": "ply07",
+ "units": [
+  296,
+  326
+ ],
+ "versions": {
+  "v0": {
+   "exe": "917e1b93969f",
+   "args": "",
+   "seconds": 13.166,
+   "nodes": 39727793,
+   "report": "ratio        +251.29%   interval [+209.79%, +298.34%]"
+  },
+  "v1": {
+   "exe": "46104e473a4f",
+   "args": "",
+   "seconds": 9.0555,
+   "nodes": 26141183,
+   "report": "ratio        +139.62%   interval [+109.87%, +173.60%]"
+  },
+  "v2": {
+   "exe": "a146108981b9",
+   "args": "",
+   "seconds": 5.9174,
+   "nodes": 10743918,
+   "report": "ratio        +56.35%   interval [+40.17%, +74.41%]"
+  },
+  "v3": {
+   "exe": "ae34f6c8332c",
+   "args": "",
+   "seconds": 4.4759,
+   "nodes": 5658371,
+   "report": "ratio        +18.11%   interval [+6.64%, +30.81%]"
+  },
+  "v4": {
+   "exe": "66c7f2a9e5ee",
+   "args": "",
+   "seconds": 3.9892,
+   "nodes": 4717789,
+   "report": "ratio        +0.00%   interval [+0.00%, +0.00%]"
+  }
+ }
+}
