@@ -659,3 +659,13 @@ test decided, (confirm) fixed length on fresh units.
   `--tt 24`): value -1 for red as before; 570.2 M nodes, 62.2 s (v4-based build: 768.2 M, 134.5 s).
 - **Not measured:** the one-thread cost of this build against v9 by SPRT (the 0.8% above is one
   reading). On v4 the same plumbing cost 1.9% [0.7%, 3.1%].
+
+## 2026-11-15 Long solve: the position after three moves that the reference reports as a draw
+
+- **What:** `1:60 4B:16,27,28,39 4C:40,41,50,52`, blue to move. The reference reports that red's 4C
+  refutes all 938 blue moves (382 s on 5 threads on its machine) and that blue's `4A:49,59,70,81`
+  does not lose, so the value is a draw. `frozen/par-v9.exe bench work/long/ply3_ublock.txt
+  --threads 16 --tt 25`, nothing else running except this session's file edits.
+- **Result:** value 0, as published. 1,765.8 M nodes, 139.8 s wall-clock on 16 threads (8 cores),
+  about 37 thread-minutes. One run. This is the exact value of the whole position, both halves
+  of the reference's statement in one search.
