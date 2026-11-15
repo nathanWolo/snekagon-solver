@@ -360,6 +360,11 @@ fn main() {
             let o = parse_opts(&args[2..]);
             prove_cmd(t, &o);
         }
+        "text" => {
+            // the position text of a list of moves, as the results file of `prove` writes it
+            let pos = Pos::parse(t, &args[2..].join(" ")).expect("bad position");
+            println!("{}", pos.to_text());
+        }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
             println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-tt BITS --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");

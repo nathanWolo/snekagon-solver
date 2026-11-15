@@ -250,6 +250,24 @@ impl<'a> Driver<'a> {
                     n.moves = moves;
                     n.skipped = skipped;
                     n.th = th;
+                    // Moves whose result is already known come first, a cut among them before the
+                    // rest: they cost nothing, and after a restart they bring the proof back to
+                    // where it was. (The window of a child is (-beta, -alpha).)
+                    let t = self.t;
+                    let known = &*self.known;
+                    n.moves.sort_by_cached_key(|e| {
+                        let m = (*e & 0xFFFF) as u16;
+                        if m == PASS {
+                            return 2u8;
+                        }
+                        let mut child = pos;
+                        child.play(t, m);
+                        match known.get(&child.hash) {
+                            Some(k) if k.hi as i32 <= -beta => 0,
+                            Some(k) if k.lo >= k.hi || k.lo as i32 >= -alpha => 1,
+                            _ => 2,
+                        }
+                    });
                     if n.moves.is_empty() && skipped == -2 {
                         n.moves.push(PASS as u64);
                     }
