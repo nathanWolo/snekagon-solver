@@ -1,0 +1,12 @@
+== --reach-threat 0 --reach-threat-touch
+# positions 12 nodes 23454691 seconds 38.793 wrong 0 unknown 0
+# reach-threat tests by pieces left [tests, threats, work]: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [76389, 47403, 249317], [658249, 396146, 2316942], [253206, 108857, 4806135], [571824, 314717, 20984386], [14232, 573, 181849], [11176, 476, 158495], [335, 1, 3004], [92, 0, 325], [9, 0, 34]]
+== --reach-threat 0 --reach-threat-max 4
+# positions 12 nodes 36630936 seconds 40.028 wrong 0 unknown 0
+# reach-threat tests by pieces left [tests, threats, work]: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [80334, 47989, 336430], [644642, 386391, 3821652], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
+== --reach-threat 0 --reach-threat-max 5
+# positions 12 nodes 34441486 seconds 40.036 wrong 0 unknown 0
+# reach-threat tests by pieces left [tests, threats, work]: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [77985, 47766, 324783], [654702, 393313, 3887978], [257314, 112112, 4440131], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
+== --reach-threat 3 --reach-threat-max 4 --reach-threat-work 100
+# positions 12 nodes 36631596 seconds 39.656 wrong 0 unknown 0
+# reach-threat tests by pieces left [tests, threats, work]: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [80334, 47989, 336430], [644642, 386386, 3821611], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
