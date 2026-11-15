@@ -28,6 +28,9 @@ pub fn growable(pos: &Pos, player: usize) -> BB {
 
 pub const MAX_CLUSTERS: usize = 24;
 
+/// E12: the reach test starts from the longest snake of the target snake (`--no-longest` turns it off).
+pub static FROM_LONGEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
 /// A player's clusters: the growable cells of each and the longest final snake possible inside it.
 pub struct Clusters {
     pub n: usize,
@@ -202,11 +205,115 @@ pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, wor
             rem += PIECE_SIZE[p] as i32;
         }
     }
-    if target > rem {
-        pos.cells[player] != 0 && reach_from(t, pos, player, target, pos.cells[player], ALL, work)
-    } else {
-        reach_from(t, pos, player, target, 0, ALL, work)
+    let pieces = left.count_ones();
+    if pieces == 0 {
+        return false;
     }
+    if pieces > 2 || !FROM_LONGEST.load(std::sync::atomic::Ordering::Relaxed) {
+        return if target > rem {
+            pos.cells[player] != 0 && reach_from(t, pos, player, target, pos.cells[player], ALL, work)
+        } else {
+            reach_from(t, pos, player, target, 0, ALL, work)
+        };
+    }
+    // One or two pieces. A final snake that holds old snakes is built outward from its longest old
+    // snake S: the first piece touches S, every other old snake in it is no longer than S, and each
+    // piece brings in at most one more snake (a piece touches own cells only with its two ends).
+    let ns = pos.nsnakes[player] as usize;
+    let mut len_of = [0i32; MAX_SNAKES];
+    for j in 0..ns {
+        len_of[j] = count(pos.snakes[player][j]) as i32;
+    }
+    let mut start: BB = 0; // the snakes that can be S; 0 = no restriction
+    if target > rem {
+        for j in 0..ns {
+            let (mut b1, mut b2) = (0i32, 0i32); // the two longest other snakes no longer than j
+            for i in 0..ns {
+                if i != j && len_of[i] <= len_of[j] {
+                    if len_of[i] > b1 {
+                        b2 = b1;
+                        b1 = len_of[i];
+                    } else if len_of[i] > b2 {
+                        b2 = len_of[i];
+                    }
+                }
+            }
+            let others = if pieces == 1 { b1 } else { b1 + b2 };
+            if len_of[j] + rem + others >= target {
+                start |= pos.snakes[player][j];
+            }
+        }
+        if start == 0 {
+            return false;
+        }
+    }
+    if pieces == 1 {
+        return pos.find_move(t, player, left, start, |m| {
+            let p = &t.placements[m as usize];
+            let mut len = p.n as i32;
+            for j in 0..ns {
+                if pos.snakes[player][j] & p.border != 0 {
+                    len += len_of[j];
+                }
+            }
+            len >= target
+        });
+    }
+    if *work == 0 {
+        return true;
+    }
+    *work -= 1;
+    let mut ends: BB = 0; // own cells that can still take a neighbour: computed when first needed
+    let mut have_ends = false;
+    pos.find_move(t, player, left, start, |m| {
+        let p = &t.placements[m as usize];
+        let mut len = p.n as i32;
+        let mut top = 0i32; // the longest snake this piece joins
+        let mut joined: u32 = 0;
+        let mut joined_cells: BB = 0;
+        for j in 0..ns {
+            if pos.snakes[player][j] & p.border != 0 {
+                len += len_of[j];
+                top = top.max(len_of[j]);
+                joined |= 1 << j;
+                joined_cells |= pos.snakes[player][j];
+            }
+        }
+        if len >= target {
+            return true;
+        }
+        let last = rem - p.n as i32; // the size of the other piece
+        let gap = target - len - last; // what the other piece cannot add by itself
+        if gap > 0 {
+            // It has to bring in one more snake: at least `gap` long, no longer than the longest
+            // joined so far, and with an end within last + 1 steps of where the piece can attach.
+            if !have_ends {
+                ends = shape_of(pos.cells[player]).ends;
+                have_ends = true;
+            }
+            let from = p.cells | (joined_cells & ends);
+            let near = &t.geo.within[(last + 1) as usize];
+            let mut found = false;
+            'snakes: for j in 0..ns {
+                if joined >> j & 1 == 0 && len_of[j] >= gap && len_of[j] <= top {
+                    let mut e = pos.snakes[player][j] & ends;
+                    while e != 0 {
+                        if near[first(e)] & from != 0 {
+                            found = true;
+                            break 'snakes;
+                        }
+                        e &= e - 1;
+                    }
+                }
+            }
+            if !found {
+                return false;
+            }
+        }
+        let mut child = *pos;
+        let built = child.place_for(t, player, m);
+        reach_from(t, &child, player, target, built, 0, work)
+    })
 }
 
 /// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.

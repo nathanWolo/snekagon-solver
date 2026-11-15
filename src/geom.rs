@@ -149,13 +149,23 @@ pub fn apply_symmetry(t: usize, mut q: i32, mut r: i32) -> (i32, i32) {
 
 pub struct Geometry {
     pub neighbours: [BB; GRID],
+    /// within[r][c]: the cells at most r steps from cell c (r = 0..=5).
+    pub within: [[BB; GRID]; 6],
     pub cells: [u8; NCELLS],
     pub sym: [[u8; GRID]; NSYM],
     pub inv_sym: [u8; NSYM],
 }
 
 pub fn build_geometry() -> Geometry {
-    let mut g = Geometry { neighbours: [0; GRID], cells: [0; NCELLS], sym: [[0; GRID]; NSYM], inv_sym: [0; NSYM] };
+    let mut g = Geometry { neighbours: [0; GRID], within: [[0; GRID]; 6], cells: [0; NCELLS], sym: [[0; GRID]; NSYM], inv_sym: [0; NSYM] };
+    for i in 0..GRID {
+        if ALL >> i & 1 == 1 {
+            g.within[0][i] = bit(i);
+            for r in 1..6 {
+                g.within[r][i] = g.within[r - 1][i] | neighbours(g.within[r - 1][i]);
+            }
+        }
+    }
     let mut n = 0;
     for i in 0..GRID {
         if ALL >> i & 1 == 1 {

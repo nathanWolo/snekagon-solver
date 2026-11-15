@@ -453,3 +453,37 @@ test decided, (confirm) fixed length on fresh units.
 - **Verdict:** accepted. Frozen as v7 (`d9bb32dbac68`, commit `5fd3fee`).
 - **What it taught:** look at what is left of a range before spending it. A gate that cannot reach
   the test's minimum only burns fresh units.
+
+## 2026-11-15 Study: what a reach test costs
+
+- **What:** the study build with counters inside the reach test (`reachstudy_patch.py`), v7, first
+  100 ply-6 tune positions. Reach tests are 37% of the time (3.07 M tests).
+
+  | Hand | Answer | Tests | Cycles each | Trial positions built each |
+  | --- | --- | --- | --- | --- |
+  | 1 piece | no | 712 K | 740 | 0 |
+  | 1 piece | yes | 340 K | 600 | 0 |
+  | 2 pieces | no | 925 K | 4,070 | 7.5 |
+  | 2 pieces | yes | 1,090 K | 1,200 | 1.6 |
+
+- **Reading it:** the two-piece "no" answers are 64% of the reach time, a quarter of all time. Of
+  them 500 K have a target that the longest snake plus both pieces cannot make (another snake has to
+  be joined), 425 K a target within that count. Each builds 7 to 8 positions after the first piece
+  and looks at every placement of the second: about 500 cycles a position.
+- **Why so many:** the size check before a position is built adds the longest snake even when the
+  first piece already sits on it, so it almost never fails; and the first piece is tried on every
+  snake, small ones included.
+
+## 2026-11-15 E12: the reach test starts from the longest snake of the target snake
+
+- **Hypothesis** (written before the run): a final snake that holds old snakes can be built outward
+  from its longest old snake. So the first piece may be taken to touch that one, every other old
+  snake in it is no longer, and with two pieces at most one more snake comes in through the second
+  piece, which must then lie within (size of the second piece + 1) steps of where it can attach.
+  These three facts prune most first placements before a position is built, and a test whose target
+  no snake can start is answered without generating anything. The answers do not change (the test
+  stays exact), so node counts stay equal to v7 unless a work limit was being hit.
+- **Expected:** half of the two-piece "no" cost and part of the one-piece cost: 10-14% less time.
+- **Risks:** the test is the source of proofs: `verify` checks it against brute force over every
+  sequence (hands of one to three), and the labels are checked on every set.
+- **Test:** node counts against v7 on the tune files; gate `E12` at ply 7, `SPRT[0, 0.05]`, cap 100.
