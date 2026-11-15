@@ -182,6 +182,8 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-narrow" => o.cfg.narrow = false,
             "--answer-bonus" => o.cfg.answer_bonus = val().parse().unwrap(),
             "--prefetch" => o.cfg.prefetch = true,
+            "--no-prefetch" => o.cfg.prefetch = false,
+            "--no-witness" => o.cfg.witness = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
@@ -346,6 +348,7 @@ fn bench(t: &Tables, o: &Opts) {
         }
         writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
+        writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
     }
     if wrong > 0 {
         std::process::exit(1);
@@ -420,7 +423,7 @@ fn main() {
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
-            println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-mul N --pn-ab LEVEL --pn-unit NODES --pn-width N --pn-model --pn-probe --pn-killers --pn-tt BITS --prefetch --tt-skip LEVEL --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
+            println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-mul N --pn-ab LEVEL --pn-unit NODES --pn-width N --pn-model --pn-probe --pn-killers --pn-tt BITS --no-prefetch --no-witness --tt-skip LEVEL --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }

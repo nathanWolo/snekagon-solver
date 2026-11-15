@@ -53,11 +53,14 @@ pub struct Config {
     pub prefetch: bool,
     /// Nodes with at most this many pieces left (both hands) neither read nor write the table.
     pub tt_skip: u32,
+    /// Answer a reach test from a sequence an earlier test found (this node's or the parent's), when
+    /// it still applies.
+    pub witness: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: false, tt_skip: 0 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true }
     }
 }
 
@@ -236,6 +239,10 @@ pub struct Solver {
     pub prof: [[u64; 8]; 16],
     /// Reach tests by kind (0 the mover, 1 the opponent) and pieces left: [tests, decided].
     pub reach_by: [[[u64; 2]; 16]; 2],
+    /// Reach tests answered by a witness instead of a search.
+    pub reach_reused: u64,
+    /// The last sequence a reach test found, by ply and player.
+    wit: [[Witness; 2]; MAX_PLY],
     node_limit: u64,
     aborted: bool,
     /// Parallel solve: the ply of the root, the nodes on the path from it by ply (hash and window at
@@ -277,6 +284,8 @@ impl Solver {
             by_left: [0; 16],
             prof: [[0; 8]; 16],
             reach_by: [[[0; 2]; 16]; 2],
+            reach_reused: 0,
+            wit: [[Witness::NONE; 2]; MAX_PLY],
             node_limit: u64::MAX,
             aborted: false,
             root_ply: 0,
@@ -586,8 +595,13 @@ impl Solver {
         if pos.left[opp] >> b.piece & 1 == 0 || !pos.legal_placement(t, opp, b) {
             return;
         }
-        let my_upper = upper_bound_ex(t, pos, me, b.cells, None);
         let opp_len = pos.longest_after(opp, b) as i32;
+        // only a bound of at most opp_len makes a threat: the flood may stop once it is above
+        let my_upper = if pos.left[me] == 0 {
+            pos.longest[me] as i32
+        } else {
+            upper_bound_cells_upto(t, &BoundCtx::new(pos, me), growable(pos, me) & !b.cells, opp_len)
+        };
         let value = if my_upper < opp_len {
             -1
         } else if my_upper <= opp_len {
@@ -669,7 +683,8 @@ impl Solver {
                     }
                 }
                 if covered != 0 {
-                    upper = upper.max(upper_bound_cells(t, &ctx, covered & !b.cells, None));
+                    // only whether it is at most `need` matters: the flood may stop once it is above
+                    upper = upper.max(upper_bound_cells_upto(t, &ctx, covered & !b.cells, need));
                 }
                 upper
             } else {
@@ -701,6 +716,20 @@ impl Solver {
                 th.n += 1;
             }
         }
+    }
+
+    /// Can `player` still build a snake of `need` cells (the exact test, `can_reach_touching`)? A
+    /// sequence found by an earlier test at this ply or the one above answers yes when it still applies.
+    #[inline]
+    fn reach(&mut self, pos: &Pos, ply: usize, player: usize, need: i32) -> bool {
+        if self.cfg.witness {
+            if self.wit[ply][player].proves(pos, player, need) || (ply > 0 && self.wit[ply - 1][player].proves(pos, player, need)) {
+                self.reach_reused += 1;
+                return true;
+            }
+        }
+        let mut work = self.cfg.reach_work;
+        can_reach_touching_w(self.t, pos, player, need, &mut work, &mut self.wit[ply][player])
     }
 
     /// True when the table now decides the node at `ply` of the current path for its window.
@@ -815,9 +844,8 @@ impl Solver {
                 // to score above a the mover must end at least this long
                 let need = theirs_now + if a >= 0 { 1 } else { 0 };
                 if mine_now < need {
-                    let mut work = self.cfg.reach_work;
                     self.reach_by[0][level][0] += 1;
-                    if !can_reach_touching(t, pos, me, need, &mut work) {
+                    if !self.reach(pos, ply, me, need) {
                         self.reach_by[0][level][1] += 1;
                         self.store_if(use_tt, pos.hash, lo, a, PASS, 1);
                         return a;
@@ -828,9 +856,8 @@ impl Solver {
                 // to hold the mover below b the opponent must end at least this long
                 let need = mine_now + if b <= 0 { 1 } else { 0 };
                 if theirs_now < need {
-                    let mut work = self.cfg.reach_work;
                     self.reach_by[1][level][0] += 1;
-                    if !can_reach_touching(t, pos, opp, need, &mut work) {
+                    if !self.reach(pos, ply, opp, need) {
                         self.reach_by[1][level][1] += 1;
                         self.store_if(use_tt, pos.hash, b, hi, PASS, 1);
                         return b;
@@ -870,18 +897,16 @@ impl Solver {
             beta = beta.min(hi);
             // a cluster bound may have moved the window: then the question is stricter
             if test_me && alpha >= 0 && a < 0 && mine_now < theirs_now + 1 {
-                let mut work = self.cfg.reach_work;
                 self.reach_by[0][level][0] += 1;
-                if !can_reach_touching(t, pos, me, theirs_now + 1, &mut work) {
+                if !self.reach(pos, ply, me, theirs_now + 1) {
                     self.reach_by[0][level][1] += 1;
                     self.store_if(use_tt, pos.hash, lo, alpha, PASS, 1);
                     return alpha;
                 }
             }
             if test_them && beta <= 0 && b > 0 && theirs_now < mine_now + 1 {
-                let mut work = self.cfg.reach_work;
                 self.reach_by[1][level][0] += 1;
-                if !can_reach_touching(t, pos, opp, mine_now + 1, &mut work) {
+                if !self.reach(pos, ply, opp, mine_now + 1) {
                     self.reach_by[1][level][1] += 1;
                     self.store_if(use_tt, pos.hash, beta, hi, PASS, 1);
                     return beta;
@@ -955,6 +980,13 @@ impl Solver {
         // 3. threats: the opponent's refutations one ply down are the natural candidates
         let threats_on = self.cfg.threats && self.cfg.bounds && pos.left[opp] != 0;
         let mut th = Threats::new();
+        if self.cfg.prefetch && self.cfg.staged {
+            // the likely first move: its child's entry loads while the threats are tried
+            let cand = if tt_move != PASS { tt_move } else { self.killers[ply][0] };
+            if cand != PASS {
+                self.prefetch(self.hash_after(pos, cand));
+            }
+        }
         if threats_on {
             self.try_threat(pos, self.killers[ply + 1][0], &mut th);
             self.try_threat(pos, self.killers[ply + 1][1], &mut th);

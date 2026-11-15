@@ -158,6 +158,84 @@ pub fn upper_bound_cells(t: &Tables, ctx: &BoundCtx, mut rest: BB, mut rec: Opti
     upper
 }
 
+/// `upper_bound_cells` without clusters recorded, for a caller that only asks whether the bound is
+/// at most `limit`: the exact bound when it is, else some number above `limit` (as soon as a cluster
+/// is seen to exceed it, part-built: a cluster's bound only grows as regions and snakes join it).
+#[inline]
+pub fn upper_bound_cells_upto(t: &Tables, ctx: &BoundCtx, mut rest: BB, limit: i32) -> i32 {
+    let lower = ctx.lower;
+    let fill = &t.best_fill[ctx.left as usize];
+    let joinable = ctx.left.count_ones() as usize + 1;
+    let ns = ctx.ns;
+    let snake_nb = &ctx.snake_nb;
+    let snake_len = &ctx.snake_len;
+    let mut upper = lower;
+    let mut used = 0u32;
+    while rest != 0 {
+        let mut cluster = flood(bit(first(rest)), rest);
+        let mut capacity = fill[count(cluster) as usize] as usize;
+        rest &= !cluster;
+        let mut lens = [0i32; MAX_SNAKES];
+        let mut nl = 0;
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for j in 0..ns {
+                if used >> j & 1 == 0 && snake_nb[j] & cluster != 0 {
+                    used |= 1 << j;
+                    lens[nl] = snake_len[j];
+                    nl += 1;
+                    let mut more = snake_nb[j] & rest;
+                    while more != 0 {
+                        let region = flood(bit(first(more)), rest);
+                        rest &= !region;
+                        more &= !region;
+                        capacity += fill[count(region) as usize] as usize;
+                        cluster |= region;
+                        changed = true;
+                    }
+                    // the part built so far: the joinable longest snakes and the capacity
+                    let mut own = 0;
+                    if nl > joinable {
+                        let mut l2 = lens;
+                        l2[..nl].sort_unstable_by(|a, b| b.cmp(a));
+                        for l in &l2[..joinable] {
+                            own += l;
+                        }
+                    } else {
+                        for l in &lens[..nl] {
+                            own += l;
+                        }
+                    }
+                    let reach = own + fill[capacity.min(GRID)] as i32;
+                    if reach > limit {
+                        return reach;
+                    }
+                }
+            }
+        }
+        let mut own = 0;
+        if nl > joinable {
+            lens[..nl].sort_unstable_by(|a, b| b.cmp(a));
+            for l in &lens[..joinable] {
+                own += l;
+            }
+        } else {
+            for l in &lens[..nl] {
+                own += l;
+            }
+        }
+        let reach = own + fill[capacity.min(GRID)] as i32;
+        if reach > upper {
+            upper = reach;
+        }
+        if upper > limit {
+            return upper;
+        }
+    }
+    upper
+}
+
 /// Can `player` still build a snake of at least `target` cells? The opponent is frozen: its moves
 /// only take placements away, so false is a proof for the real game too. `work` is the number of
 /// positions the search may still look at; when it runs out the answer is true (no proof).
@@ -195,6 +273,47 @@ pub fn can_reach_alone(t: &Tables, pos: &Pos, player: usize, target: i32, work: 
 /// an old snake; its new pieces can be ordered outward from that snake, so the first piece touches an
 /// own snake and each later piece touches what has been built.
 pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32) -> bool {
+    let mut wit = Witness::NONE;
+    can_reach_touching_w(t, pos, player, target, work, &mut wit)
+}
+
+/// A sequence of placements that builds a snake of `len` cells for a player with the cells `own`
+/// and the pieces `left`, the opponent frozen. `mask`: the cells the sequence needs empty (its cells,
+/// and the border of a piece that starts a new snake). It proves "yes" for any target up to `len` in
+/// every position where the player has the same cells and pieces and `mask` is empty: placing a piece
+/// that grows a snake depends only on the own cells and on its cells being empty, and a new snake also
+/// on its border being empty. len = 0: no witness.
+#[derive(Clone, Copy)]
+pub struct Witness {
+    pub own: BB,
+    pub mask: BB,
+    pub left: u8,
+    pub len: i32,
+}
+
+impl Witness {
+    pub const NONE: Witness = Witness { own: 0, mask: 0, left: 0, len: 0 };
+
+    /// Whether this witness proves that `player` reaches `target` in `pos`.
+    #[inline(always)]
+    pub fn proves(&self, pos: &Pos, player: usize, target: i32) -> bool {
+        self.len >= target && self.own == pos.cells[player] && self.left == pos.left[player] && self.mask & pos.occupied() == 0
+    }
+}
+
+/// The cells placement `p` needs empty when played with the own cells `own`.
+#[inline(always)]
+fn needs_empty(p: &Placement, own: BB) -> BB {
+    if p.border & own != 0 {
+        p.cells
+    } else {
+        p.cells | p.border
+    }
+}
+
+/// `can_reach_touching`; when it answers yes from a sequence it found, the sequence goes to `wit`
+/// (otherwise `wit` is left alone). The answer is exactly that of `can_reach_touching`.
+pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32, wit: &mut Witness) -> bool {
     if pos.longest[player] as i32 >= target {
         return true;
     }
@@ -256,7 +375,13 @@ pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, wor
                     len += len_of[j];
                 }
             }
-            len >= target
+            if len >= target {
+                let own = pos.cells[player];
+                *wit = Witness { own, mask: needs_empty(p, own), left, len };
+                true
+            } else {
+                false
+            }
         });
     }
     if *work == 0 {
@@ -280,6 +405,8 @@ pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, wor
             }
         }
         if len >= target {
+            let own = pos.cells[player];
+            *wit = Witness { own, mask: needs_empty(p, own), left, len };
             return true;
         }
         let last = rem - p.n as i32; // the size of the other piece
@@ -310,9 +437,54 @@ pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, wor
                 return false;
             }
         }
-        let mut child = *pos;
-        let built = child.place_for(t, player, m);
-        reach_from(t, &child, player, target, built, 0, work)
+        // the last piece (reach_from with one piece left, keeping the sequence it finds), on the
+        // position after the first piece without building it: the built snake is p and the
+        // snakes it joined, `len` cells long
+        if *work == 0 {
+            return true;
+        }
+        *work -= 1;
+        let built = p.cells | joined_cells;
+        let own2 = pos.cells[player] | p.cells;
+        let occ2 = pos.occupied() | p.cells;
+        let left2 = left & !(1u8 << p.piece);
+        let mut found = PASS;
+        let mut flen = 0;
+        let check = |m2: u16| {
+            let p2 = &t.placements[m2 as usize];
+            let mut len2 = p2.n as i32 + len; // it touches the built snake
+            for j in 0..ns {
+                if joined >> j & 1 == 0 && pos.snakes[player][j] & p2.border != 0 {
+                    len2 += len_of[j];
+                }
+            }
+            if len2 >= target {
+                found = m2;
+                flen = len2;
+                true
+            } else {
+                false
+            }
+        };
+        let ok = if gap > 0 {
+            // The last piece touches the built snake and at most one other (a piece has at most two
+            // outside own neighbours): only a snake of at least `gap` cells can be that one.
+            let mut other: BB = 0;
+            for j in 0..ns {
+                if joined >> j & 1 == 0 && len_of[j] >= gap {
+                    other |= pos.snakes[player][j];
+                }
+            }
+            find_grow_both(t, own2, occ2, left2, built, other, check)
+        } else {
+            find_grow(t, own2, occ2, left2, built, check)
+        };
+        if ok {
+            let own = pos.cells[player];
+            let p2 = &t.placements[found as usize];
+            *wit = Witness { own, mask: needs_empty(p, own) | needs_empty(p2, own | p.cells), left, len: flen };
+        }
+        ok
     })
 }
 
