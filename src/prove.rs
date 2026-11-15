@@ -88,6 +88,9 @@ const ROOT: usize = 0;
 type Killers = [[u16; 2]; MAX_PLY];
 const MAX_BUDGET: u32 = 40;
 const NEVER: u32 = 1000;
+/// Added to the score of a move that is a mirror image of a move that has cut at the same ply:
+/// above the model and the answer rule, below the killers.
+const WINNER_BONUS: u64 = 1 << 24;
 /// Jobs smaller than this many nodes are not kept.
 const MIN_RECORD: u64 = 2000;
 
@@ -160,6 +163,10 @@ struct Driver<'a> {
     freed: Vec<usize>,
     /// The coordinator's solver: move order, threat zones and the table.
     top: Solver,
+    /// By ply: the moves that have cut at a coordinator node of that ply. In an opening with a
+    /// symmetric start the same idea wins again turned or mirrored, so the images of these moves
+    /// under the board's symmetries are tried before the rest of the order.
+    winners: Vec<Vec<u16>>,
     known: &'a mut HashMap<u64, Known>,
     log: &'a mut Option<std::fs::File>,
     start: Instant,
@@ -256,6 +263,18 @@ impl<'a> Driver<'a> {
                     n.given = true;
                     n.best_move = k.mv;
                     self.res.reused += 1;
+                    if lo >= beta && k.mv != PASS {
+                        // a cut that was known: its move is a killer and a winner like any other
+                        let ply = (pos.ply as usize).min(MAX_PLY - 1);
+                        let ks = &mut n.killers[ply];
+                        if ks[0] != k.mv {
+                            ks[1] = ks[0];
+                            ks[0] = k.mv;
+                        }
+                        if !self.winners[ply].contains(&k.mv) {
+                            self.winners[ply].push(k.mv);
+                        }
+                    }
                 }
                 hint = k.mv;
             }
@@ -268,6 +287,21 @@ impl<'a> Driver<'a> {
                     n.moves = moves;
                     n.skipped = skipped;
                     n.th = th;
+                    let ply = (pos.ply as usize).min(MAX_PLY - 1);
+                    if !self.winners[ply].is_empty() {
+                        let mut images = std::collections::HashSet::new();
+                        for &w in &self.winners[ply] {
+                            for s in 0..NSYM {
+                                images.insert(self.t.sym_placement[w as usize][s]);
+                            }
+                        }
+                        for e in n.moves.iter_mut() {
+                            if *e >> 16 < WINNER_BONUS && images.contains(&((*e & 0xFFFF) as u16)) {
+                                *e += WINNER_BONUS << 16;
+                            }
+                        }
+                        n.moves.sort_unstable_by(|a, b| b.cmp(a));
+                    }
                     // Moves whose result is already known come first, a cut among them before the
                     // rest: they cost nothing, and after a restart they bring the proof back to
                     // where it was. (The window of a child is (-beta, -alpha).)
@@ -491,6 +525,9 @@ impl<'a> Driver<'a> {
             );
         }
         if cut {
+            if via != PASS && !self.winners[ply].contains(&via) {
+                self.winners[ply].push(via);
+            }
             let ks = &mut self.nodes[p].killers[ply];
             if via != PASS && ks[0] != via {
                 ks[1] = ks[0];
@@ -675,6 +712,7 @@ impl Prover {
             free: Vec::new(),
             freed: Vec::new(),
             top: Solver::with_table(c.cfg, self.table.clone()),
+            winners: vec![Vec::new(); MAX_PLY],
             known: &mut self.known,
             log: &mut self.log,
             start,
