@@ -448,3 +448,8 @@ test decided, (confirm) fixed length on fresh units.
   void gate's reading was in favour, running a second one cannot select for a lucky result, so E11
   gets one properly sized gate at ply 7, declared here before it runs: key `E11-P7`, time against
   v6, `SPRT[0, 0.05]`, cap 100. The owner may overrule this and revert the commit.
+- **Gate `E11-P7`** (ply 7, unused gate units 119-148): PASS at unit 30. +4.8% [+4.2%, +5.4%], time
+  0.954x (2.94 s to 2.81 s), nodes identical (4,634,616).
+- **Verdict:** accepted. Frozen as v7 (`d9bb32dbac68`, commit `5fd3fee`).
+- **What it taught:** look at what is left of a range before spending it. A gate that cannot reach
+  the test's minimum only burns fresh units.
