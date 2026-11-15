@@ -1167,3 +1167,229 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   stand, 66,433 up to symmetry over all parents (0.2% repeat), and no parent has a symmetry of
   its own. Red's answers differ from reply to reply, so the transpositions do not meet.
 - **Verdict:** dropped before a build. Reopen only if red's answers are chosen to coincide.
+- **First three jobs** (`frozen/prove.exe`, one run each, quiet machine; seconds of wall-clock):
+
+  | Job | One job of 16 threads | 16 workers, depth 1 | 16 workers, depth 2 | 4 workers of 4 threads, depth 1 |
+  | --- | --- | --- | --- | --- |
+  | a | 77.0 | 55.5 | 55.4 | 57.5 |
+  | b | 74.1 | 67.4 | 73.1 | 73.2 |
+  | c | 87.1 | 78.0 | 45.5 | 78.6 |
+  | all | 238.2 | 200.9 (0.84x) | 174.0 (0.73x) | 209.3 (0.88x) |
+
+  The bar (10% on each job) is not met on job b. Seven more jobs were started and stopped: I
+  compiled while the first was being timed, which spoiled it, and stopping the task left the
+  script and a solver running (found and killed by hand: stopping a background shell does not
+  stop the solver it started). The base's three settings are being run again on four jobs kept
+  for the deciding read (g to j), every run under the run lock.
+
+## 2026-11-15 The climb moves to `parallel-v9`, with sub-agents
+
+- **Owner:** "keep hill climbing the performance of the prover. act as a coordinator with opus
+  sub-agents for implementations."
+- **Set-up:** `main` merged into `parallel-v9` (commit `f4e5efc`: the E23 options, the proof
+  benchmark, `--prefetch`, `--tt-skip`); identity and values checked on the merged build
+  (8,076,471 and 7,136,589 nodes; the bench file through `prove`: wrong 0). The build is kept as
+  `frozen/climb-base.exe`, the base of this climb. `tools/locked.sh` is the machine's run lock;
+  `tools/run.py` knows the set `proof4` (unit: 2 positions; tune 0-87, gate 88-441) and takes
+  `--base`, and runs every arm under the lock.
+- **Three agents (Opus), each in its own worktree and branch:** `climb/search` (one-thread
+  speed of the search on proof positions), `climb/driver` (wall-clock of `prove` on proof jobs),
+  `climb/study` (where a 2x could come from: counts, no shipping). They return evidence; the
+  coordinator gates on positions and jobs they were told not to touch (proof positions 48 and
+  later; jobs g to j).
+- **Worktrees:** the app's own worktree isolation fails here (the folder's path is too long for
+  git), so the worktrees were made by hand in a shorter place.
+- **Gate for the driver:** `tools/provegate.py` reads base against candidate on whole proof jobs
+  (wall-clock, a job a unit, fixed length, every solve under the lock). Reserved for it: jobs g to
+  j and eight more made today from the paused proof's results (`work/e24/k.pos` to `r.pos`, the
+  next eight by the time the proof spent on them: 113 to 142 s). Twelve jobs cannot feed a
+  sequential test (it takes no decision before 30 units), so a driver read is of fixed length
+  and passes when its 95% interval excludes zero.
+- **Owner, on the build tools for profile-guided optimisation (E27):** "I'll install them". E27
+  is open again once the C++ linker is on the machine. It will be two reads, not one: the MSVC
+  toolchain against the GNU one (the environment pin changes), then the profile on top.
+
+## 2026-11-15 E27 open again: the plan, written before the build tools are in
+
+- **Owner:** asked whether I could install the build tools myself; told what it takes (the
+  package manager, Microsoft's licence accepted on the owner's behalf, the administrator prompt
+  theirs to click, a few gigabytes): "Yes, install it". The installer runs holding the run lock
+  (kept fresh every four minutes), and the three agents were told that the lock is held long.
+- **Two questions, kept apart.** Both toolchains are rustc 1.97.1.
+  - **E27a, the toolchain:** the unchanged source built for `x86_64-pc-windows-msvc` against the
+    GNU build. Same compiler and LLVM; the linker and the C runtime differ. Expected: within 2%
+    either way. It is read because E27b's base has to be the plain MSVC build.
+  - **E27b, the profile:** the MSVC build made with a profile of the tune positions (proof
+    positions 0-23 with `--window 0,1`, and ply 7 positions 0-99) against the plain MSVC build.
+    Expected: 5-15% less time. Node counts must be the base's exactly (same source).
+- **How it would be used.** A profiled build is packaging, not a change of the program: day to
+  day, candidate and base are both plain builds, so a gate keeps comparing like with like. The
+  profile goes onto the build that does the long proofs, and its gain is read again at each
+  freeze.
+- **Test:** screen on proof positions 0-23, three runs an arm, interleaved, one thread, under
+  the lock. Gate on fresh proof units through `tools/run.py --set proof4` if the screen shows
+  2% or more. **Bar:** `SPRT[0, 0.05]`, wrong values 0, node counts identical.
+
+## 2026-11-15 E24 result: sixteen single-thread workers beat one job of sixteen threads, unevenly
+
+- **Reserved jobs g to j** (`frozen/climb-base.exe`, one run each, every run under the lock;
+  seconds of wall-clock; `work/e24c/`):
+
+  | Job | One job of 16 threads | 16 workers, depth 1 | 16 workers, depth 2 | Beside it |
+  | --- | --- | --- | --- | --- |
+  | g | 92.4 | 82.6 | 102.5 | nothing |
+  | h | 98.4 | 96.2 | 87.3 | nothing |
+  | i | 127.6 | 114.6 | 108.5 | the build-tools installer, from the second run on |
+  | j | 126.0 | 121.0 | 93.9 | the installer (first run), two compiles of mine (the others) |
+
+- **Clean jobs only** (a, b, c from the first batch, g, h): one job of 16 threads 429.0 s;
+  16 workers at depth 1 379.7 s (0.89x); at depth 2 363.8 s (0.85x). With i and j: 682.6,
+  615.3 (0.90x), 566.2 (0.83x).
+- **By job the ratio runs from 0.52x to 1.11x.** The bar of the hypothesis (10% on each job) is
+  not met; on the total both settings are 10-17% ahead of the shared-table job. Depth 1
+  against depth 2 is not decided: they trade places from job to job (g: 82.6 against 102.5; c:
+  78.0 against 45.5), and one run a job cannot tell the setting from the run. Depth 2 throws
+  work away (55 to 152 jobs stopped a solve), depth 1 none.
+- **Verdict:** a long proof should use single-thread workers, not the shared table (this is what
+  the paused proof used: `--job-threads 16`). Which depth, and whether the spread between jobs
+  can be removed (work thrown away, workers idle at the end of a root), is the driver agent's
+  question. Not known yet: how much two runs of the same setting differ; that A/A read comes
+  before the driver's gate.
+- **Mistake, twice:** timed runs with something beside them. The installer was started outside
+  the lock because the owner was waiting for its prompt (right call, known cost); my two
+  compiles during job j were not needed then. Compiles are allowed beside one-thread timings;
+  beside a 16-thread timing they take a sixteenth of the machine. Rule from here: no compile
+  while a `prove` timing of mine is running.
+
+## 2026-11-15 E27: the build tools are in; identity and the screen
+
+- **Install:** Visual Studio Build Tools 2022 (17.14.45, the C++ workload), by `winget`, on the
+  owner's word; seven minutes (13:15 to 13:22).
+- **The linker and this folder:** `link.exe` fails with LNK1104 when the target directory is
+  inside this repo (the path is longer than 260 characters). An MSVC build needs a short
+  `--target-dir` (the scratchpad). The GNU build is not affected.
+- **Identity:** the plain MSVC build and the profiled build both give 1,724,647 nodes on ply 7
+  positions 0-99, as the base does; all values right.
+- **The profile:** the instrumented build on proof positions 0-23 (`--window 0,1`; 75.4 M nodes)
+  and ply 7 positions 0-99, merged with `llvm-profdata`.
+- **Screen** (proof positions 24-35, not in the profile; `--window 0,1`; 62,315,717 nodes on
+  every run; seconds, in the order run; the machine was idle except for the agents' compiles):
+
+  | Run | GNU base | MSVC plain | MSVC profiled |
+  | --- | --- | --- | --- |
+  | 1 | 61.7 | 53.0 | 54.3 |
+  | 2 | 63.5 | 61.1 | 55.8 |
+  | 3 | 59.9 | (cut off) | (cut off) |
+
+  Repeats of one build differ by up to 15%, so the screen says only "both look ahead of the
+  GNU build; the profile's own share is not visible". The screen ran without the run lock, on
+  purpose: the lock was stuck (below) and nothing could be timed beside it.
+- **Gates started:** `E27A` (MSVC plain against the GNU base) and `E27B` (profiled against MSVC
+  plain), each `SPRT[0, 0.05]` on fresh proof units, cap 60 units.
+- **A stuck lock:** the search agent force-killed a timing round that held the run lock
+  (13:27). The lock frees itself after 20 minutes. The agent's own attempt to remove it was
+  refused by the permission check and it asked whether I would; I did not (a refused action is
+  not done for an agent by someone else). The profile run and the screen used the gap. Told to
+  all agents' future briefs: stop the solver, never the script that holds the lock.
+
+## 2026-11-15 E27 result: both gates pass; the climb's base is now a profiled MSVC build
+
+- **E27A, the toolchain** (plain MSVC build against the GNU base; proof units 44-73, `--window 0,1`):
+  +4.9% [+2.1%, +7.8%] where it stopped, sd 0.076 per unit, `SPRT[0, 0.05]` PASS at 30 units;
+  total time 175.2 s against 168.2 s (0.960x); node counts identical (183,799,694).
+- **E27B, the profile** (profiled against plain MSVC; proof units 74-103): +6.3% [+3.0%, +9.8%]
+  where it stopped, sd 0.090, PASS at 30 units; total time 162.3 s against 153.3 s (0.944x);
+  node counts identical (177,240,303).
+- **Not measured:** the two together against the GNU base. Passes do not add; the product of
+  the two totals (0.907x) is an expectation, not a reading. Both sizes are read where a
+  sequential test stopped and lean high.
+- **Hypotheses against results:** the toolchain was expected "within 2% either way" and gave
+  about 5%: wrong, in our favour. The profile was expected at 5-15% and gave about 6%.
+- **Frozen:** `frozen/climb-base.exe` = the profiled build that passed (`231876efcb8b`, source
+  of `f4e5efc`). Beside it: `climb-base-plain.exe` (plain MSVC, `7321efa41a10`) and
+  `climb-base-gnu.exe` (the GNU build, `18c5a5c49d58`).
+- **The build is a script now:** `sh tools/build.sh OUT.exe` (plain MSVC) and
+  `sh tools/build.sh --pgo OUT.exe` (profiled; the profile is always collected on proof
+  positions 0-23 with `--window 0,1` and ply 7 positions 0-99). It builds in a short directory
+  because the linker fails on this folder's long path. Two plain builds of the same source
+  differ in 23 bytes (the linker's time stamps): the code is the same.
+- **What changes for the climb** (the skill's rule 2: test the build production runs):
+  - A deciding read compares two profiled builds, base and candidate each built by
+    `tools/build.sh --pgo`. A hand-tuned branch or layout that pays on a plain build may be
+    worth nothing once the compiler has the profile.
+  - Screens may use plain MSVC builds on both arms (a build in 20 s instead of 3 minutes).
+  - The agents now at work started from GNU builds. Their screens stand as screens; their
+    changes are gated on profiled builds.
+- **Gate units:** the proof set's gate range has 117 units left (104-220).
+
+## 2026-11-15 The proof driver against itself: two runs of one setting differ by 12% (sd)
+
+- **Run** `DRV-AA` (`tools/provegate.py`): the profiled base against itself, 16 single-thread
+  workers at depth 1, jobs g to j, every solve under the lock.
+
+  | Job | First run (s) | Second run (s) | Ratio | Nodes, first and second |
+  | --- | --- | --- | --- | --- |
+  | g | 77.2 | 75.5 | 0.978 | 1,023 M and 1,028 M |
+  | h | 76.2 | 71.5 | 0.939 | 1,004 M and 946 M |
+  | i | 98.5 | 99.3 | 1.008 | 1,198 M and 1,277 M |
+  | j | 91.1 | 110.9 | 1.217 | 1,102 M and 1,383 M |
+
+- **Reading:** the sd of the log ratio is 0.115 a job. The time follows the nodes: which
+  worker finishes first changes what the others know, and job j searched a quarter more
+  positions on its second run. So one run a job cannot rank two settings that differ by
+  less than about a quarter, which is what E24's table looked like.
+- **What a driver read resolves:** twelve jobs, one run an arm: a 95% interval of about plus or
+  minus 7%. Two runs an arm: about 5%. A driver change has to be worth 10% to be seen with the
+  jobs at hand; smaller ones need more jobs (62 more proved positions exist in the paused
+  proof's results, at 2 to 12 minutes a solve).
+- **The profiled build on whole jobs** (not a paired read: other runs, other hours): g 77.2 and
+  75.5 s where the GNU build took 82.6 s with the same setting; h 76.2 and 71.5 s against
+  96.2 s.
+- **The spoiled arms of E24** (jobs i and j) are not run again: the base has changed build since,
+  and a driver read pairs candidate and base anyway.
+
+## 2026-11-15 The machine is a third slower today than last night (the ruler, not the solver)
+
+- **What:** asked how we compare with the reference, I timed the profiled base on its five bench
+  files: 142.6 s on one thread, 161.5 M nodes, all 126 values right (16 threads: 19.9 s). Last
+  night v9 took 99.7 s for the same 161.5 M nodes.
+- **Check:** four builds side by side on `bench_ply5_other_openings` (24 positions, 13,223,437
+  nodes each), three runs, under the lock: v9 of last night (`frozen/base.exe`) 8.68, 8.30,
+  8.40 s; the climb base built with GNU 8.20, 8.62, 8.62; plain MSVC 8.06, 8.07, 8.03; profiled
+  8.26, 7.34, 8.01. Last night `frozen/base.exe` took 6.3 s on this file.
+- **Reading:** the same executable is 1.33x slower today, so today's absolute times cannot be
+  set beside last night's. Paired reads (candidate and base in the same minutes) are not
+  touched by this. Side by side the profiled base is about 0.93x of v9 on this file.
+- **Why, not settled:** the machine now runs three agents, their builds and the desktop
+  app's sessions beside every timing: 3.1 GB of 15.9 GB free, 22 GB committed, the system
+  compressing memory, power plan "Balanced". Earlier today the same was seen and not
+  explained (ply 5 positions 0-29: 8.2 s last night, 11.3-11.8 s today). A long proof should
+  run with the machine to itself; what a quiet machine is worth is a measurement to take when
+  the agents are done.
+
+## 2026-11-15 E28: the search agent's bundle (hypothesis, before the gate)
+
+- **From:** branch `climb/search` (Opus sub-agent), eight commits on `f4e5efc`, tip `8507875`.
+  Seven change the code that runs by default, all claimed to keep every answer: a reach test
+  can answer from the placements an earlier test found (a witness; `--no-witness`); the last
+  piece of a two-piece reach test is generated only where it can close the gap, and without
+  copying the position; threat scans and killer threats stop their bound as soon as it is
+  above what the threat needs; cheaper grow anchors. The eighth extends `--prefetch`.
+- **The agent's screens** (tune positions; median of 5 rounds; node counts identical, 75,382,224
+  on proof positions 0-23): GNU builds 0.880x, with `--prefetch` 0.830x; profiled MSVC builds
+  0.915x, with `--prefetch` 0.877x. The profile takes back about a third of what the hand
+  changes show on the GNU build. Its profile of the base: reach tests 40% of the time (the
+  two-piece "no" answers alone 26%), threat scans 17%.
+- **Hypothesis E28:** the seven changes together, profiled build against profiled base, take
+  less time on fresh proof positions; expected 0.92x. Same nodes. `SPRT[0, 0.05]`, cap 60.
+- **Hypothesis E25 (logged earlier, now on this code):** prefetch on by default (commit
+  `36892b4` on `climb/search-pf`, profiled with it on) against the E28 candidate; expected
+  0.95x. Same nodes. `SPRT[0, 0.05]`, cap 60.
+- **Before a freeze, besides the gates:** the coordinator's own identity and label runs (three
+  identity sets, ply 8, the five bench files, `verify 100`, one 16-thread run), and an
+  independent agent (Opus, branch `climb/verify`) that tries to refute each change and runs old
+  and new code side by side. The witness is the one to worry about: it is the only change
+  that carries an answer from one position to another.
+- **Not split by commit:** the agent's early rounds were lost; the bundle is gated as one. If it
+  fails, nothing is learned about its members; if the review breaks one member, that one is
+  taken out and the rest gated again under a new key.

@@ -37,6 +37,8 @@ BASE = os.path.join(FROZEN, "base.exe")
 CAND = os.path.join(ROOT, "target", "release", "snek.exe")
 HC = os.path.join(ROOT, "tools", "hc.py")
 GROUP = 10
+# sets that are not a ply file of tests/set1: their file and their positions a unit
+OTHER_SETS = {"proof4": (os.path.join(ROOT, "tests", "proof4", "positions.txt"), 2)}
 # shares of each set, in units: tune, gate, confirm, held-out
 SHARES = (0.15, 0.60, 0.15, 0.10)
 MIN_GATE_UNITS = 30  # the default --min-units of hc.py sprt
@@ -47,12 +49,18 @@ def sha(path):
 
 
 def set_path(name):
+    if name in OTHER_SETS:
+        return OTHER_SETS[name][0]
     return os.path.join(SETS, name + ".txt")
+
+
+def group(name):
+    return OTHER_SETS[name][1] if name in OTHER_SETS else GROUP
 
 
 def ranges(name):
     """Unit ranges [a, b) of each kind for a set."""
-    n = sum(1 for l in open(set_path(name)) if l.strip() and not l.startswith("#")) // GROUP
+    n = sum(1 for l in open(set_path(name)) if l.strip() and not l.startswith("#")) // group(name)
     cuts = [0]
     for s in SHARES[:-1]:
         cuts.append(cuts[-1] + int(n * s))
@@ -74,8 +82,10 @@ def next_unused(name, kind):
 
 def solve_units(exe, args, name, u0, u1):
     """Runs one arm on units [u0, u1); returns per-unit (seconds, nodes) and whether every value was right."""
-    cmd = [exe, "bench", set_path(name), "--from", str(u0 * GROUP), "--to", str(u1 * GROUP)] + args
-    out = subprocess.run(cmd, capture_output=True, text=True)
+    g = group(name)
+    # under the machine's run lock (tools/locked.sh), so that no other timed or heavy run overlaps
+    cmd = ["sh", os.path.join(ROOT, "tools", "locked.sh"), exe, "bench", set_path(name), "--from", str(u0 * g), "--to", str(u1 * g)] + args
+    out = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
     units = {}
     ok = out.returncode == 0
     for line in out.stdout.splitlines():
@@ -84,7 +94,7 @@ def solve_units(exe, args, name, u0, u1):
         i, ply, expected, value, nodes, us, verdict = line.split()
         if verdict != "ok":
             ok = False
-        u = int(i) // GROUP
+        u = int(i) // g
         s, n = units.get(u, (0.0, 0))
         units[u] = (s + max(int(us), 1) / 1e6, n + int(nodes))
     if len(units) != u1 - u0:
@@ -103,6 +113,7 @@ def main():
     ap.add_argument("kind", choices=["aa", "known", "tune", "gate", "confirm", "heldout", "freeze"])
     ap.add_argument("--set", default="ply07")
     ap.add_argument("--cand", default=CAND)
+    ap.add_argument("--base", default=BASE, help="the build to compare against (default: frozen/base.exe)")
     ap.add_argument("--cand-args", default="")
     ap.add_argument("--base-args", default="")
     ap.add_argument("--units", type=int, default=30)
@@ -124,12 +135,12 @@ def main():
             sys.exit(f"no passed gate under the key {a.key}: nothing frozen")
         if gates[-1].get("cand") != sha(a.cand):
             sys.exit(f"{a.cand} is not the executable that passed the gate {a.key}: nothing frozen")
-        shutil.copyfile(a.cand, BASE)
+        shutil.copyfile(a.cand, a.base)
         git = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
         dirty = subprocess.run(["git", "-C", ROOT, "status", "--porcelain", "--", "src", "Cargo.toml"], capture_output=True, text=True).stdout.strip()
-        rec = {"time": now(), "key": a.key, "kind": "freeze", "base": sha(BASE), "commit": git + ("+dirty" if dirty else ""), "note": a.hypothesis}
-        shutil.copyfile(BASE, os.path.join(FROZEN, f"{a.key}-{rec['base']}.exe"))
-        with open(os.path.join(FROZEN, "BASE.txt"), "w") as f:
+        rec = {"time": now(), "key": a.key, "kind": "freeze", "base": sha(a.base), "commit": git + ("+dirty" if dirty else ""), "note": a.hypothesis}
+        shutil.copyfile(a.base, os.path.join(FROZEN, f"{a.key}-{rec['base']}.exe"))
+        with open(os.path.splitext(a.base)[0].replace("base", "BASE") + ".txt" if a.base == BASE else os.path.splitext(a.base)[0] + ".txt", "w") as f:
             f.write(json.dumps(rec) + "\n")
         append(RUNLOG, rec)
         print("frozen", rec)
@@ -140,8 +151,8 @@ def main():
         sys.exit(f"key {a.key} was already used; a run is not repeated under its key")
     if a.kind in ("gate", "confirm", "heldout") and not a.hypothesis:
         sys.exit("a deciding read needs --hypothesis")
-    base_exe = BASE
-    cand_exe = BASE
+    base_exe = a.base
+    cand_exe = a.base
     if a.kind != "aa":
         # a private copy, so that a rebuild during the run cannot change the candidate
         os.makedirs(os.path.join(ROOT, "work"), exist_ok=True)
@@ -193,7 +204,7 @@ def main():
                 break
     used_to = u0 + done
 
-    rec = {"time": now(), "key": a.key, "kind": a.kind, "set": a.set, "units": [u0, used_to], "group": GROUP, "hypothesis": a.hypothesis,
+    rec = {"time": now(), "key": a.key, "kind": a.kind, "set": a.set, "units": [u0, used_to], "group": group(a.set), "hypothesis": a.hypothesis,
            "base": sha(base_exe), "cand": sha(cand_exe), "base_args": a.base_args, "cand_args": a.cand_args}
     if a.kind in ("gate", "confirm", "heldout"):
         append(LEDGER, {"time": now(), "key": a.key, "set": a.set, "kind": a.kind, "from": u0, "to": used_to})

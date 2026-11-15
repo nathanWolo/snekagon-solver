@@ -13,3 +13,5 @@
 {"time": "2026-11-15T01:49:02-07:00", "key": "E14", "set": "ply07", "kind": "gate", "from": 179, "to": 209}
 {"time": "2026-11-15T02:06:34-07:00", "key": "LADDER-7B", "set": "ply07", "kind": "confirm", "from": 326, "to": 355}
 {"time": "2026-11-15T02:07:06-07:00", "key": "LADDER-6B", "set": "ply06", "kind": "confirm", "from": 212, "to": 230}
+{"time": "2026-11-15T13:53:19-07:00", "key": "E27A", "set": "proof4", "kind": "gate", "from": 44, "to": 74}
+{"time": "2026-11-15T13:58:37-07:00", "key": "E27B", "set": "proof4", "kind": "gate", "from": 74, "to": 104}
