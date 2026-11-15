@@ -104,7 +104,7 @@ fn threat_zone(pos: &Pos, opp: usize, b: &Placement) -> BB {
         b.cells | b.border
     }
 }
-const MAX_PLY: usize = 40;
+pub(crate) const MAX_PLY: usize = 40;
 const TT_MOVE: u64 = 1 << 30;
 const KILLER1: u64 = 1 << 29;
 const KILLER2: u64 = 1 << 28;
@@ -127,7 +127,7 @@ pub struct Solver {
     aborted: bool,
     /// Measurement only: take the first move from the previous solve's table entries.
     pub hint: bool,
-    killers: [[u16; 2]; MAX_PLY],
+    pub(crate) killers: [[u16; 2]; MAX_PLY],
     bufs: Vec<Vec<u64>>,
     replies: Vec<(u32, BB)>,
 }
@@ -183,6 +183,20 @@ impl Solver {
         self.aborted = false;
         let v = self.search(pos, alpha, beta);
         if self.aborted {
+            UNKNOWN
+        } else {
+            v
+        }
+    }
+
+    /// One more window search for a driver above: the table stays and `nodes` goes on counting.
+    /// `node_limit` is a limit on `nodes`. UNKNOWN when it stopped the search.
+    pub(crate) fn search_more(&mut self, pos: &Pos, alpha: i32, beta: i32, node_limit: u64) -> i32 {
+        self.node_limit = node_limit;
+        self.aborted = false;
+        let v = self.search(pos, alpha, beta);
+        if self.aborted {
+            self.aborted = false;
             UNKNOWN
         } else {
             v

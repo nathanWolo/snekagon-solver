@@ -1063,3 +1063,54 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
   leaves' alpha-beta nodes).
 - **Bar:** at least 5% less time than v9 on ply 6 and on ply 5 for a gate. Otherwise it is
   dropped as a speed gain; the options stay if they beat the old `--pn`.
+- **Built** as planned, plus `--pn-killers` (the proof-number layers share the alpha-beta
+  solver's killers: a move that proved the mover's goal at a ply goes first, and after a refuted
+  move the moves that cover a cell of the refuting reply) and `--pn-mul` (the slope of the start
+  numbers). `snek children FILE` lists the positions one move after each position of a file.
+- **Identity:** without `--pn` the counts are v9's (8,076,471 on ply 7 positions 0-589, 7,136,589
+  on ply 6 positions 0-199); `--pn` alone gives the old counts (733,362 on ply 7 positions 0-7).
+- **Correct:** every label on plies 8-11 (16,000 positions, leaves at 5 pieces with a unit of 40
+  nodes so that leaves stop and resume), ply 7 0-589, ply 6 0-379, ply 5 0-244, and 48 proof
+  positions in eight variants. No wrong value.
+- **A new benchmark, made for this: `tests/proof4/`** (`tools/mkproof.py`): 592 positions four
+  moves in, eight children of each of the 74 positions that the paused run searched to a loss
+  for blue. Each is a red win that the proof of the centre opening has to show. v9 needs about
+  5 M nodes and 5 s for one. Positions 0-47 were used here; the rest are unused.
+- **Results** (one thread, a fresh table for each position; nodes are exact; the seconds of the
+  two right-hand columns were taken with six to eight runs side by side, so only their order
+  counts). "Narrow" is the v9 search asked the question of a proof-number search ("does the mover
+  win", then if not "does the opponent win") with windows of one step: `--pn --pn-ab 12`. The
+  hybrids have `--pn-model --pn-probe --pn-killers --pn-width 3 --pn-rank 1`.
+
+  | Search | Ply 6, 0-199 (alone) | Ply 5, 30-244 | Proof positions 0-47 |
+  | --- | --- | --- | --- |
+  | v9, wide window | 7.14 M, 3.77 s | 103.0 M, 92.8 s | 247.9 M, 246.8 s |
+  | v9, narrow | 7.21 M, 3.67 s | 84.3 M, 76.8 s | 178.4 M, 183.4 s |
+  | Hybrid, proof numbers at the root only | 7.12 M, 3.61 s | 95.7 M, 83.8 s | 174.6 M, 180.3 s |
+  | Hybrid, two layers | 7.09 M, 3.78 s | 100.9 M, 90.1 s | 187.9 M, 196.7 s |
+  | Hybrid, three layers | 8.37 M, 5.54 s | not run | 169.5 M, 174.0 s |
+  | Two layers, leaves with a budget (unit 10,000) | 7.29 M at unit 3,000 | 98.8 M, 89.5 s | 179.3 M, 179.3 s |
+  | Root only, leaves with a budget (unit 10,000) | 8.94 M at unit 3,000 | not run | 383.9 M, 387.5 s |
+
+  Before the killers the hybrid took 7.38 M nodes at ply 6 (root only) and 8.75 M (two layers).
+  The old `--pn` takes 52.5 M nodes and 67 s on the first 30 positions of ply 7, where v9 takes
+  about 0.25 s.
+- **Reading.**
+  1. With alpha-beta's order, its killers and alpha-beta below, the proof-number search went
+     from 60 times slower to level with alpha-beta: within 5% at ply 6 and on the proof
+     positions, 14-20% behind at ply 5. It does not get ahead. The first reading on ply 5
+     (positions 0-29: 4% fewer nodes, 14% fewer with a budget) did not hold on the 215 fresh
+     ones.
+  2. The part that only a proof-number search has, leaves that return after a budget so that
+     effort can move, gains nothing that repeats (-5% to +2% with two layers) and can cost 2.2x.
+     This is what the pot sizing said.
+  3. **The gain found on the way is the question, not the search:** asked "does the mover win"
+     with a window of one step, v9 itself takes 18% fewer nodes at ply 5 and 28% fewer on the
+     proof positions than with the wide window. The window study after E18 had this (0.82-0.94x
+     for a won position); it grows with depth. The proof driver already asks its jobs narrow
+     questions, so the paused run had this gain; `bench` and `solve` do not.
+- **Verdict against the bar** (5% less time than v9's best on ply 6 and ply 5): not met; no
+  gate. The options stay, off by default, as the proof-number search of this project
+  (`--pn --pn-ab 9 --pn-model --pn-probe --pn-killers --pn-width 3 --pn-rank 1`).
+- **Reopen if:** a cost predictor exists that the numbers could carry (see "cheapest win
+  first"), or positions appear where the first moves in order are dear and wrong.
