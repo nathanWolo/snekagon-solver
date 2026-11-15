@@ -437,22 +437,25 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
                 return false;
             }
         }
-        let mut child = *pos;
-        let built = child.place_for(t, player, m);
-        // the last piece (reach_from with one piece left, keeping the sequence it finds)
+        // the last piece (reach_from with one piece left, keeping the sequence it finds), on the
+        // position after the first piece without building it: the built snake is p and the
+        // snakes it joined, `len` cells long
         if *work == 0 {
             return true;
         }
         *work -= 1;
-        let cns = child.nsnakes[player] as usize;
+        let built = p.cells | joined_cells;
+        let own2 = pos.cells[player] | p.cells;
+        let occ2 = pos.occupied() | p.cells;
+        let left2 = left & !(1u8 << p.piece);
         let mut found = PASS;
         let mut flen = 0;
         let check = |m2: u16| {
             let p2 = &t.placements[m2 as usize];
-            let mut len2 = p2.n as i32;
-            for j in 0..cns {
-                if child.snakes[player][j] & p2.border != 0 {
-                    len2 += count(child.snakes[player][j]) as i32;
+            let mut len2 = p2.n as i32 + len; // it touches the built snake
+            for j in 0..ns {
+                if joined >> j & 1 == 0 && pos.snakes[player][j] & p2.border != 0 {
+                    len2 += len_of[j];
                 }
             }
             if len2 >= target {
@@ -472,9 +475,9 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
                     other |= pos.snakes[player][j];
                 }
             }
-            child.find_move_both(t, player, child.left[player], built, other, check)
+            find_grow_both(t, own2, occ2, left2, built, other, check)
         } else {
-            child.find_move(t, player, child.left[player], built, check)
+            find_grow(t, own2, occ2, left2, built, check)
         };
         if ok {
             let own = pos.cells[player];

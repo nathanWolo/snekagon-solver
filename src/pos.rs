@@ -210,17 +210,7 @@ impl Pos {
     /// The generator context for placements that grow an own snake only (`free_new` is left empty).
     #[inline]
     pub fn gen_ctx_grow(&self, player: usize) -> Gen {
-        let empty = self.empty();
-        let own = self.cells[player];
-        let s = shape_of(own);
-        let not_next_body = empty & !neighbours(s.body);
-        Gen {
-            free_new: 0,
-            allowed: [not_next_body & !s.t3 & !s.pair, not_next_body & !s.t2, not_next_body & !s.t1],
-            next_own: empty & s.t1,
-            own,
-            own_with_nb: own & s.t1,
-        }
+        gen_grow(self.cells[player], self.occupied())
     }
 
     /// Whether `player` may place p now, straight from the rules (one placement at a time).
@@ -285,26 +275,7 @@ impl Pos {
         }
         if touching != 0 {
             // only placements that grow a snake: no new-snake anchors to compute
-            let mut g = self.gen_ctx_grow(player);
-            g.next_own &= neighbours(touching);
-            if g.next_own == 0 {
-                return false;
-            }
-            for piece in (0..NPIECES).rev() {
-                if pieces >> piece & 1 == 0 {
-                    continue;
-                }
-                for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
-                    let mut anchors = grow_anchors(o, &g);
-                    while anchors != 0 {
-                        if f(o.placement_at[first(anchors)] as u16) {
-                            return true;
-                        }
-                        anchors &= anchors - 1;
-                    }
-                }
-            }
-            return false;
+            return find_grow(t, self.cells[player], self.occupied(), pieces, touching, f);
         }
         let g = self.gen_ctx(player);
         for piece in (0..NPIECES).rev() {
@@ -327,39 +298,8 @@ impl Pos {
     /// `find_move` for placements that grow a snake and touch both the own cells `a` and the own
     /// cells `b` (a cell of the placement next to a cell of each), in the same order.
     #[inline]
-    pub fn find_move_both<F: FnMut(u16) -> bool>(&self, t: &Tables, player: usize, pieces: u8, a: BB, b: BB, mut f: F) -> bool {
-        if pieces == 0 {
-            return false;
-        }
-        let mut g = self.gen_ctx_grow(player);
-        let next_a = g.next_own & neighbours(a);
-        let next_b = g.next_own & neighbours(b);
-        if next_a == 0 || next_b == 0 {
-            return false;
-        }
-        g.next_own = next_a;
-        for piece in (0..NPIECES).rev() {
-            if pieces >> piece & 1 == 0 {
-                continue;
-            }
-            for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
-                let mut touch_b = next_b;
-                for k in 1..o.size as usize {
-                    touch_b |= (next_b & o.win[k]) >> o.shift[k];
-                }
-                if touch_b == 0 {
-                    continue;
-                }
-                let mut anchors = grow_anchors_in(o, &g, touch_b);
-                while anchors != 0 {
-                    if f(o.placement_at[first(anchors)] as u16) {
-                        return true;
-                    }
-                    anchors &= anchors - 1;
-                }
-            }
-        }
-        false
+    pub fn find_move_both<F: FnMut(u16) -> bool>(&self, t: &Tables, player: usize, pieces: u8, a: BB, b: BB, f: F) -> bool {
+        find_grow_both(t, self.cells[player], self.occupied(), pieces, a, b, f)
     }
 
     pub fn moves(&self, t: &Tables, out: &mut Vec<u16>) {
@@ -473,6 +413,86 @@ impl Pos {
             Pos::from_text(text)
         }
     }
+}
+
+/// The generator context for placements of the player with the cells `own` that grow an own snake
+/// (`free_new` is left empty); `occ`: all occupied cells.
+#[inline]
+pub fn gen_grow(own: BB, occ: BB) -> Gen {
+    let empty = ALL & !occ;
+    let s = shape_of(own);
+    let not_next_body = empty & !neighbours(s.body);
+    Gen {
+        free_new: 0,
+        allowed: [not_next_body & !s.t3 & !s.pair, not_next_body & !s.t2, not_next_body & !s.t1],
+        next_own: empty & s.t1,
+        own,
+        own_with_nb: own & s.t1,
+    }
+}
+
+/// Placements among `pieces` of the player with the cells `own` (`occ` occupied in all) that grow a
+/// snake and touch the own cells `a`, largest pieces first, until f says yes.
+#[inline]
+pub fn find_grow<F: FnMut(u16) -> bool>(t: &Tables, own: BB, occ: BB, pieces: u8, a: BB, mut f: F) -> bool {
+    let mut g = gen_grow(own, occ);
+    g.next_own &= neighbours(a);
+    if g.next_own == 0 {
+        return false;
+    }
+    for piece in (0..NPIECES).rev() {
+        if pieces >> piece & 1 == 0 {
+            continue;
+        }
+        for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
+            let mut anchors = grow_anchors(o, &g);
+            while anchors != 0 {
+                if f(o.placement_at[first(anchors)] as u16) {
+                    return true;
+                }
+                anchors &= anchors - 1;
+            }
+        }
+    }
+    false
+}
+
+/// Placements among `pieces` of the player with the cells `own` (`occ` occupied in all) that grow a
+/// snake and touch both the own cells `a` and the own cells `b`, largest pieces first, until f says yes.
+#[inline]
+pub fn find_grow_both<F: FnMut(u16) -> bool>(t: &Tables, own: BB, occ: BB, pieces: u8, a: BB, b: BB, mut f: F) -> bool {
+    if pieces == 0 {
+        return false;
+    }
+    let mut g = gen_grow(own, occ);
+    let next_a = g.next_own & neighbours(a);
+    let next_b = g.next_own & neighbours(b);
+    if next_a == 0 || next_b == 0 {
+        return false;
+    }
+    g.next_own = next_a;
+    for piece in (0..NPIECES).rev() {
+        if pieces >> piece & 1 == 0 {
+            continue;
+        }
+        for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
+            let mut touch_b = next_b;
+            for k in 1..o.size as usize {
+                touch_b |= (next_b & o.win[k]) >> o.shift[k];
+            }
+            if touch_b == 0 {
+                continue;
+            }
+            let mut anchors = grow_anchors_in(o, &g, touch_b);
+            while anchors != 0 {
+                if f(o.placement_at[first(anchors)] as u16) {
+                    return true;
+                }
+                anchors &= anchors - 1;
+            }
+        }
+    }
+    false
 }
 
 /// The anchor cells where orientation `o` starts a new snake.
