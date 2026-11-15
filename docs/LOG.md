@@ -503,3 +503,36 @@ test decided, (confirm) fixed length on fresh units.
   timing it. The size check was sound and almost useless, because it counted the same snake twice.
 - **Process note:** I chained the freeze to the gate command in one line. The verdict was a pass, but
   a line like that would also have frozen a fail. The freeze now checks the verdict first.
+
+## 2026-11-15 Side study: a second look at the best few moves (not built)
+
+- **What:** `tools/rerank.py` on the root-move files of the earlier study (ply 5, 6, 7): order the
+  moves by the model, then re-order the first K by a look-ahead feature and count the nodes up to the
+  first win.
+- **Result:** nothing that holds across files. Fewest replies first, K = 10: 0.89x, 1.08x, 0.85x on
+  the three ply-6 files, 1.03x at ply 7, 1.22x at ply 5. The other keys are within a few percent
+  of 1.00x or worse.
+- **Where the root's cost is:** 21-55% is moves tried before the first win, and the win that is found
+  costs about twice the cheapest one. The cheapest win alone would cost 3.2-4.3 times less at ply 6.
+- **Verdict:** not built. The open idea "cheapest win first" stands, and these features are not it.
+
+## 2026-11-15 E13: a reach test whose target needs a second snake asks first whether one is near
+
+- **Hypothesis** (written before the run): when the target is more than a snake plus the cells in
+  hand, another old snake has to be joined, and one of them must have an end within (cells in hand +
+  1) steps of an end of the starting snake. 500 K of the 925 K two-piece "no" answers have such a
+  target and cost about 2,000 cycles each in v8. A distance check per snake (a table of the cells
+  within r steps) answers those where no snake is near without generating a placement. Answers do
+  not change; node counts stay equal to v8.
+- **Expected:** about 5% less time.
+- **Test:** node counts against v8; `verify` (reach against brute force); gate `E13` at ply 7,
+  `SPRT[0, 0.05]`, cap 100.
+- **Built and reverted.** Identity held (node counts equal to v8, `verify 150 21` passed), and the
+  time did not move: 1.013 s against 1.003 s on 100 ply-7 tune positions and 2.786 s against 2.780 s
+  at ply 6, switch on against off in the same build (read beside the data-generation jobs, so only
+  the comparison counts).
+- **Verdict:** dropped at the screen; no gate run. `git checkout src/`.
+- **What it taught:** I did not size the pot. Two pieces make the radius up to nine steps on a board
+  eleven cells across: nearly every snake is "near". The check that does prune is the one E12 already
+  has, for the second piece alone (radius up to five). *Reopen if* a tighter necessary condition
+  than distance is found (free cells along the way, not steps).
