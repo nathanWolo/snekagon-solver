@@ -536,3 +536,14 @@ test decided, (confirm) fixed length on fresh units.
   eleven cells across: nearly every snake is "near". The check that does prune is the one E12 already
   has, for the second piece alone (radius up to five). *Reopen if* a tighter necessary condition
   than distance is found (free cells along the way, not steps).
+
+## 2026-11-15 E14: after a failed move, moves that answer the refutation come first
+
+- **Hypothesis** (written before the run): at a node where the first move failed, the opponent's
+  reply that refuted it (the first killer one ply down) is likely to refute most other moves that
+  leave it alone, each at the price of a subtree. The side-study above puts 21-55% of a root's cost
+  in moves tried before the first win. Raising the score of the remaining moves that cover or touch
+  that reply's cells should find the win sooner. Order only: values cannot change.
+- **Expected:** unknown; a guess of 5-15% fewer nodes at ply 6 and 7, more at ply 5.
+- **Test:** node counts on the tune units of plies 7 and 6 for a few sizes of the bonus and levels
+  (screen); if a setting gives 5% fewer nodes on both, gate `E14` at ply 7, `SPRT[0, 0.05]`, cap 100.

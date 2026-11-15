@@ -166,6 +166,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-staged" => o.cfg.staged = false,
             "--no-lazy" => o.cfg.lazy = false,
             "--no-narrow" => o.cfg.narrow = false,
+            "--answer-bonus" => o.cfg.answer_bonus = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),

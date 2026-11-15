@@ -36,11 +36,14 @@ pub struct Config {
     pub lazy: bool,
     /// In a threat scan, recompute only the clusters a placement covers.
     pub narrow: bool,
+    /// After a failed move, the score added to the moves that cover a cell of the reply that refuted
+    /// it (0 = off). 1024 is more than any other score: those moves come first, in their old order.
+    pub answer_bonus: u64,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22, staged: true, lazy: true, narrow: true }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024 }
     }
 }
 
@@ -731,6 +734,7 @@ impl Solver {
         let mut searched = 0u64;
         let mut best = -2;
         let mut best_move = PASS;
+        let mut answered = PASS;
         if buf.is_empty() && skipped == -2 {
             let mut child = *pos;
             child.play(t, PASS);
@@ -788,6 +792,24 @@ impl Solver {
                         self.prof[level][4] += 1;
                     }
                     break;
+                }
+                // The reply that refuted this move (the first killer one ply down) will meet most
+                // moves that leave it alone: the moves that cover one of its cells go first.
+                if self.cfg.answer_bonus > 0 && i + 2 < n {
+                    let k = self.killers[ply + 1][0];
+                    if k != PASS && k != answered {
+                        answered = k;
+                        let reply = t.placements[k as usize].cells;
+                        let bonus = self.cfg.answer_bonus << 16;
+                        for e in buf[i + 1..].iter_mut() {
+                            if t.placements[(*e & 0xFFFF) as usize].cells & reply != 0 {
+                                *e += bonus;
+                            }
+                        }
+                        if i >= 3 {
+                            buf[i + 1..].sort_unstable_by(|a, b| b.cmp(a));
+                        }
+                    }
                 }
                 // The refutation just found may be a threat against the remaining moves. And once the
                 // first move has failed this is probably a node where every move must be refuted, so
