@@ -5,6 +5,7 @@ mod par;
 mod pieces;
 mod pns;
 mod pos;
+mod prove;
 mod solver;
 mod study;
 
@@ -147,11 +148,17 @@ struct Opts {
     pn: bool,
     threads: usize,
     pn_cfg: PnConfig,
+    /// `prove`: the plies the coordinator searches, the results file, plain young-brothers-wait.
+    depth: u32,
+    job_threads: usize,
+    out: Option<String>,
+    plain: bool,
+    upper_first: bool,
     rest: Vec<String>,
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -180,6 +187,11 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-work" => o.cfg.reach_work = val().parse().unwrap(),
             "--pn" => o.pn = true,
             "--threads" => o.threads = val().parse().unwrap(),
+            "--depth" => o.depth = val().parse().unwrap(),
+            "--job-threads" => o.job_threads = val().parse().unwrap(),
+            "--out" => o.out = Some(val()),
+            "--plain" => o.plain = true,
+            "--upper-first" => o.upper_first = true,
             "--par-level" => o.cfg.par_level = val().parse().unwrap(),
             "--par-join" => o.cfg.par_join = val().parse().unwrap(),
             "--pn-slack" => o.pn_cfg.slack = val().parse().unwrap(),
@@ -196,6 +208,47 @@ fn parse_opts(args: &[String]) -> Opts {
         i += 1;
     }
     o
+}
+
+/// Like `bench`, with the proof driver: `--threads N` jobs at once, each solved by `--job-threads T`
+/// threads together, the first `--depth D` plies searched by the coordinator, every finished job appended to `--out FILE` and read back from it at the start.
+/// One line per position: index, ply, expected, value, nodes, microseconds, verdict, then jobs
+/// finished, jobs stopped, results reused, thread-seconds.
+fn prove_cmd(t: &Tables, o: &Opts) {
+    let path = &o.rest[0];
+    let text = std::fs::read_to_string(path).expect("cannot read the position file");
+    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first });
+    let (mut total_nodes, mut total_us, mut wrong, mut n) = (0u64, 0u128, 0u32, 0u32);
+    let (mut jobs, mut stopped, mut thread_s) = (0u64, 0u64, 0f64);
+    for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
+        if i < o.from || i >= o.to {
+            continue;
+        }
+        let (expected, rest) = line.trim().split_once(char::is_whitespace).expect("line needs an expected value and a position");
+        let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
+        let r = prover.prove(&pos);
+        let us = (r.seconds * 1e6) as u128;
+        let ok = if expected == "?" || expected.parse::<i32>().ok() == Some(r.value) {
+            "ok"
+        } else {
+            wrong += 1;
+            "WRONG"
+        };
+        total_nodes += r.nodes;
+        total_us += us;
+        jobs += r.jobs;
+        stopped += r.stopped;
+        thread_s += r.thread_seconds;
+        n += 1;
+        if !o.quiet {
+            println!("{} {} {} {} {} {} {} {} {} {} {:.1} {}", i, pos.ply, expected, r.value, r.nodes, us, ok, r.jobs, r.stopped, r.reused, r.thread_seconds, move_to_string(t, r.best));
+        }
+    }
+    println!("# positions {} nodes {} seconds {:.3} wrong {} unknown 0", n, total_nodes, total_us as f64 / 1e6, wrong);
+    println!("# jobs {} stopped {} thread-seconds {:.1}", jobs, stopped, thread_s);
+    if wrong > 0 {
+        std::process::exit(1);
+    }
 }
 
 /// Solves every position of a file (lines: "<expected or ?> <position text or moves>") and prints one
@@ -302,6 +355,10 @@ fn main() {
         "bench" => {
             let o = parse_opts(&args[2..]);
             bench(t, &o);
+        }
+        "prove" => {
+            let o = parse_opts(&args[2..]);
+            prove_cmd(t, &o);
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");

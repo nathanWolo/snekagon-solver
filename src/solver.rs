@@ -205,7 +205,7 @@ fn threat_zone(pos: &Pos, opp: usize, b: &Placement) -> BB {
         b.cells | b.border
     }
 }
-const MAX_PLY: usize = 40;
+pub const MAX_PLY: usize = 40;
 const NO_UNWIND: usize = usize::MAX;
 const TT_MOVE: u64 = 1 << 30;
 const KILLER1: u64 = 1 << 29;
@@ -310,6 +310,107 @@ impl Solver {
         } else {
             v
         }
+    }
+
+    /// For the proof driver: the value of one position within (alpha, beta), on the shared table,
+    /// given up when `self.stop` is set. `killers`: the killer moves to start from (those of the
+    /// positions searched just before this one in the tree); they come back as the search left them.
+    /// Returns the value (UNKNOWN when stopped) and the table's best move for the position.
+    pub fn solve_job(&mut self, pos: &Pos, alpha: i32, beta: i32, killers: &mut [[u16; 2]; MAX_PLY]) -> (i32, u16) {
+        self.nodes = 0;
+        self.node_limit = u64::MAX;
+        self.aborted = false;
+        self.root_ply = (pos.ply as usize).min(MAX_PLY - 2);
+        self.unwind_to = NO_UNWIND;
+        self.killers = *killers;
+        let v = self.search::<true>(pos, alpha, beta);
+        *killers = self.killers;
+        if self.aborted {
+            return (UNKNOWN, PASS);
+        }
+        (v, self.probe(pos.hash).map_or(PASS, |e| e.mv))
+    }
+
+    /// For the proof driver: what is already known about a position goes into the table.
+    pub(crate) fn seed(&mut self, hash: u64, lo: i32, hi: i32, mv: u16) {
+        self.store(hash, lo, hi, mv, 1 << 30);
+    }
+
+    /// For the proof driver: the moves of `pos` worth a search in the window above `alpha`, best
+    /// first, each as score << 16 | move; the best bound of the moves a threat rules out (-2 if
+    /// none); and the threats. The scores are those of the search (step 4 of `search`, repeated
+    /// here so that the search itself is left as it was); `first` are the moves to put in front.
+    pub(crate) fn ordered_moves(&mut self, pos: &Pos, alpha: i32, first: [u16; 3]) -> (Vec<u64>, i32, Threats) {
+        let t = self.t;
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let mut th = Threats::new();
+        if self.cfg.threats && self.cfg.bounds && pos.left[opp] != 0 {
+            let mut mine = Clusters::new();
+            upper_bound_ex(t, pos, me, 0, Some(&mut mine));
+            self.scan_threats(pos, &mine, alpha, &mut th);
+        }
+        let mut skipped = -2;
+        let mut buf: Vec<u64> = Vec::new();
+        let level = (pos.left[0].count_ones() + pos.left[1].count_ones()) as u32;
+        let own = pos.cells[me];
+        let theirs = pos.cells[opp];
+        let front = neighbours(shape_of(theirs).ends) & pos.empty();
+        let use_model = level >= self.cfg.model_level;
+        let w = self.cfg.model;
+        let empty = pos.empty();
+        let their_shape = shape_of(theirs);
+        let their_free = neighbours(their_shape.ends) & empty & !neighbours(their_shape.body);
+        pos.for_each_move(t, me, pos.pieces_now(), |m| {
+            let p = &t.placements[m as usize];
+            if th.n > 0 {
+                let bound = th.bound_for(p.cells);
+                if bound <= alpha {
+                    skipped = skipped.max(bound);
+                    return;
+                }
+            }
+            let mut score = p.n as u64 * 64;
+            if p.border & own != 0 {
+                score += 256;
+            }
+            if p.cells & front != 0 {
+                score += 128;
+            } else if p.border & theirs != 0 {
+                score += 32;
+            }
+            if use_model {
+                let mut joined = p.n as i32;
+                for j in 0..pos.nsnakes[me] as usize {
+                    if pos.snakes[me][j] & p.border != 0 {
+                        joined += count(pos.snakes[me][j]) as i32;
+                    }
+                }
+                let after = joined.max(pos.longest[me] as i32);
+                let mine = shape_of(own | p.cells);
+                let my_ends = count(neighbours(mine.ends) & empty & !p.cells & !neighbours(mine.body)) as i32;
+                let their_ends = count(their_free & !p.cells) as i32;
+                let s = w[0] * (after - pos.longest[opp] as i32)
+                    + w[1] * p.n as i32
+                    + w[2] * (p.border & own != 0) as i32
+                    + w[3] * joined
+                    + w[4] * (p.cells & front != 0) as i32
+                    + w[5] * (p.border & theirs != 0) as i32
+                    + w[6] * my_ends
+                    + w[7] * their_ends;
+                score = (s + (1 << 20)).max(0) as u64;
+            }
+            if m == first[0] {
+                score = TT_MOVE;
+            } else if m == first[1] {
+                score = KILLER1;
+            } else if m == first[2] {
+                score = KILLER2;
+            }
+            buf.push(score << 16 | m as u64);
+        });
+        buf.sort_unstable_by(|a, b| b.cmp(a));
+        (buf, skipped, th)
     }
 
     #[inline]
