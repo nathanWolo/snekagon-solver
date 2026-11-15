@@ -235,11 +235,13 @@ pub(crate) struct Threats {
     value: [i32; MAX_THREATS],
     tried: [u16; MAX_TRIED],
     ntried: usize,
+    rtried: [u16; MAX_TRIED],
+    nrtried: usize,
 }
 
 impl Threats {
     pub(crate) fn new() -> Threats {
-        Threats { n: 0, zone: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0 }
+        Threats { n: 0, zone: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0, rtried: [PASS; MAX_TRIED], nrtried: 0 }
     }
     /// Upper bound on our value for a move covering `cells`.
     #[inline]
@@ -635,12 +637,24 @@ impl Solver {
     }
 
     /// Adds the opponent placement `m` to the threats if the bounds decide the game after it.
-    fn try_threat(&self, pos: &Pos, m: u16, alpha: i32, th: &mut Threats) {
-        if m == PASS || th.n >= MAX_THREATS || th.ntried >= MAX_TRIED || th.tried[..th.ntried].contains(&m) {
+    fn try_threat(&self, pos: &Pos, m: u16, alpha: i32, deep: bool, th: &mut Threats) {
+        if m == PASS || th.n >= MAX_THREATS {
             return;
         }
-        th.tried[th.ntried] = m;
-        th.ntried += 1;
+        let level = pos.left[0].count_ones() + pos.left[1].count_ones();
+        let deep = deep && level >= self.cfg.reach_threat && th.nrtried < MAX_TRIED && !th.rtried[..th.nrtried].contains(&m);
+        let first_time = th.ntried < MAX_TRIED && !th.tried[..th.ntried].contains(&m);
+        if !first_time && !deep {
+            return;
+        }
+        if first_time {
+            th.tried[th.ntried] = m;
+            th.ntried += 1;
+        }
+        if deep {
+            th.rtried[th.nrtried] = m;
+            th.nrtried += 1;
+        }
         let t = self.t;
         let me = pos.stm as usize;
         let opp = me ^ 1;
@@ -662,8 +676,7 @@ impl Solver {
         // the opponent's? If not, a move of ours that neither covers nor touches b leaves b playable,
         // is itself playable after b, and our one-player optimum after both is no more than after b
         // alone: the move is worth at most the threat's value. Zone: b's cells and border.
-        let level = pos.left[0].count_ones() + pos.left[1].count_ones();
-        let ask = level >= self.cfg.reach_threat && pos.left[me] != 0 && (value == 2 || (value == 0 && alpha < 0));
+        let ask = deep && pos.left[me] != 0 && (value == 2 || (value == 0 && alpha < 0));
         let mut rv = 2;
         if ask {
             let mut child = *pos;
@@ -682,7 +695,7 @@ impl Solver {
             th.zone[th.n] = b.cells | b.border;
             th.value[th.n] = rv;
             th.n += 1;
-        } else if value <= 0 {
+        } else if value <= 0 && first_time {
             th.zone[th.n] = threat_zone(pos, opp, b);
             th.value[th.n] = value;
             th.n += 1;
@@ -1307,8 +1320,8 @@ impl Solver {
         let threats_on = self.cfg.threats && self.cfg.bounds && pos.left[opp] != 0;
         let mut th = Threats::new();
         if threats_on {
-            self.try_threat(pos, self.killers[ply + 1][0], alpha, &mut th);
-            self.try_threat(pos, self.killers[ply + 1][1], alpha, &mut th);
+            self.try_threat(pos, self.killers[ply + 1][0], alpha, false, &mut th);
+            self.try_threat(pos, self.killers[ply + 1][1], alpha, false, &mut th);
         }
         let mut skipped = -2; // the best bound of the moves skipped because of threats
         let mut scanned = !threats_on;
@@ -1602,7 +1615,7 @@ impl Solver {
                 // first move has failed this is probably a node where every move must be refuted, so
                 // look for all of the opponent's threats.
                 if threats_on && first_pass && i + 1 < n {
-                    self.try_threat(pos, self.killers[ply + 1][0], alpha, &mut th);
+                    self.try_threat(pos, self.killers[ply + 1][0], alpha, true, &mut th);
                     if !scanned {
                         scanned = true;
                         self.prof[level][7] += 1;

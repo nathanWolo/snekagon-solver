@@ -1,0 +1,62 @@
+== identity (flags off), proof 0-4, expect 13150272
+# positions 4 nodes 13150272 seconds 11.271 wrong 0 unknown 0
+== reach threats on (all levels), proof 0-4
+# positions 4 nodes 6683620 seconds 11.364 wrong 0 unknown 0
+== verify 30
+verify ok: 30 games, 479 positions, 2492716 placement checks, 22903 threat-bound checks, 882 reach checks
+== study, proof 0-1
+# positions 1 nodes 2026448 seconds 4.572 wrong 0 unknown 0
+# study: total nodes 2026448
+# waste (nodes under failed moves at nodes that cut, outermost): red-to-move nodes 1092890 (53.9%), blue-to-move nodes 0 (0.0%)
+# waste by pieces left of the wasted node: left nodes | under red's failed moves, under blue's failed moves (share of the level)
+#   2:    243336 |    224194  92.1%         0   0.0%
+#   3:    362448 |    282270  77.9%         0   0.0%
+#   4:    548158 |    452872  82.6%         0   0.0%
+#   5:    751346 |     90221  12.0%         0   0.0%
+#   6:     73647 |     40763  55.3%         0   0.0%
+#   7:     46057 |      1818   3.9%         0   0.0%
+#   8:      1095 |       744  67.9%         0   0.0%
+#   9:       357 |         6   1.7%         0   0.0%
+#  10:         3 |         2  66.7%         0   0.0%
+#  11:         1 |         0   0.0%         0   0.0%
+# all-fail nodes: left count | moves/node distinct-replies/node top-reply-share-of-moves top-reply-share-of-nodes nodes/node | kinds of children: bound, table, first-cut, later-cut, other
+#   4:   18434 |    9.5  0.78  50.0%  63.5%     13.8 | 73643 27329 72854 2048 0
+#   5:   30742 |   14.0  1.17  41.3%  60.6%     24.7 | 177801 83354 160861 6872 0
+#   6:   25997 |   27.4  0.48  21.4%  40.4%     38.8 | 396980 202921 110460 795 0
+#   7:     739 |   52.9  3.60  77.0%  73.6%   1182.4 | 125 2692 34933 1351 0
+#   8:     353 |  127.9  4.10  72.9%  78.2%   3000.6 | 11 11344 33738 70 0
+#   9:       2 |  305.5  7.50  36.3%  36.2% 331887.0 | 0 0 594 17 0
+#  10:       1 |  351.0  6.00  76.4%  82.7% 1008077.0 | 0 0 347 4 0
+# reach threats at all-fail nodes: left | tests threats work/test | in order: moves pruned, nodes under them | oracle: moves, nodes
+#   4:   14329    6782      5.3 |    71312      99467 |    83961     118181
+#   5:   35821   17729     18.1 |   212061     327615 |   242614     390958
+#   6:   12352    5487     34.9 |   135281     166907 |   151771     190205
+#   7:    2606     126     30.7 |     4371      54327 |     5348      81372
+#   8:    1435     105     50.3 |     4525      51499 |     4713      55164
+#   9:      15       0      2.7 |        0          0 |        0          0
+#  10:       6       0      4.2 |        0          0 |        0          0
+# reach threats, exclusive nodes saved: in order 683449 (33.7%), oracle 800574 (39.5%)
+# one-player optimum at open nodes: left | nodes tests decided work/test out-of-work | separated (whole) separated (relevant clusters)
+#   4:   216934        4        4      1.0      0 |      0      8
+#   5:   148797    38290     8360     18.0      0 |      0      0
+#   6:    67921    67921    16201     23.1      0 |      0      0
+#   7:    34700    34700      461      6.7      0 |      0      0
+#   8:     1095     1095        0      3.1      0 |      0      0
+#   9:      357      357        0      2.6      0 |      0      0
+#  10:        3        3        0      3.0      0 |      0      0
+#  11:        1        1        0      2.0      0 |      0      0
+# exclusive nodes saved: one-player optimum 356000 (17.6%), separation 87 (0.0%)
+# slack of the upper bound over the one-player optimum (sample), by pieces left and hand: counts of slack 0..7+
+#   4 hand 2: [29820, 4096, 1663, 5337, 5313, 1275, 2107, 4527]
+#   5 hand 2: [10923, 178, 1747, 2175, 1758, 223, 338, 1182]
+#   5 hand 3: [8895, 583, 1684, 4427, 1085, 250, 319, 1281]
+#   6 hand 3: [9807, 198, 696, 1587, 1342, 393, 735, 2048]
+#   7 hand 3: [828, 6, 290, 585, 810, 360, 517, 924]
+#   7 hand 4: [4236, 0, 42, 26, 11, 3, 0, 2]
+#   8 hand 4: [188, 0, 8, 22, 8, 0, 2, 1]
+#   9 hand 4: [34, 0, 1, 7, 1, 0, 0, 0]
+#   9 hand 5: [43, 0, 0, 0, 0, 0, 0, 0]
+
+real	0m4.607s
+user	0m0.015s
+sys	0m0.015s

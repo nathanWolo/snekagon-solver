@@ -1,0 +1,14 @@
+== ply11 all, reach threats 0
+# positions 4000 nodes 23670 seconds 0.013 wrong 0 unknown 0
+== ply10 all, reach threats 0
+# positions 4000 nodes 112016 seconds 0.076 wrong 0 unknown 0
+== ply09 all, reach threats 0
+# positions 4000 nodes 691971 seconds 0.430 wrong 0 unknown 0
+== ply08 all, reach threats 0
+# positions 4000 nodes 4828464 seconds 4.569 wrong 0 unknown 0
+== ply07 0-589, off then on
+# positions 590 nodes 8076471 seconds 4.747 wrong 0 unknown 0
+# positions 590 nodes 5425148 seconds 4.930 wrong 0 unknown 0
+== ply06 0-199, off then on
+# positions 200 nodes 7136589 seconds 3.866 wrong 0 unknown 0
+# positions 200 nodes 4571569 seconds 4.152 wrong 0 unknown 0

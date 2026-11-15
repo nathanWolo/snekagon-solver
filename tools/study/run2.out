@@ -1,0 +1,16 @@
+== 
+# positions 12 nodes 40986167 seconds 38.987 wrong 0 unknown 0
+== --reach-threat 0
+# positions 12 nodes 20892206 seconds 41.123 wrong 0 unknown 0
+== --reach-threat 0 --reach-threat-work 200
+# positions 12 nodes 21941929 seconds 40.726 wrong 0 unknown 0
+== --reach-threat 0 --reach-threat-work 600
+# positions 12 nodes 20917348 seconds 41.083 wrong 0 unknown 0
+== --reach-threat 5
+# positions 12 nodes 25878243 seconds 40.234 wrong 0 unknown 0
+== --reach-threat 6
+# positions 12 nodes 28314809 seconds 41.286 wrong 0 unknown 0
+== --reach-threat 7
+# positions 12 nodes 40608134 seconds 37.967 wrong 0 unknown 0
+== --reach-threat 5 --reach-threat-work 600
+# positions 12 nodes 25892426 seconds 41.773 wrong 0 unknown 0
