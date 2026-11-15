@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 refdata/
 work/
+tests/set1/*.txt
+!tests/set1/MANIFEST.txt
+frozen/

@@ -1,0 +1,22 @@
+labels.txt 22780 positions sha256 79157f6b43cf790f5c1e3e3122843117f58768fb25a593a9bdacfb3e4e3a1c4f
+  ply 5: 245 positions (233 wins, 1 draws, 11 losses for the side to move)
+  ply 6: 2583 positions (2369 wins, 22 draws, 192 losses for the side to move)
+  ply 7: 3952 positions (2373 wins, 222 draws, 1357 losses for the side to move)
+  ply 8: 4000 positions (2496 wins, 210 draws, 1294 losses for the side to move)
+  ply 9: 4000 positions (2260 wins, 233 draws, 1507 losses for the side to move)
+  ply 10: 4000 positions (2270 wins, 222 draws, 1508 losses for the side to move)
+  ply 11: 4000 positions (2129 wins, 212 draws, 1659 losses for the side to move)
+ply05.txt 245 positions sha256 c41235c934490e00bc51e97865efca093f5913182d3a069daab738aaf8d4382d
+ply06.txt 2583 positions sha256 a555a2ad23157ed586bd56a6da0c4a7af0fce8ade48edd519b732e72096abf12
+ply07.txt 3952 positions sha256 c230f356ebe9d3ac92d9d0f10d32edb4883c44322e08c91beb66e6bf087ea63f
+ply08.txt 4000 positions sha256 c7e5840aa278808103a2770edf8ffbfaeaa683591ac58d1870292a1140bd1f35
+ply09.txt 4000 positions sha256 4f668d4f98841e429aa413c3237a547f2046feb01bd3d64f769b5217190d237a
+ply10.txt 4000 positions sha256 18e9abf43ffc36ba48958f21f62c88ef15c0fc4019605df11d9155fb2faa6242
+ply11.txt 4000 positions sha256 7154f00efcc829dd0dda1288f56ac6f342951c1ebaf13305bb699045c791c052
+  new positions per source file: {'labels_good_v4.csv': 13942, 'labels_noisy_v4.csv': 8593, 'labels_good_v3.csv': 0, 'labels_good_ply5.csv': 245, 'labels_good_v4_head1.csv': 0, 'labels_noisy_v4_head1.csv': 0}
+  dropped for conflicting values: 0
+bench_ply5_blue_wins.txt 24 positions sha256 dd063ff13f661df84c70de4f9071f3194e6998df1909f49125d9fa34d8812c84
+bench_ply5_blue_wins_holdout.txt 24 positions sha256 1b031604f7de511cb2af03b2dce4b695e8b342453a844939ce6ac4cc818cfaf0
+bench_ply5_random_units.txt 24 positions sha256 f7c36615509cc80bd0639fe4a7778e5c42aa44111d2a86be423cdbc1149d4a55
+bench_ply5_other_openings.txt 24 positions sha256 53b616ea65b7e38d9819b6c84d42df89f4d9ad789827ddb85361c3941db20425
+bench_ply5_ublock_refutations.txt 30 positions sha256 a014f4e9cab27eef6e79ffcebe1b5f487eb74faa987afb36e3d652090af4d4ca

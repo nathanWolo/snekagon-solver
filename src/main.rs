@@ -1,11 +1,15 @@
+mod bounds;
 mod geom;
 mod naive;
 mod pieces;
 mod pos;
+mod solver;
 
 use geom::*;
 use pieces::*;
 use pos::*;
+use solver::*;
+use std::io::Write;
 use std::time::Instant;
 
 pub struct Rng(pub u64);
@@ -50,6 +54,7 @@ fn verify(t: &Tables, games: usize, seed: u64) {
     let mut moves = Vec::new();
     for _ in 0..games {
         let mut pos = Pos::initial();
+        let mut prev_upper = [i32::MAX; 2];
         while !pos.is_over() {
             pos.moves(t, &mut moves);
             let reference = naive::moves(t, &pos);
@@ -64,6 +69,11 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                 assert_eq!(pos.longest[player] as u32, naive::longest(pos.cells[player]));
                 let total: u32 = (0..pos.nsnakes[player] as usize).map(|j| count(pos.snakes[player][j])).sum();
                 assert_eq!(total, count(pos.cells[player]));
+                let upper = bounds::upper_bound(t, &pos, player);
+                assert_eq!(upper, bounds::upper_bound_reference(t, &pos, player), "upper bound differs at {}", pos.to_text());
+                assert!(upper <= prev_upper[player], "upper bound rose at {}", pos.to_text());
+                assert!(upper >= pos.longest[player] as i32);
+                prev_upper[player] = upper;
             }
             let mut fresh = pos;
             fresh.recompute();
@@ -75,8 +85,84 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             let m = if moves.is_empty() { PASS } else { moves[rng.below(moves.len())] };
             pos.play(t, m);
         }
+        for player in 0..2 {
+            assert!(pos.longest[player] as i32 <= prev_upper[player], "final snake above the bound");
+        }
     }
     println!("verify ok: {} games, {} positions, {} placement checks", games, positions, placements_checked);
+}
+
+struct Opts {
+    cfg: Config,
+    nodes: u64,
+    from: usize,
+    to: usize,
+    quiet: bool,
+    rest: Vec<String>,
+}
+
+fn parse_opts(args: &[String]) -> Opts {
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, rest: Vec::new() };
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i].as_str();
+        let mut val = || {
+            i += 1;
+            args[i].clone()
+        };
+        match a {
+            "--no-bounds" => o.cfg.bounds = false,
+            "--tt" => o.cfg.tt_bits = val().parse().unwrap(),
+            "--nodes" => o.nodes = val().parse().unwrap(),
+            "--from" => o.from = val().parse().unwrap(),
+            "--to" => o.to = val().parse().unwrap(),
+            "--quiet" => o.quiet = true,
+            _ => o.rest.push(a.to_string()),
+        }
+        i += 1;
+    }
+    o
+}
+
+/// Solves every position of a file (lines: "<expected or ?> <position text or moves>") and prints one
+/// line each: index, ply, expected, value, nodes, microseconds. Exits 1 on any wrong value.
+fn bench(t: &Tables, o: &Opts) {
+    let path = &o.rest[0];
+    let text = std::fs::read_to_string(path).expect("cannot read the position file");
+    let mut solver = Solver::new(o.cfg);
+    let (mut total_nodes, mut total_us, mut wrong, mut unknown, mut n) = (0u64, 0u128, 0u32, 0u32, 0u32);
+    let out = std::io::stdout();
+    let mut out = out.lock();
+    for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
+        if i < o.from || i >= o.to {
+            continue;
+        }
+        let (expected, rest) = line.trim().split_once(char::is_whitespace).expect("line needs an expected value and a position");
+        let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
+        solver.clear();
+        let start = Instant::now();
+        let v = solver.solve(&pos, -1, 1, o.nodes);
+        let us = start.elapsed().as_micros();
+        let ok = if v == UNKNOWN {
+            unknown += 1;
+            "unknown"
+        } else if expected == "?" || expected.parse::<i32>().ok() == Some(v) {
+            "ok"
+        } else {
+            wrong += 1;
+            "WRONG"
+        };
+        total_nodes += solver.nodes;
+        total_us += us;
+        n += 1;
+        if !o.quiet {
+            writeln!(out, "{} {} {} {} {} {} {}", i, pos.ply, expected, v, solver.nodes, us, ok).unwrap();
+        }
+    }
+    writeln!(out, "# positions {} nodes {} seconds {:.3} wrong {} unknown {}", n, total_nodes, total_us as f64 / 1e6, wrong, unknown).unwrap();
+    if wrong > 0 {
+        std::process::exit(1);
+    }
 }
 
 fn main() {
@@ -104,8 +190,21 @@ fn main() {
             let seed: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1);
             verify(t, games, seed);
         }
+        "solve" => {
+            let o = parse_opts(&args[2..]);
+            let pos = Pos::parse(t, &o.rest.join(" ")).expect("bad position");
+            let mut solver = Solver::new(o.cfg);
+            let start = Instant::now();
+            let v = solver.solve(&pos, -1, 1, o.nodes);
+            println!("value {} nodes {} seconds {:.3}", v, solver.nodes, start.elapsed().as_secs_f64());
+        }
+        "bench" => {
+            let o = parse_opts(&args[2..]);
+            bench(t, &o);
+        }
         _ => {
-            println!("commands: info | perft <depth> | verify <games> <seed>");
+            println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
+            println!("options: --no-bounds --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }
