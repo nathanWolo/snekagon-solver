@@ -1,6 +1,7 @@
 mod bounds;
 mod geom;
 mod naive;
+mod par;
 mod pieces;
 mod pns;
 mod pos;
@@ -142,13 +143,13 @@ struct Opts {
     quiet: bool,
     profile: bool,
     pn: bool,
-    oracle: bool,
+    threads: usize,
     pn_cfg: PnConfig,
     rest: Vec<String>,
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, oracle: false, pn_cfg: PnConfig::default(), rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -171,7 +172,9 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-hand" => o.cfg.reach_hand = val().parse().unwrap(),
             "--reach-work" => o.cfg.reach_work = val().parse().unwrap(),
             "--pn" => o.pn = true,
-            "--oracle" => o.oracle = true,
+            "--threads" => o.threads = val().parse().unwrap(),
+            "--par-level" => o.cfg.par_level = val().parse().unwrap(),
+            "--par-join" => o.cfg.par_join = val().parse().unwrap(),
             "--pn-slack" => o.pn_cfg.slack = val().parse().unwrap(),
             "--pn-rank" => o.pn_cfg.rank_div = val().parse().unwrap(),
             "--pn-tt" => o.pn_cfg.tt_bits = val().parse().unwrap(),
@@ -196,7 +199,7 @@ fn bench(t: &Tables, o: &Opts) {
     let mut solver = Solver::new(if o.pn { Config { tt_bits: 4, ..o.cfg } } else { o.cfg });
     let mut pn = if o.pn { Some(PnSolver::new(o.pn_cfg, o.cfg)) } else { None };
     let (mut total_nodes, mut total_us, mut wrong, mut unknown, mut n) = (0u64, 0u128, 0u32, 0u32, 0u32);
-    let mut oracle_first = 0u64;
+    let mut par = if o.threads > 1 { Some(par::ParSolver::new(o.cfg, o.threads)) } else { None };
     let out = std::io::stdout();
     let mut out = out.lock();
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
@@ -210,24 +213,16 @@ fn bench(t: &Tables, o: &Opts) {
             p.clear();
         }
         let start = Instant::now();
-        let v = match pn.as_mut() {
-            Some(p) => p.solve(&pos, o.nodes),
-            None => solver.solve(&pos, -1, 1, o.nodes),
+        let v = match (pn.as_mut(), par.as_mut()) {
+            (Some(p), _) => p.solve(&pos, o.nodes),
+            (None, Some(p)) => p.solve(&pos),
+            (None, None) => solver.solve(&pos, -1, 1, o.nodes),
         };
-        if o.oracle && pn.is_none() {
-            // measurement: solve again with the first solve's best moves as the first moves
-            let first = solver.nodes;
-            solver.clear();
-            solver.hint = true;
-            let v2 = solver.solve(&pos, -1, 1, o.nodes);
-            solver.hint = false;
-            assert!(v2 == v);
-            oracle_first += first;
-        }
         let us = start.elapsed().as_micros();
-        let nodes = match pn.as_ref() {
-            Some(p) => p.nodes,
-            None => solver.nodes,
+        let nodes = match (pn.as_ref(), par.as_ref()) {
+            (Some(p), _) => p.nodes,
+            (None, Some(p)) => p.nodes,
+            (None, None) => solver.nodes,
         };
         let ok = if v == UNKNOWN {
             unknown += 1;
@@ -246,9 +241,6 @@ fn bench(t: &Tables, o: &Opts) {
         }
     }
     writeln!(out, "# positions {} nodes {} seconds {:.3} wrong {} unknown {}", n, total_nodes, total_us as f64 / 1e6, wrong, unknown).unwrap();
-    if o.oracle {
-        writeln!(out, "# oracle: first solve {} nodes, second solve (reported above) with its best moves first", oracle_first).unwrap();
-    }
     if o.profile {
         writeln!(out, "# nodes by pieces left: {:?}", solver.by_left).unwrap();
         writeln!(out, "# left: nodes | table cuts, bound cuts, searched nodes, moves searched, first-move cuts, no cut, moves left unsearched, scans").unwrap();
@@ -306,7 +298,7 @@ fn main() {
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
-            println!("options: --pn --pn-slack N --pn-rank N --pn-tt BITS --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
+            println!("options: --threads N --par-level N --pn --pn-slack N --pn-rank N --pn-tt BITS --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }

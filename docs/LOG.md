@@ -232,3 +232,56 @@ test decided, (confirm) fixed length on fresh units.
   pruning change: it wins big on some units and loses on others, so its gate needed 36 units where the
   others needed 30 at five times the margin. (2) Fitting to the cost itself overfits 200 positions;
   fitting "wins" does not. (3) The cheap features did as well in the solver as the expensive ones.
+
+## 2026-11-15 E8: a parallel solve
+
+- **Hypothesis** (written before the run): the score so far is thread-seconds; what the owner will feel
+  is wall-clock ("solve non-start positions fairly quickly"). The tree has wide nodes where every move
+  must be refuted, so threads that share the table and set aside a move another thread is already
+  searching (simplified ABDADA) should divide that work with little waste. Expected on 8 cores / 16
+  threads: 4-8x less wall-clock on positions that take a second or more, less on small ones; more
+  nodes in total (duplicated first moves).
+- **Risks:** a table shared without locks must never return a torn entry (a wrong value is the one
+  unforgivable result): entries are stored as key ^ data and data and checked on read. The single
+  thread path must not change.
+- **Test:** (1) identity: one thread, node counts equal to v4 on the tune files; A/B time against v4 on
+  ply 7 tune must show no loss (the table is now atomic words). (2) correctness with 16 threads: labels
+  on plies 8-11 and the tune units of plies 5-7, twice. (3) wall-clock and total nodes for 1, 2, 4, 8, 16
+  threads on ply 5 tune units. This is a second score (wall-clock), reported beside thread-seconds, so
+  there is no SPRT gate against the single-thread base; the one-thread identity is the gate.
+- **Built:** the table is now atomic words shared through an `Arc` (an entry is key ^ data and data); a
+  `Busy` table of (position, move) pairs being searched; a thread sets a busy move aside and returns
+  to it after the others (simplified ABDADA); every 256 nodes a thread looks whether the table now
+  decides a node on its path and unwinds to it. `bench --threads N` and `src/par.rs` drive it.
+- **Identity:** one thread gives v4's node counts exactly (1,897,508 on the first 100 ply-7 positions;
+  10,481,020 on the 59 tune units).
+- **Correctness, 16 threads:** two passes over all of plies 9-11, the first 1,500 of ply 8, 590 of
+  ply 7 and 380 of ply 6: 28,940 solves, none wrong. `verify 100 9` passes.
+- **Wall-clock** (tune, ply 5 positions 0-29; v4 one thread 23.9 s, 26.9 M nodes):
+
+  | Threads | Seconds | Speed-up | Nodes |
+  | --- | --- | --- | --- |
+  | 2 | 14.0 | 1.7x | 30.6 M |
+  | 4 | 8.8 | 2.7x | 37.7 M |
+  | 8 | 6.1 | 3.9x | 45.5 M |
+  | 16 | 6.1 | 3.9x | 61.0 M |
+
+  The machine has 8 cores; the second 8 threads add nodes, not speed.
+- **What mattered on the way** (tune): unwinding to a resolved ancestor 8.4 s to... little by itself;
+  searching the first two plies jointly instead of spreading over alternatives 8.4 s to 6.3 s (at a
+  node the winner must find one move, spreading puts one thread on each candidate); no cap on the
+  set-aside list 7.3 s to 6.1 s (a long node sets aside far more than 32 moves); a plain pointer to the
+  busy table instead of an `Arc` clone per node.
+- **The one-thread cost** (tune, ply 7, 59 units, against v4, nodes identical): -1.9% [-3.1%, -0.7%]
+  with the search compiled twice (plain and parallel copy); -2.6% with a cached bucket pointer on top;
+  -1.9% with the profile counters compiled out as well; ply 6, 20 units: -1.5% [-2.4%, -0.5%]. Bisect:
+  v4 plus the atomic table alone reads -1.2% [-2.3%, -0.1%]. So the shared table costs about 1% and
+  the rest of the parallel plumbing about another 1%, and it moves by a point from build to build.
+- **Verdict:** by the test written above ("no loss" with one thread) E8 does not become the base. It
+  is exact and it is 3.9x faster in wall-clock on this machine, so it is kept whole on the branch
+  `parallel`; `main` stays v4. Merging it (and accepting about 2% in thread-seconds) is the owner's
+  call.
+- **What it taught:** (1) in this tree the winner's nodes need one move, so parallel work must be
+  shared inside the proof of the first move, not spread over alternatives; (2) a cap that "cannot be
+  reached" was reached; (3) plumbing that is never executed still costs a point or two in a hot
+  function, and compiling the function twice recovers only part of it.

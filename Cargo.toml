@@ -11,3 +11,7 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 debug = false
+
+[features]
+# count nodes by pieces left and how they end (bench --profile)
+profile = []

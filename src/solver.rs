@@ -6,6 +6,9 @@ use crate::bounds::*;
 use crate::geom::*;
 use crate::pieces::*;
 use crate::pos::*;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8};
+use std::sync::Arc;
 
 #[derive(Clone, Copy)]
 pub struct Config {
@@ -28,28 +31,128 @@ pub struct Config {
     /// the opponent, free cells at our ends after, free cells at their ends after, their longest snake
     /// after their best reply, ours after our best next placement, their upper bound, our upper bound.
     pub model: [i32; NFEATURES],
+    /// In a parallel solve, moves are shared out between threads at nodes with at least this many
+    /// pieces left.
+    pub par_level: u32,
+    /// In a parallel solve, the first this-many plies from the root are searched by all threads
+    /// together, move by move; below them a move another thread has taken is set aside.
+    pub par_join: usize,
     /// log2 of the number of table entries.
     pub tt_bits: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22 }
     }
 }
 
+/// What the table knows about a position: its value lies in [lo, hi]; mv was the best move.
 #[derive(Clone, Copy)]
 struct Entry {
-    key: u64,
     lo: i8,
     hi: i8,
-    work: u8,
-    gen: u8,
     mv: u16,
 }
 
-const EMPTY: Entry = Entry { key: 0, lo: -1, hi: 1, work: 0, gen: 0, mv: PASS };
+/// The transposition table, shared by all threads of a solve. A bucket holds two entries; an entry
+/// is two words, key ^ data and data, so a pair torn by two writers fails its key test and is
+/// ignored. data: move (16 bits), generation (8), log2 of the work (8), lo + 1 (2), hi + 1 (2).
+pub struct Table {
+    slots: Vec<[AtomicU64; 4]>,
+    mask: usize,
+    gen: AtomicU8,
+}
+
+#[inline]
+fn pack(lo: i32, hi: i32, mv: u16, work: u8, gen: u8) -> u64 {
+    mv as u64 | (gen as u64) << 16 | (work as u64) << 24 | ((lo + 1) as u64) << 32 | ((hi + 1) as u64) << 34
+}
+
+impl Table {
+    pub fn new(bits: u32) -> Table {
+        let buckets = 1usize << (bits - 1);
+        Table {
+            slots: (0..buckets).map(|_| [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)]).collect(),
+            mask: buckets - 1,
+            gen: AtomicU8::new(1),
+        }
+    }
+
+    /// Starts a new generation: entries of an older one never match. The table is wiped only when
+    /// the counter wraps (generation 0 is the empty entry's).
+    pub fn next_generation(&self) -> u8 {
+        let mut g = self.gen.load(Relaxed).wrapping_add(1);
+        if g == 0 {
+            for b in self.slots.iter() {
+                for w in b {
+                    w.store(0, Relaxed);
+                }
+            }
+            g = 1;
+        }
+        self.gen.store(g, Relaxed);
+        g
+    }
+
+    pub fn generation(&self) -> u8 {
+        self.gen.load(Relaxed)
+    }
+}
+
+/// A pointer to the buckets of a `Table` that the holder keeps alive.
+#[derive(Clone, Copy)]
+struct SlotPtr(*const [AtomicU64; 4]);
+unsafe impl Send for SlotPtr {}
+
+/// Which (position, move) pairs some thread is searching right now. A thread that meets one sets the
+/// move aside and comes back to it later, when the answer is likely in the table (simplified
+/// ABDADA). Races here only change who searches what, never a value.
+pub struct Busy {
+    slots: Vec<AtomicU64>,
+}
+
+const BUSY_BUCKETS: usize = 1 << 14;
+const BUSY_WAYS: usize = 4;
+const MAX_DEFERRED: usize = 4096;
+
+impl Busy {
+    pub fn new() -> Busy {
+        Busy { slots: (0..BUSY_BUCKETS * BUSY_WAYS).map(|_| AtomicU64::new(0)).collect() }
+    }
+    #[inline]
+    fn bucket(h: u64) -> usize {
+        ((h >> 24) as usize & (BUSY_BUCKETS - 1)) * BUSY_WAYS
+    }
+    #[inline]
+    fn is_busy(&self, h: u64) -> bool {
+        let b = Self::bucket(h);
+        (0..BUSY_WAYS).any(|i| self.slots[b + i].load(Relaxed) == h)
+    }
+    #[inline]
+    fn start(&self, h: u64) {
+        let b = Self::bucket(h);
+        for i in 0..BUSY_WAYS {
+            if self.slots[b + i].load(Relaxed) == 0 {
+                self.slots[b + i].store(h, Relaxed);
+                return;
+            }
+        }
+        self.slots[b].store(h, Relaxed);
+    }
+    #[inline]
+    fn finish(&self, h: u64) {
+        let b = Self::bucket(h);
+        for i in 0..BUSY_WAYS {
+            if self.slots[b + i].load(Relaxed) == h {
+                self.slots[b + i].store(0, Relaxed);
+            }
+        }
+    }
+}
 pub const UNKNOWN: i32 = -9;
+/// The profile counters (`--profile`) are compiled in only with `cargo build --features profile`.
+pub const PROFILE: bool = cfg!(feature = "profile");
 pub const NFEATURES: usize = 12;
 /// Fitted on tune positions of plies 6 and 7 (`tools/rootfit.py --win-only`, 2026-11-15). The last four
 /// (one placement ahead, bounds after the move) cost a child position each and did not pay: weight 0.
@@ -96,6 +199,7 @@ fn threat_zone(pos: &Pos, opp: usize, b: &Placement) -> BB {
     }
 }
 const MAX_PLY: usize = 40;
+const NO_UNWIND: usize = usize::MAX;
 const TT_MOVE: u64 = 1 << 30;
 const KILLER1: u64 = 1 << 29;
 const KILLER2: u64 = 1 << 28;
@@ -103,9 +207,15 @@ const KILLER2: u64 = 1 << 28;
 pub struct Solver {
     pub(crate) t: &'static Tables,
     pub cfg: Config,
-    tt: Vec<[Entry; 2]>,
+    tt: Arc<Table>,
+    /// The table's buckets and index mask, cached: the table is owned through `tt` and never resized.
+    slots: SlotPtr,
     mask: usize,
     gen: u8,
+    /// Set by another thread when the answer is known: stop.
+    pub stop: Option<Arc<AtomicBool>>,
+    /// Shared with the other threads of a parallel solve.
+    pub busy: Option<Arc<Busy>>,
     pub nodes: u64,
     /// Nodes by the number of pieces both players still hold (a profile, not used by the search).
     pub by_left: [u64; 16],
@@ -116,10 +226,14 @@ pub struct Solver {
     pub reach_by: [[[u64; 2]; 16]; 2],
     node_limit: u64,
     aborted: bool,
-    /// Measurement only: take the first move from the previous solve's table entries.
-    pub hint: bool,
+    /// Parallel solve: the ply of the root, the nodes on the path from it by ply (hash and window at
+    /// entry), and the ply to unwind to when another thread has resolved a node we are below.
+    root_ply: usize,
+    path: Vec<(u64, i32, i32)>,
+    unwind_to: usize,
     killers: [[u16; 2]; MAX_PLY],
     bufs: Vec<Vec<u64>>,
+    defer_bufs: Vec<Vec<u16>>,
     replies: Vec<(u32, BB)>,
 }
 
@@ -133,36 +247,45 @@ pub fn game_result(pos: &Pos) -> i32 {
 
 impl Solver {
     pub fn new(cfg: Config) -> Solver {
-        let buckets = 1usize << (cfg.tt_bits - 1);
+        Solver::with_table(cfg, Arc::new(Table::new(cfg.tt_bits)))
+    }
+
+    /// A solver on a table that other solvers (threads) may share.
+    pub fn with_table(cfg: Config, table: Arc<Table>) -> Solver {
         Solver {
             t: tables(),
             cfg,
-            tt: vec![[EMPTY; 2]; buckets],
-            mask: buckets - 1,
-            gen: 1,
+            gen: table.generation(),
+            slots: SlotPtr(table.slots.as_ptr()),
+            mask: table.mask,
+            tt: table,
+            stop: None,
+            busy: None,
             nodes: 0,
             by_left: [0; 16],
             prof: [[0; 8]; 16],
             reach_by: [[[0; 2]; 16]; 2],
             node_limit: u64::MAX,
             aborted: false,
-            hint: false,
+            root_ply: 0,
+            path: vec![(0, 0, 0); MAX_PLY + 2],
+            unwind_to: NO_UNWIND,
             killers: [[PASS; 2]; MAX_PLY],
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
+            defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
             replies: Vec::with_capacity(1024),
         }
     }
 
     /// Forget everything learned from earlier positions.
     pub fn clear(&mut self) {
-        // entries of an older generation never match; the table is wiped only when the counter wraps
-        self.gen = self.gen.wrapping_add(1);
-        if self.gen == 0 {
-            for b in self.tt.iter_mut() {
-                *b = [EMPTY; 2];
-            }
-            self.gen = 1;
-        }
+        self.gen = self.tt.next_generation();
+        self.killers = [[PASS; 2]; MAX_PLY];
+    }
+
+    /// For a thread of a parallel solve: take up the table's present generation.
+    pub fn sync(&mut self) {
+        self.gen = self.tt.generation();
         self.killers = [[PASS; 2]; MAX_PLY];
     }
 
@@ -172,7 +295,9 @@ impl Solver {
         self.nodes = 0;
         self.node_limit = node_limit;
         self.aborted = false;
-        let v = self.search(pos, alpha, beta);
+        self.root_ply = (pos.ply as usize).min(MAX_PLY - 2);
+        self.unwind_to = NO_UNWIND;
+        let v = if self.busy.is_some() { self.search::<true>(pos, alpha, beta) } else { self.search::<false>(pos, alpha, beta) };
         if self.aborted {
             UNKNOWN
         } else {
@@ -182,31 +307,59 @@ impl Solver {
 
     #[inline]
     fn probe(&self, key: u64) -> Option<Entry> {
-        let b = &self.tt[(key as usize) & self.mask];
-        if b[0].key == key && b[0].gen == self.gen {
-            Some(b[0])
-        } else if b[1].key == key && b[1].gen == self.gen {
-            Some(b[1])
-        } else {
-            None
+        // in bounds: mask is the bucket count minus one
+        let b = unsafe { &*self.slots.0.add((key as usize) & self.mask) };
+        for i in 0..2 {
+            let d = b[2 * i + 1].load(Relaxed);
+            if b[2 * i].load(Relaxed) ^ d == key && (d >> 16) as u8 == self.gen {
+                return Some(Entry { lo: ((d >> 32) & 3) as i8 - 1, hi: ((d >> 34) & 3) as i8 - 1, mv: d as u16 });
+            }
         }
+        None
     }
 
     #[inline]
     fn store(&mut self, key: u64, lo: i32, hi: i32, mv: u16, work: u64) {
         let work = (64 - work.leading_zeros()) as u8;
         let gen = self.gen;
-        let b = &mut self.tt[(key as usize) & self.mask];
-        let e = Entry { key, lo: lo as i8, hi: hi as i8, work, gen, mv };
-        if b[0].key == key {
-            b[0] = e;
-        } else if b[1].key == key {
-            b[1] = e;
-        } else if b[0].gen != gen || work >= b[0].work {
-            b[1] = b[0];
-            b[0] = e;
+        // in bounds: mask is the bucket count minus one
+        let b = unsafe { &*self.slots.0.add((key as usize) & self.mask) };
+        let d0 = b[1].load(Relaxed);
+        let k0 = b[0].load(Relaxed) ^ d0;
+        let d1 = b[3].load(Relaxed);
+        let k1 = b[2].load(Relaxed) ^ d1;
+        // An entry of this position from this solve (another thread's): both bounds are true, so keep
+        // the tighter of each. With one thread this never changes anything.
+        let merged = |old: u64| -> u64 {
+            if (old >> 16) as u8 != gen {
+                return pack(lo, hi, mv, work, gen);
+            }
+            let (olo, ohi) = (((old >> 32) & 3) as i32 - 1, ((old >> 34) & 3) as i32 - 1);
+            let (nlo, nhi) = (lo.max(olo), hi.min(ohi));
+            if nlo > nhi {
+                return pack(lo, hi, mv, work, gen);
+            }
+            pack(nlo, nhi, if mv == PASS { old as u16 } else { mv }, work.max((old >> 24) as u8), gen)
+        };
+        if k0 == key {
+            let d = merged(d0);
+            b[0].store(key ^ d, Relaxed);
+            b[1].store(d, Relaxed);
+        } else if k1 == key {
+            let d = merged(d1);
+            b[2].store(key ^ d, Relaxed);
+            b[3].store(d, Relaxed);
         } else {
-            b[1] = e;
+            let d = pack(lo, hi, mv, work, gen);
+            if (d0 >> 16) as u8 != gen || work >= (d0 >> 24) as u8 {
+                b[2].store(k0 ^ d0, Relaxed);
+                b[3].store(d0, Relaxed);
+                b[0].store(key ^ d, Relaxed);
+                b[1].store(d, Relaxed);
+            } else {
+                b[2].store(key ^ d, Relaxed);
+                b[3].store(d, Relaxed);
+            }
         }
     }
 
@@ -374,14 +527,51 @@ impl Solver {
         }
     }
 
-    fn search(&mut self, pos: &Pos, mut alpha: i32, mut beta: i32) -> i32 {
+    /// True when the table now decides the node at `ply` of the current path for its window.
+    #[inline]
+    fn resolved(&self, ply: usize) -> bool {
+        let (hash, alpha, beta) = self.path[ply];
+        match self.probe(hash) {
+            Some(e) => e.lo >= e.hi || e.lo as i32 >= beta || e.hi as i32 <= alpha,
+            None => false,
+        }
+    }
+
+    /// The value of a position within the window (alpha, beta): exact inside it, a bound outside.
+    /// Compiled twice: PAR = false is the plain search, PAR = true adds what a parallel solve needs,
+    /// so that one thread pays nothing for it.
+    fn search<const PAR: bool>(&mut self, pos: &Pos, mut alpha: i32, mut beta: i32) -> i32 {
         self.nodes += 1;
         if self.nodes > self.node_limit {
             self.aborted = true;
             return 0;
         }
+        let ply = (pos.ply as usize).min(MAX_PLY - 2);
+        let (alpha_in, beta_in) = (alpha, beta);
+        if PAR {
+            // a parallel solve: remember the path, and now and then look whether another thread has
+            // resolved a node we are below; if so, unwind to it
+            self.path[ply] = (pos.hash, alpha, beta);
+            if self.nodes & 255 == 0 {
+                if let Some(stop) = &self.stop {
+                    if stop.load(Relaxed) {
+                        self.aborted = true;
+                        return 0;
+                    }
+                }
+                for p in self.root_ply..ply {
+                    if self.resolved(p) {
+                        self.aborted = true;
+                        self.unwind_to = p;
+                        return 0;
+                    }
+                }
+            }
+        }
         let level = ((pos.left[0].count_ones() + pos.left[1].count_ones()) as usize).min(15);
-        self.by_left[level] += 1;
+        if PROFILE {
+            self.by_left[level] += 1;
+        }
         if pos.is_over() {
             return game_result(pos);
         }
@@ -403,20 +593,16 @@ impl Solver {
             hi = e.hi as i32;
             tt_move = e.mv;
             if lo >= hi || lo >= beta {
-                self.prof[level][0] += 1;
+                if PROFILE {
+                    self.prof[level][0] += 1;
+                }
                 return lo;
             }
             if hi <= alpha {
-                self.prof[level][0] += 1;
+                if PROFILE {
+                    self.prof[level][0] += 1;
+                }
                 return hi;
-            }
-        } else if self.hint {
-            let b = &self.tt[(pos.hash as usize) & self.mask];
-            let before = self.gen.wrapping_sub(1);
-            if b[0].key == pos.hash && b[0].gen == before {
-                tt_move = b[0].mv;
-            } else if b[1].key == pos.hash && b[1].gen == before {
-                tt_move = b[1].mv;
             }
         }
 
@@ -447,11 +633,15 @@ impl Solver {
             lo = lo.max(blo);
             hi = hi.min(bhi);
             if lo >= hi || lo >= beta {
-                self.prof[level][1] += 1;
+                if PROFILE {
+                    self.prof[level][1] += 1;
+                }
                 return lo;
             }
             if hi <= alpha {
-                self.prof[level][1] += 1;
+                if PROFILE {
+                    self.prof[level][1] += 1;
+                }
                 return hi;
             }
         }
@@ -467,9 +657,13 @@ impl Solver {
             let need = theirs_now + if alpha >= 0 { 1 } else { 0 };
             if test_me && mine_now < need {
                 let mut work = self.cfg.reach_work;
-                self.reach_by[0][total][0] += 1;
+                if PROFILE {
+                    self.reach_by[0][total][0] += 1;
+                }
                 if !can_reach(t, pos, me, need, &my_clusters, &mut work) {
-                    self.reach_by[0][total][1] += 1;
+                    if PROFILE {
+                        self.reach_by[0][total][1] += 1;
+                    }
                     self.store(pos.hash, lo, alpha, PASS, 1);
                     return alpha;
                 }
@@ -478,9 +672,13 @@ impl Solver {
             let need = mine_now + if beta <= 0 { 1 } else { 0 };
             if test_them && theirs_now < need {
                 let mut work = self.cfg.reach_work;
-                self.reach_by[1][total][0] += 1;
+                if PROFILE {
+                    self.reach_by[1][total][0] += 1;
+                }
                 if !can_reach(t, pos, opp, need, &their_clusters, &mut work) {
-                    self.reach_by[1][total][1] += 1;
+                    if PROFILE {
+                        self.reach_by[1][total][1] += 1;
+                    }
                     self.store(pos.hash, beta, hi, PASS, 1);
                     return beta;
                 }
@@ -573,29 +771,51 @@ impl Solver {
         }
 
         // 5. search them, best-scored first
-        self.prof[level][2] += 1;
+        if PROFILE {
+            self.prof[level][2] += 1;
+        }
         let mut searched = 0u64;
         let mut best = -2;
         let mut best_move = PASS;
         if buf.is_empty() && skipped == -2 {
             let mut child = *pos;
             child.play(t, PASS);
-            best = -self.search(&child, -beta, -alpha);
+            best = -self.search::<PAR>(&child, -beta, -alpha);
         } else {
             let n = buf.len();
-            for i in 0..n {
-                if i < 3 {
-                    let mut b = i;
-                    for j in i + 1..n {
-                        if buf[j] > buf[b] {
-                            b = j;
+            // In a parallel solve: a move another thread is searching is set aside and taken up again
+            // after the others, when its answer is probably in the table.
+            // A plain pointer, not a clone of the Arc: a clone would have every thread write the same
+            // reference count at every node. The Arc is owned by self and outlives this call.
+            let busy: *const Busy = match &self.busy {
+                Some(b) if PAR && level as u32 >= self.cfg.par_level && ply - self.root_ply.min(ply) >= self.cfg.par_join => Arc::as_ptr(b),
+                _ => std::ptr::null(),
+            };
+            let mut deferred = if !busy.is_null() { std::mem::take(&mut self.defer_bufs[ply]) } else { Vec::new() };
+            deferred.clear();
+            let mut d = 0usize;
+            let mut i = 0;
+            loop {
+                let (m, first_pass) = if i < n {
+                    if i < 3 {
+                        let mut b = i;
+                        for j in i + 1..n {
+                            if buf[j] > buf[b] {
+                                b = j;
+                            }
                         }
+                        buf.swap(i, b);
+                    } else if i == 3 {
+                        buf[3..].sort_unstable_by(|a, b| b.cmp(a));
                     }
-                    buf.swap(i, b);
-                } else if i == 3 {
-                    buf[3..].sort_unstable_by(|a, b| b.cmp(a));
-                }
-                let m = (buf[i] & 0xFFFF) as u16;
+                    i += 1;
+                    ((buf[i - 1] & 0xFFFF) as u16, true)
+                } else if d < deferred.len() {
+                    d += 1;
+                    (deferred[d - 1], false)
+                } else {
+                    break;
+                };
                 if th.n > 0 {
                     let bound = th.bound_for(t.placements[m as usize].cells);
                     if bound <= alpha {
@@ -603,10 +823,28 @@ impl Solver {
                         continue;
                     }
                 }
+                let move_key = pos.hash ^ (m as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                if !busy.is_null() {
+                    let busy = unsafe { &*busy };
+                    if searched > 0 && self.resolved(ply) {
+                        // another thread finished this node while we were searching its moves
+                        self.aborted = true;
+                        self.unwind_to = ply;
+                        break;
+                    }
+                    if first_pass && searched > 0 && deferred.len() < MAX_DEFERRED && busy.is_busy(move_key) {
+                        deferred.push(m);
+                        continue;
+                    }
+                    busy.start(move_key);
+                }
                 let mut child = *pos;
                 child.play(t, m);
                 searched += 1;
-                let v = -self.search(&child, -beta, -alpha);
+                let v = -self.search::<PAR>(&child, -beta, -alpha);
+                if !busy.is_null() {
+                    unsafe { &*busy }.finish(move_key);
+                }
                 if self.aborted {
                     break;
                 }
@@ -623,32 +861,60 @@ impl Solver {
                         self.killers[ply][0] = m;
                     }
                     if searched == 1 {
-                        self.prof[level][4] += 1;
+                        if PROFILE {
+                            self.prof[level][4] += 1;
+                        }
                     }
                     break;
                 }
                 // The refutation just found may be a threat against the remaining moves. And once the
                 // first move has failed this is probably a node where every move must be refuted, so
                 // look for all of the opponent's threats.
-                if threats_on && i + 2 < n {
+                if threats_on && i + 1 < n {
                     self.try_threat(pos, self.killers[ply + 1][0], &mut th);
                     if !scanned {
                         scanned = true;
-                        self.prof[level][7] += 1;
+                        if PROFILE {
+                            self.prof[level][7] += 1;
+                        }
                         self.scan_threats(pos, &my_clusters, alpha, &mut th);
                     }
                 }
             }
+            if !busy.is_null() {
+                self.defer_bufs[ply] = deferred;
+            }
             best = best.max(skipped);
-            self.prof[level][3] += searched;
-            self.prof[level][6] += (n as u64).saturating_sub(searched);
+            if PROFILE {
+                self.prof[level][3] += searched;
+            }
+            if PROFILE {
+                self.prof[level][6] += (n as u64).saturating_sub(searched);
+            }
             if alpha < beta {
-                self.prof[level][5] += 1;
+                if PROFILE {
+                    self.prof[level][5] += 1;
+                }
             }
         }
         self.bufs[ply] = buf;
         if self.aborted {
-            return 0;
+            if !PAR || self.unwind_to != ply {
+                return 0;
+            }
+            // another thread resolved this node while we were below it: take its answer
+            self.aborted = false;
+            self.unwind_to = NO_UNWIND;
+            if let Some(e) = self.probe(pos.hash) {
+                let (lo, hi) = (e.lo as i32, e.hi as i32);
+                if lo >= hi || lo >= beta_in {
+                    return lo;
+                }
+                if hi <= alpha_in {
+                    return hi;
+                }
+            }
+            return self.search::<PAR>(pos, alpha_in, beta_in); // the entry was replaced meanwhile
         }
 
         // 6. store what we learned
