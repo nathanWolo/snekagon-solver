@@ -156,6 +156,10 @@ struct Opts {
     upper_first: bool,
     wide: bool,
     no_symmetry: bool,
+    /// `prove`: split a running job when a worker is idle (seconds of age; negative = never).
+    split: f64,
+    /// `prove`: give each job the coordinator's best guess at its first move.
+    hint: bool,
     /// `bench`: the window every position is searched with (one thread).
     window: (i32, i32),
     /// `bench`: only positions with this label.
@@ -164,7 +168,7 @@ struct Opts {
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, no_symmetry: false, window: (-1, 1), only: None, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, no_symmetry: false, split: -1.0, hint: false, window: (-1, 1), only: None, rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -202,6 +206,8 @@ fn parse_opts(args: &[String]) -> Opts {
             "--upper-first" => o.upper_first = true,
             "--wide" => o.wide = true,
             "--no-symmetry" => o.no_symmetry = true,
+            "--split" => o.split = val().parse().unwrap(),
+            "--hint" => o.hint = true,
             "--window" => {
                 let v = val();
                 let (a, b) = v.split_once(',').expect("--window A,B");
@@ -240,9 +246,9 @@ fn parse_opts(args: &[String]) -> Opts {
 fn prove_cmd(t: &Tables, o: &Opts) {
     let path = &o.rest[0];
     let text = std::fs::read_to_string(path).expect("cannot read the position file");
-    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first, wide: o.wide, no_symmetry: o.no_symmetry });
+    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first, wide: o.wide, no_symmetry: o.no_symmetry, split: o.split, hint: o.hint });
     let (mut total_nodes, mut total_us, mut wrong, mut n) = (0u64, 0u128, 0u32, 0u32);
-    let (mut jobs, mut stopped, mut thread_s) = (0u64, 0u64, 0f64);
+    let (mut jobs, mut stopped, mut thread_s, mut splits) = (0u64, 0u64, 0f64, 0u64);
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
         if i < o.from || i >= o.to {
             continue;
@@ -261,6 +267,7 @@ fn prove_cmd(t: &Tables, o: &Opts) {
         total_us += us;
         jobs += r.jobs;
         stopped += r.stopped;
+        splits += r.splits;
         thread_s += r.thread_seconds;
         n += 1;
         if !o.quiet {
@@ -268,7 +275,7 @@ fn prove_cmd(t: &Tables, o: &Opts) {
         }
     }
     println!("# positions {} nodes {} seconds {:.3} wrong {} unknown 0", n, total_nodes, total_us as f64 / 1e6, wrong);
-    println!("# jobs {} stopped {} thread-seconds {:.1}", jobs, stopped, thread_s);
+    println!("# jobs {} stopped {} thread-seconds {:.1} splits {}", jobs, stopped, thread_s, splits);
     if wrong > 0 {
         std::process::exit(1);
     }

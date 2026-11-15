@@ -52,6 +52,13 @@ pub struct ProveCfg {
     /// has one move under way at a time, so no move is searched with a window that has since moved.
     /// Cheaper for a drawn position (LOG, the window study); the workers are idle more.
     pub wide: bool,
+    /// When a worker would be idle (nothing left to hand out), the running job whose root move is
+    /// the oldest is stopped and its position becomes a coordinator node whose moves are jobs, if
+    /// that root move has been under way at least this many seconds. Negative: never.
+    pub split: f64,
+    /// A job's first move is the coordinator's pick (its order with the winners), passed in as
+    /// the first killer of the job's ply.
+    pub hint: bool,
 }
 
 pub struct ProveResult {
@@ -59,6 +66,8 @@ pub struct ProveResult {
     pub best: u16,
     pub jobs: u64,
     pub stopped: u64,
+    /// Jobs split because a worker was idle.
+    pub splits: u64,
     pub reused: u64,
     pub nodes: u64,
     pub thread_seconds: f64,
@@ -128,6 +137,12 @@ struct Node {
     done: bool,
     dead: bool,
     stop: Option<Arc<AtomicBool>>,
+    /// When the subtree this node belongs to started: its own making, or that of the node it was
+    /// split from.
+    born: Instant,
+    /// A leaf whose job was stopped to split it: the node is now a coordinator node, and the
+    /// stopped job has not come back yet.
+    split: bool,
 }
 
 struct Job {
@@ -243,6 +258,10 @@ impl<'a> Driver<'a> {
             done: false,
             dead: false,
             stop: None,
+            // below the frontier a node exists only because a job was split: it is part of the
+            // work of the node that was split
+            born: if parent != NONE && pos.ply as u32 > self.frontier { self.nodes[parent].born } else { Instant::now() },
+            split: false,
         };
         if pos.is_over() {
             n.done = true;
@@ -282,6 +301,25 @@ impl<'a> Driver<'a> {
                 if pos.ply as u32 >= self.frontier {
                     n.leaf = true;
                 } else {
+                    self.expand(&mut n, hint);
+                }
+            }
+        }
+        if let Some(i) = self.free.pop() {
+            self.nodes[i] = n;
+            i
+        } else {
+            self.nodes.push(n);
+            self.nodes.len() - 1
+        }
+    }
+
+    /// The moves of node `n`, in the order they are searched.
+    fn expand(&mut self, n: &mut Node, hint: u16) {
+        let (pos, alpha, beta) = (n.pos, n.alpha, n.beta);
+        {
+            {
+                {
                     let ks = n.killers[(pos.ply as usize).min(MAX_PLY - 1)];
                     let (moves, skipped, th) = self.top.ordered_moves(&pos, alpha, [hint, ks[0], ks[1]]);
                     n.moves = moves;
@@ -347,13 +385,6 @@ impl<'a> Driver<'a> {
                     }
                 }
             }
-        }
-        if let Some(i) = self.free.pop() {
-            self.nodes[i] = n;
-            i
-        } else {
-            self.nodes.push(n);
-            self.nodes.len() - 1
         }
     }
 
@@ -569,6 +600,35 @@ impl<'a> Driver<'a> {
         self.res.thread_seconds += done.micros as f64 / 1e6;
         let id = done.id;
         self.nodes[id].running = false;
+        if self.nodes[id].split {
+            // the job of a node that has been split since: the node is a coordinator node now
+            self.nodes[id].split = false;
+            let gone = self.nodes[id].dead || self.nodes[id].done;
+            if done.value == UNKNOWN {
+                self.res.stopped += 1;
+                if gone {
+                    self.freed.push(id);
+                }
+                return;
+            }
+            // it finished before it saw the stop: its value is a proof like any other
+            self.res.jobs += 1;
+            let (pos, window) = (self.nodes[id].pos, self.nodes[id].window);
+            if done.nodes >= MIN_RECORD {
+                self.remember(&pos, window, done.value, done.best, done.nodes, done.micros / 1000);
+            }
+            if gone {
+                self.freed.push(id);
+            } else {
+                let kids = std::mem::take(&mut self.nodes[id].kids);
+                for k in kids {
+                    self.cancel(k);
+                }
+                self.nodes[id].leaf = true; // recorded above; finish need not record it again
+                self.finish(id, done.value, done.best);
+            }
+            return;
+        }
         self.nodes[id].killers = done.killers;
         if done.value == UNKNOWN {
             self.res.stopped += 1;
@@ -585,10 +645,97 @@ impl<'a> Driver<'a> {
             // a smaller job is cheaper to run again than to keep
             self.remember(&pos, window, done.value, done.best, done.nodes, done.micros / 1000);
         }
+        if self.c.hint && done.value >= window.1 && done.best != PASS {
+            // the move that won the job is a winner at its ply, as at a coordinator node
+            let ply = (pos.ply as usize).min(MAX_PLY - 1);
+            if !self.winners[ply].contains(&done.best) {
+                self.winners[ply].push(done.best);
+            }
+        }
         if self.nodes[id].dead {
             self.freed.push(id);
         } else {
             self.finish(id, done.value, done.best);
+        }
+    }
+
+    /// The move the coordinator would search first at the position of leaf `j`: its order with the
+    /// known results, the killers and the winners.
+    fn pick(&mut self, j: usize) -> u16 {
+        let mut tmp = self.placeholder();
+        let n = &self.nodes[j];
+        tmp.pos = n.pos;
+        tmp.alpha = n.alpha;
+        tmp.beta = n.beta;
+        tmp.window = n.window;
+        tmp.killers = n.killers;
+        let hint = self.known.get(&n.pos.hash).map_or(PASS, |k| k.mv);
+        self.expand(&mut tmp, hint);
+        tmp.moves.first().map_or(PASS, |e| (*e & 0xFFFF) as u16)
+    }
+
+    /// A worker is free and there is nothing to hand out: the running job of the oldest root move
+    /// is stopped and its position becomes a coordinator node, whose moves are then jobs. What the
+    /// stopped job found stays in the table, so its moves are cheap where it got to. Returns
+    /// whether a job was split.
+    fn split_one(&mut self) -> bool {
+        if self.c.split < 0.0 {
+            return false;
+        }
+        let mut victim = NONE;
+        for (i, n) in self.nodes.iter().enumerate() {
+            if n.leaf && n.running && !n.split && !n.dead && !n.done && (n.pos.ply as usize) < MAX_PLY - 2 {
+                if victim == NONE || n.born < self.nodes[victim].born {
+                    victim = i;
+                }
+            }
+        }
+        if victim == NONE || self.nodes[victim].born.elapsed().as_secs_f64() < self.c.split {
+            return false;
+        }
+        let ph = self.placeholder();
+        let mut n = std::mem::replace(&mut self.nodes[victim], ph);
+        if let Some(stop) = &n.stop {
+            stop.store(true, Relaxed);
+        }
+        n.leaf = false;
+        n.split = true;
+        let hint = self.known.get(&n.pos.hash).map_or(PASS, |k| k.mv);
+        self.expand(&mut n, hint);
+        self.nodes[victim] = n;
+        self.res.splits += 1;
+        self.settle(victim);
+        true
+    }
+
+    fn placeholder(&self) -> Node {
+        Node {
+            pos: self.nodes[ROOT].pos,
+            parent: NONE,
+            via: PASS,
+            window: (-1, 1),
+            alpha: -1,
+            beta: 1,
+            best: -2,
+            best_move: PASS,
+            skipped: -2,
+            moves: Vec::new(),
+            next: 0,
+            th: Threats::new(),
+            kids: Vec::new(),
+            finished: 0,
+            need: 1,
+            answered: PASS,
+            killers: [[PASS; 2]; MAX_PLY],
+            leaf: false,
+            started: false,
+            running: false,
+            given: false,
+            done: false,
+            dead: false,
+            stop: None,
+            born: Instant::now(),
+            split: false,
         }
     }
 
@@ -607,7 +754,23 @@ impl<'a> Driver<'a> {
             while self.busy < self.c.threads && !self.nodes[ROOT].done {
                 let mut freed = std::mem::take(&mut self.freed);
                 self.free.append(&mut freed);
-                let Some(j) = (0..=MAX_BUDGET).find_map(|budget| self.find_work(ROOT, budget)) else { break };
+                let Some(j) = (0..=MAX_BUDGET).find_map(|budget| self.find_work(ROOT, budget)) else {
+                    if self.split_one() {
+                        continue;
+                    }
+                    break;
+                };
+                if self.c.hint {
+                    let m = self.pick(j);
+                    if m != PASS {
+                        let ply = (self.nodes[j].pos.ply as usize).min(MAX_PLY - 1);
+                        let ks = &mut self.nodes[j].killers[ply];
+                        if ks[0] != m {
+                            ks[1] = ks[0];
+                            ks[0] = m;
+                        }
+                    }
+                }
                 let stop = Arc::new(AtomicBool::new(false));
                 let n = &mut self.nodes[j];
                 n.stop = Some(stop.clone());
@@ -717,7 +880,7 @@ impl Prover {
             log: &mut self.log,
             start,
             busy: 0,
-            res: ProveResult { value: UNKNOWN, best: PASS, jobs: 0, stopped: 0, reused: 0, nodes: 0, thread_seconds: 0.0, seconds: 0.0 },
+            res: ProveResult { value: UNKNOWN, best: PASS, jobs: 0, stopped: 0, splits: 0, reused: 0, nodes: 0, thread_seconds: 0.0, seconds: 0.0 },
         };
         let table = &self.table;
         let (mut lo, mut hi) = (-1, 1);
