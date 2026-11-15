@@ -19,18 +19,22 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 
 Update this section in the same change that freezes a version.
 
-- **Base for new work:** `frozen/base.exe` = v4 (alpha-beta with a table, length bounds, the last
-  pieces in closed form, threat zones, the reach test, model ordering). Id, commit and date:
-  `frozen/BASE.txt` and `docs/SHIPLOG.md`. Branch `main`.
-- **Parallel solve:** branch `parallel` (`bench --threads N`, `src/par.rs`). Exact; 3.9x wall-clock
-  on 8 cores; about 2% slower than v4 with one thread, which is why it is not merged. A built copy is
-  `frozen/par.exe`. Merging is the owner's call (asked 2026-11-15).
+- **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
+  form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
+  move searched before the list is generated, and after a failed move the moves that cover the
+  refuting reply first). Id, commit and date: `frozen/BASE.txt` and `docs/SHIPLOG.md`. Branch `main`.
+- **Parallel solve:** branch `parallel-v9` (`bench --threads N`, `src/par.rs`), the port of branch
+  `parallel` (built from v4) onto v9. Exact; 3.4x wall-clock on 8 threads; on v4 the plumbing cost
+  about 2% with one thread, which is why it is not merged. A built copy is `frozen/par-v9.exe`.
+  Merging is the owner's call (asked 2026-11-15).
 - **Proof-number search:** `--pn` (df-pn, `src/pns.rs`). Exact and 28-60x slower than alpha-beta here;
   `docs/IDEAS.md` (graveyard) says why and what would reopen it.
 - **State:** the end of `docs/LOG.md`, and the table in `docs/SHIPLOG.md`.
-- **What a gate resolves:** timing noise is about 1-2% per unit (A/A). A pruning change has sd 0.2
-  per unit and an ordering change 0.45; 30-40 units decide a change of 25% or more. Plan with
+- **What a gate resolves:** timing noise is about 1-2% per unit (A/A). A change that keeps the node
+  counts has sd 0.02-0.08 per unit, a pruning change 0.2, an ordering change 0.25-0.45. Plan with
   `python tools/hc.py plan` on the screen's records.
+- **Gate units:** the ply-6 gate range is used up. Gates run at ply 7 (about 90 unused gate units
+  on 2026-11-15); `tools/run.py` refuses a gate with fewer than 30. More positions are needed soon.
 
 ## Standing rules
 
@@ -69,7 +73,8 @@ The contract is `docs/TESTING.md`. In short:
 - Build experiments that must not disturb a running `target/release/snek.exe` with
   `cargo build --release --target-dir work/target`.
 - Several versions on the same fresh units: `python tools/ladder.py KEY --set plyNN --units N v3=frozen/v3-....exe v4=frozen/base.exe`.
-- Profile counters: `cargo build --release --features profile` on branch `parallel`; on `main` they are always on.
+- A study build that times the sections of a node: the patch scripts named in `docs/LOG.md` (`timing2_patch.py`), applied to a copy, built into `work/target`, never committed.
+- Order ideas are screened on node counts first (exact, free of load): `snek bench FILE --from A --to B --quiet` with the option on and off.
 
 ## Where things are
 
