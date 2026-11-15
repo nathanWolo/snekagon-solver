@@ -13,13 +13,15 @@ pub struct Config {
     pub bounds: bool,
     /// Value the last pieces (at most one in each hand) without a search.
     pub last_pieces: bool,
+    /// Skip moves that leave a deciding opponent placement playable.
+    pub threats: bool,
     /// log2 of the number of table entries.
     pub tt_bits: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, tt_bits: 22 }
+        Config { bounds: true, last_pieces: true, threats: true, tt_bits: 22 }
     }
 }
 
@@ -35,6 +37,47 @@ struct Entry {
 
 const EMPTY: Entry = Entry { key: 0, lo: -1, hi: 1, work: 0, gen: 0, mv: PASS };
 pub const UNKNOWN: i32 = -9;
+const MAX_THREATS: usize = 6;
+const MAX_TRIED: usize = 8;
+const MAX_FOUND: usize = 64;
+const NO_BOUND: i32 = 2;
+
+/// Opponent placements that would decide the game by the bounds if played now. A move of ours that
+/// covers no cell of a threat's zone leaves it playable and is worth at most the threat's value.
+struct Threats {
+    n: usize,
+    zone: [BB; MAX_THREATS],
+    value: [i32; MAX_THREATS],
+    tried: [u16; MAX_TRIED],
+    ntried: usize,
+}
+
+impl Threats {
+    fn new() -> Threats {
+        Threats { n: 0, zone: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0 }
+    }
+    /// Upper bound on our value for a move covering `cells`.
+    #[inline]
+    fn bound_for(&self, cells: BB) -> i32 {
+        let mut b = NO_BOUND;
+        for i in 0..self.n {
+            if cells & self.zone[i] == 0 && self.value[i] < b {
+                b = self.value[i];
+            }
+        }
+        b
+    }
+}
+
+/// The cells our move has to cover to make the opponent placement b illegal.
+#[inline]
+fn threat_zone(pos: &Pos, opp: usize, b: &Placement) -> BB {
+    if b.border & pos.cells[opp] != 0 {
+        b.cells
+    } else {
+        b.cells | b.border
+    }
+}
 const MAX_PLY: usize = 40;
 const TT_MOVE: u64 = 1 << 30;
 const KILLER1: u64 = 1 << 29;
@@ -192,6 +235,118 @@ impl Solver {
         best
     }
 
+    /// Adds the opponent placement `m` to the threats if the bounds decide the game after it.
+    fn try_threat(&self, pos: &Pos, m: u16, th: &mut Threats) {
+        if m == PASS || th.n >= MAX_THREATS || th.ntried >= MAX_TRIED || th.tried[..th.ntried].contains(&m) {
+            return;
+        }
+        th.tried[th.ntried] = m;
+        th.ntried += 1;
+        let t = self.t;
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let b = &t.placements[m as usize];
+        if pos.left[opp] >> b.piece & 1 == 0 || !pos.legal_placement(t, opp, b) {
+            return;
+        }
+        let my_upper = upper_bound_ex(t, pos, me, b.cells, None);
+        let opp_len = pos.longest_after(opp, b) as i32;
+        let value = if my_upper < opp_len {
+            -1
+        } else if my_upper <= opp_len {
+            0
+        } else {
+            return;
+        };
+        th.zone[th.n] = threat_zone(pos, opp, b);
+        th.value[th.n] = value;
+        th.n += 1;
+    }
+
+    /// Adds every opponent placement after which our value is at most alpha by the bounds.
+    /// `mine`: our clusters. A placement lowers our bound only inside the clusters it covers, so it
+    /// has to cover every cluster whose bound is too high: the cheap test before the exact one.
+    fn scan_threats(&self, pos: &Pos, mine: &Clusters, alpha: i32, th: &mut Threats) {
+        let t = self.t;
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let my_lower = pos.longest[me] as i32;
+        let strict = if alpha < 0 { 1 } else { 0 }; // a loss needs our bound strictly below their length
+        // one placement joins at most two opponent snakes, which caps the opponent's length after it
+        let (mut longest, mut second) = (0i32, 0i32);
+        for j in 0..pos.nsnakes[opp] as usize {
+            let len = count(pos.snakes[opp][j]) as i32;
+            if len > longest {
+                second = longest;
+                longest = len;
+            } else if len > second {
+                second = len;
+            }
+        }
+        let max_need = (pos.longest[opp] as i32).max(4 + longest + second) - strict;
+        if my_lower > max_need {
+            return;
+        }
+        let mut must_cover = ALL;
+        if !mine.overflow {
+            for i in 0..mine.n {
+                if mine.upper[i] > max_need {
+                    must_cover = mine.cells[i];
+                    break;
+                }
+            }
+        }
+        let mut found: [(u32, BB, i32); MAX_FOUND] = [(0, 0, 0); MAX_FOUND];
+        let mut nf = 0;
+        pos.for_each_move(t, opp, pos.left[opp], |m| {
+            if nf >= MAX_FOUND {
+                return;
+            }
+            let b = &t.placements[m as usize];
+            if b.cells & must_cover == 0 {
+                return;
+            }
+            let opp_len = pos.longest_after(opp, b) as i32;
+            let need = opp_len - strict; // our upper bound must not exceed this
+            if my_lower > need {
+                return;
+            }
+            if !mine.overflow {
+                for i in 0..mine.n {
+                    if mine.upper[i] > need && mine.cells[i] & b.cells == 0 {
+                        return;
+                    }
+                }
+            }
+            let my_upper = upper_bound_ex(t, pos, me, b.cells, None);
+            let value = if my_upper < opp_len {
+                -1
+            } else if my_upper <= opp_len {
+                0
+            } else {
+                1
+            };
+            if value <= alpha {
+                let zone = threat_zone(pos, opp, b);
+                found[nf] = (count(zone), zone, value);
+                nf += 1;
+            }
+        });
+        // smallest zones first: a zone that contains a kept one (with a value as low) prunes nothing more
+        found[..nf].sort_unstable_by_key(|f| f.0);
+        for f in &found[..nf] {
+            if th.n >= MAX_THREATS {
+                break;
+            }
+            let redundant = (0..th.n).any(|i| th.zone[i] & !f.1 == 0 && th.value[i] <= f.2);
+            if !redundant {
+                th.zone[th.n] = f.1;
+                th.value[th.n] = f.2;
+                th.n += 1;
+            }
+        }
+    }
+
     fn search(&mut self, pos: &Pos, mut alpha: i32, mut beta: i32) -> i32 {
         self.nodes += 1;
         if self.nodes > self.node_limit {
@@ -228,8 +383,9 @@ impl Solver {
         }
 
         // 2. the snake-length bounds
+        let mut my_clusters = Clusters::new();
         if self.cfg.bounds {
-            let mine = bounds(t, pos, me);
+            let mine = Bounds { lower: pos.longest[me] as i32, upper: upper_bound_ex(t, pos, me, 0, Some(&mut my_clusters)) };
             let theirs = bounds(t, pos, opp);
             let blo = if mine.lower > theirs.upper {
                 1
@@ -258,8 +414,18 @@ impl Solver {
         beta = beta.min(hi);
         let (alpha0, beta0) = (alpha, beta);
 
-        // 3. generate and score the moves
-        let ply = (pos.ply as usize).min(MAX_PLY - 1);
+        // 3. threats: the opponent's refutations one ply down are the natural candidates
+        let ply = (pos.ply as usize).min(MAX_PLY - 2);
+        let threats_on = self.cfg.threats && self.cfg.bounds && pos.left[opp] != 0;
+        let mut th = Threats::new();
+        if threats_on {
+            self.try_threat(pos, self.killers[ply + 1][0], &mut th);
+            self.try_threat(pos, self.killers[ply + 1][1], &mut th);
+        }
+        let mut skipped = -2; // the best bound of the moves skipped because of threats
+        let mut scanned = !threats_on;
+
+        // 4. generate and score the moves
         let mut buf = std::mem::take(&mut self.bufs[ply]);
         buf.clear();
         {
@@ -269,6 +435,13 @@ impl Solver {
             let (k1, k2) = (self.killers[ply][0], self.killers[ply][1]);
             pos.for_each_move(t, me, pos.pieces_now(), |m| {
                 let p = &t.placements[m as usize];
+                if th.n > 0 {
+                    let bound = th.bound_for(p.cells);
+                    if bound <= alpha {
+                        skipped = skipped.max(bound);
+                        return;
+                    }
+                }
                 let mut score = p.n as u64 * 64;
                 if p.border & own != 0 {
                     score += 256;
@@ -289,10 +462,10 @@ impl Solver {
             });
         }
 
-        // 4. search them, best-scored first
+        // 5. search them, best-scored first
         let mut best = -2;
         let mut best_move = PASS;
-        if buf.is_empty() {
+        if buf.is_empty() && skipped == -2 {
             let mut child = *pos;
             child.play(t, PASS);
             best = -self.search(&child, -beta, -alpha);
@@ -311,6 +484,13 @@ impl Solver {
                     buf[3..].sort_unstable_by(|a, b| b.cmp(a));
                 }
                 let m = (buf[i] & 0xFFFF) as u16;
+                if th.n > 0 {
+                    let bound = th.bound_for(t.placements[m as usize].cells);
+                    if bound <= alpha {
+                        skipped = skipped.max(bound);
+                        continue;
+                    }
+                }
                 let mut child = *pos;
                 child.play(t, m);
                 let v = -self.search(&child, -beta, -alpha);
@@ -331,14 +511,25 @@ impl Solver {
                     }
                     break;
                 }
+                // The refutation just found may be a threat against the remaining moves. And once the
+                // first move has failed this is probably a node where every move must be refuted, so
+                // look for all of the opponent's threats.
+                if threats_on && i + 2 < n {
+                    self.try_threat(pos, self.killers[ply + 1][0], &mut th);
+                    if !scanned {
+                        scanned = true;
+                        self.scan_threats(pos, &my_clusters, alpha, &mut th);
+                    }
+                }
             }
+            best = best.max(skipped);
         }
         self.bufs[ply] = buf;
         if self.aborted {
             return 0;
         }
 
-        // 5. store what we learned
+        // 6. store what we learned
         let (mut nlo, mut nhi) = (lo, hi);
         if best <= alpha0 {
             nhi = nhi.min(best);

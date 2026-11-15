@@ -26,11 +26,39 @@ pub fn growable(pos: &Pos, player: usize) -> BB {
     pos.empty() & !neighbours(shape_of(pos.cells[player]).body)
 }
 
+pub const MAX_CLUSTERS: usize = 24;
+
+/// A player's clusters: the growable cells of each and the longest final snake possible inside it.
+pub struct Clusters {
+    pub n: usize,
+    pub cells: [BB; MAX_CLUSTERS],
+    pub upper: [i32; MAX_CLUSTERS],
+    /// More clusters than the list holds: the list is not complete.
+    pub overflow: bool,
+}
+
+impl Clusters {
+    pub fn new() -> Clusters {
+        Clusters { n: 0, cells: [0; MAX_CLUSTERS], upper: [0; MAX_CLUSTERS], overflow: false }
+    }
+}
+
 /// The upper bound, cluster by cluster: regions of growable cells, merged by the snakes touching them.
 #[inline]
 pub fn upper_bound(t: &Tables, pos: &Pos, player: usize) -> i32 {
+    upper_bound_ex(t, pos, player, 0, None)
+}
+
+/// The upper bound of `player` when the empty cells `blocked` are taken by the opponent as well;
+/// with `rec`, the clusters are recorded there.
+#[inline]
+pub fn upper_bound_ex(t: &Tables, pos: &Pos, player: usize, blocked: BB, mut rec: Option<&mut Clusters>) -> i32 {
     let lower = pos.longest[player] as i32;
     let left = pos.left[player];
+    if let Some(r) = rec.as_deref_mut() {
+        r.n = 0;
+        r.overflow = false;
+    }
     if left == 0 {
         return lower;
     }
@@ -44,7 +72,7 @@ pub fn upper_bound(t: &Tables, pos: &Pos, player: usize) -> i32 {
         snake_len[j] = count(pos.snakes[player][j]) as i32;
     }
     let mut upper = lower;
-    let mut rest = growable(pos, player);
+    let mut rest = growable(pos, player) & !blocked;
     let mut used = 0u32; // snakes already inside a cluster
     while rest != 0 {
         // one cluster: flood a region, pull in the snakes touching it, flood the regions they touch
@@ -87,6 +115,15 @@ pub fn upper_bound(t: &Tables, pos: &Pos, player: usize) -> i32 {
         let reach = own + fill[capacity.min(GRID)] as i32;
         if reach > upper {
             upper = reach;
+        }
+        if let Some(r) = rec.as_deref_mut() {
+            if r.n < MAX_CLUSTERS {
+                r.cells[r.n] = cluster;
+                r.upper[r.n] = reach;
+                r.n += 1;
+            } else {
+                r.overflow = true;
+            }
         }
     }
     upper

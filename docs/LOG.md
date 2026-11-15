@@ -45,3 +45,32 @@ test decided, (confirm) fixed length on fresh units.
 - **What it taught:** the closed form removes the nodes with 0 and 1 pieces left; what remains sits at
   2 and 3 pieces left (4.3 M and 4.2 M of 9.65 M), so the next gains are there and in the number of
   replies searched at the loser nodes above them.
+
+## 2026-11-14 E2: threat zones
+
+- **Hypothesis** (written before the run): at a node where the mover is losing, v1 searches every move.
+  If an opponent placement b, played now as a free move, already decides the game by the bounds, then
+  every move of ours that leaves b playable (does not cover it; does not touch it when b starts a new
+  snake) is worth no more than that verdict, because the opponent answers b and our upper bound only
+  falls as cells fill. So only moves through the zone of every such threat need a search. Threats come
+  from the opponent killer moves one ply down and, once a first move has failed, from one scan of all
+  opponent placements. The reference credits this for most of its v4 gain. Expected: 2x or more
+  fewer nodes at ply 7, more at ply 6.
+- **Risk:** the scan costs about a move generation plus a bound per candidate; it may not pay near the leaves.
+- **Test:** flag `--no-threats` restores v1 (identity on node counts). `verify` gains a check of the
+  monotonicity the argument needs. Screen on ply 7 tune, gate `E2` on ply 7, scaling check on ply 6.
+- **Identity:** with `--no-threats` the first 100 positions of ply 7 take 9,651,030 nodes, as v1 does.
+- **Correctness:** `verify 3000 7` passes, with 2.3 M checks that a move outside a threat's zone leaves
+  the threat playable and does not raise our bound with the threat's cells blocked. Labels equal on all
+  12,000 positions of plies 9-11 and on the first 600 of ply 8.
+- **Screen `E2-S`** (tune, ply 7, 20 units): nodes 0.44x, total time 0.66x.
+- **Gate `E2`** (ply 7, gate units 89-118, `SPRT[0, 0.05]`): PASS at unit 30, LLR +11.5. Where it stopped:
+  +59.5% [+46.3%, +73.8%] (gate); total time 7.46 s against 11.75 s (0.63x); nodes 0.44x.
+- **Scaling check `E2-UP`** (ply 6, tune units 0-5): total time 6.56 s against 12.09 s (0.54x), nodes
+  0.39x. The gain grows with depth, as expected of a cut at the loser's nodes.
+- **Verdict:** accepted. Frozen as v2.
+- **What it taught:** nodes fell 2.3x but time only 1.6x: a node now costs about 0.55 microseconds
+  against 0.37 (the scan and a second bound per node). Profile of the first 100 ply-7 positions after E2:
+  4.30 M nodes, of which 2 pieces left: 2.06 M, 3: 1.51 M, 4: 0.44 M, 5: 0.26 M. Nodes with two pieces
+  left are now half of the tree, so a closed form or a tighter bound there (E3) is the next pot, and
+  the cost of a node (E7) is worth more than before.

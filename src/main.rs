@@ -50,7 +50,7 @@ fn perft(t: &Tables, pos: &Pos, depth: u32) -> u64 {
 /// Random games; at every position the fast code is compared with the naive rules.
 fn verify(t: &Tables, games: usize, seed: u64) {
     let mut rng = Rng(seed);
-    let (mut positions, mut placements_checked) = (0u64, 0u64);
+    let (mut positions, mut placements_checked, mut threat_checks) = (0u64, 0u64, 0u64);
     let mut moves = Vec::new();
     for _ in 0..games {
         let mut pos = Pos::initial();
@@ -81,6 +81,32 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             assert_eq!(fresh.nsnakes, pos.nsnakes);
             let round = Pos::from_text(&pos.to_text()).unwrap();
             assert_eq!(round.hash, pos.hash);
+            // what the threat zones rely on: if the opponent could play b now, our upper bound after b
+            // is no lower than after any move of ours that leaves b playable, followed by b
+            let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
+            for _ in 0..40 {
+                if moves.is_empty() || pos.left[opp] == 0 {
+                    break;
+                }
+                let b = &t.placements[rng.below(t.placements.len())];
+                if pos.left[opp] >> b.piece & 1 == 0 || !pos.legal_placement(t, opp, b) {
+                    continue;
+                }
+                let zone = if b.border & pos.cells[opp] != 0 { b.cells } else { b.cells | b.border };
+                let before = bounds::upper_bound_ex(t, &pos, me, b.cells, None);
+                for _ in 0..8 {
+                    let m = moves[rng.below(moves.len())];
+                    if t.placements[m as usize].cells & zone != 0 {
+                        continue;
+                    }
+                    let mut child = pos;
+                    child.play(t, m);
+                    assert!(child.legal_placement(t, opp, b), "threat no longer playable at {}", pos.to_text());
+                    let after = bounds::upper_bound_ex(t, &child, me, b.cells, None);
+                    assert!(after <= before, "upper bound rose after our own move at {}", pos.to_text());
+                    threat_checks += 1;
+                }
+            }
             positions += 1;
             let m = if moves.is_empty() { PASS } else { moves[rng.below(moves.len())] };
             pos.play(t, m);
@@ -89,7 +115,7 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             assert!(pos.longest[player] as i32 <= prev_upper[player], "final snake above the bound");
         }
     }
-    println!("verify ok: {} games, {} positions, {} placement checks", games, positions, placements_checked);
+    println!("verify ok: {} games, {} positions, {} placement checks, {} threat-bound checks", games, positions, placements_checked, threat_checks);
 }
 
 struct Opts {
@@ -114,6 +140,7 @@ fn parse_opts(args: &[String]) -> Opts {
         match a {
             "--no-bounds" => o.cfg.bounds = false,
             "--no-last" => o.cfg.last_pieces = false,
+            "--no-threats" => o.cfg.threats = false,
             "--tt" => o.cfg.tt_bits = val().parse().unwrap(),
             "--nodes" => o.nodes = val().parse().unwrap(),
             "--from" => o.from = val().parse().unwrap(),
@@ -210,7 +237,7 @@ fn main() {
         }
         _ => {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
-            println!("options: --no-bounds --no-last --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
+            println!("options: --no-bounds --no-last --no-threats --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
 }
