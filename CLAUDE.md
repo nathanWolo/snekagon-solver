@@ -30,8 +30,10 @@ Update this section in the same change that freezes a version.
 - **Found about the game:** after `1:60 4B:16,27,28,39` red wins with `4B:70,81,82,93` (LOG,
   "the position after two moves is a win for red"; three runs and two engine generations agree;
   the reference solver has not been asked).
-- **The centre opening `1:60` is being solved:** 172 blue replies after symmetry, each needs a
-  red win. The run and how to go on with it:
+- **The centre opening `1:60` is being solved:** 172 blue replies after symmetry (of 1,932),
+  each needs a red win. At 06:33 on 2026-11-15: 31 refuted, 0 hold, 141 open, about
+  4.4 minutes a reply. What is proved: `python tools/certificate.py work/long/ply1_results.txt`.
+  The run and how to go on with it:
   `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2 --tt 27 --out work/long/ply1_results.txt`.
   It can be stopped at any time; the same command continues from the results file. Progress:
   `grep "root move" work/long/ply1.err`.

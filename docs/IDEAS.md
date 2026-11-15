@@ -5,8 +5,13 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 
 ## Open, by expected gain for the effort
 
-0. **Finish the centre opening.** `1:60` has 172 blue replies after symmetry; one is refuted
-   (`4B:16,27,28,39`, by red's `4B:70,81,82,93`). If every one loses, the start position is a
+0. **Finish the centre opening.** `1:60` has 172 blue replies after symmetry; 31 were refuted
+   by 06:33 on 2026-11-15 (LOG, "the centre opening"), none held.
+   *Considered and not built:* a survey order, every reply gets a few red tries before any
+   reply gets more (one cost term in the driver's scheduler). It would show early which replies
+   are stubborn, but it is never faster to the value of `1:60`: if a reply holds, the
+   refutations of the others were not needed for it. The dearest reply so far took 21 red
+   tries. If every one loses, the start position is a
    win for red. The run is set up and can be resumed (CLAUDE.md, "Right now"). What decides its
    length is how soon red's winning move comes up in the order at ply 2: a red move that only
    draws costs about 20 s, the win about 5 minutes. The driver tries the last winning moves and

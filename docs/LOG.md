@@ -860,7 +860,7 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
   reference's result that this reply wins against red's `4A:7,8,9,20`, the reply is sound only
   against the wrong answer. Whether blue has any reply to `1:60` that holds is now the question
   that decides the centre opening, and with twelve symmetries there are about 135 replies to
-  check, not 1,589.
+  check, not 1,589. (Corrected in the next entry: 172 classes of 1,932 replies.)
 
 ## 2026-11-15 E22: a table lookup of every child before the first move (dropped at the screen)
 
@@ -893,3 +893,75 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
 - **Reopens if** the order of moves gets worse for another reason (so that the cutting child
   comes late), or in the proof driver's top plies, where one saved move is minutes and the
   lookup is free. The driver already does that with its results file ("known results first").
+
+## 2026-11-15 Long solve under way: the centre opening `1:60`
+
+- **Question:** does every blue reply to `1:60` lose? Then the centre opening is a win for red,
+  and so is the start position (red chooses the opening). Expected from the solve above: about
+  5 minutes for a reply whose refutation is tried early, hours for a reply that holds (all of
+  red's moves must then be shown not to win).
+- **Run:** `frozen/prove.exe prove work/long/ply1.txt --threads 1 --job-threads 16 --depth 2
+  --tt 27 --out work/long/ply1_results.txt` (build `22d36ad`), started at 04:18. The
+  coordinator holds the first two plies (blue's reply, red's answer); each position after them
+  is one job for 16 threads on the shared table. The results file was seeded with the results
+  of the solve above (73 positions), so the reply `4B:16,27,28,39` was done at once.
+- **New in this build, not measured against the build without them:** moves that a symmetry of
+  the position maps onto each other are searched once; a move that cut at a coordinator ply is
+  tried first at its sibling nodes, and so are its twelve mirror images ("winners").
+- **The count, checked without the solver:** `tools/certificate.py` builds the replies from the
+  piece shapes: 1,932 blue replies (a first piece may not touch the centre tile) in 172
+  classes under the twelve symmetries. The driver searches 172 root moves. This corrects
+  the entry above, which guessed "about 135 replies, not 1,589": 1,589 is the number of red
+  moves in the position after two moves.
+- **Progress at 06:33: 31 of 172 classes are refuted, 141 are open.** No reply holds so far.
+  133 minutes and 102.4 billion nodes for the 30 replies done in this
+  run, 4.4 minutes a reply.
+
+  | Blue's reply (cells) | Red wins with | Red moves tried | Seconds |
+  | --- | --- | --- | --- |
+  | 9,19,28,29 | 4B:36,37,48,49 | 3 | 174 |
+  | 16,27,28,39 | 4B:70,81,82,93 | seed (72, 31 min) |  |
+  | 17,19,28,29 | 4C:61,63,72,73 | 1 | 136 |
+  | 17,27,36,37 | 4C:29,30,39,50 | 1 | 188 |
+  | 18,20,29,30 | 4C:61,63,72,73 | 2 | 158 |
+  | 18,28,37,38 | 4B:41,42,50,51 | 3 | 208 |
+  | 19,29,38,39 | 4B:36,37,48,49 | 1 | 185 |
+  | 20,30,39,40 | 4B:36,37,48,49 | 4 | 248 |
+  | 27,28,37 | 4B:41,42,50,51 | 1 | 203 |
+  | 27,37,46,47 | 4C:29,30,39,50 | 5 | 247 |
+  | 28,30,39,40 | 4C:51,52,61,63 | 1 | 400 |
+  | 28,38,47,48 | 4C:29,30,39,50 | 3 | 357 |
+  | 38,39,48 | 4C:71,72,83,93 | 4 | 322 |
+  | 38,48,57,58 | 4C:27,28,39,49 | 2 | 200 |
+  | 40,42,51,52 | 4C:27,28,39,49 | 2 | 500 |
+  | 48,58,67,68 | 4B:18,28,39,49 | 2 | 168 |
+  | 51,53,62,63 | 4B:18,28,39,49 | 1 | 191 |
+  | 53,62,63,72 | 4B:71,81,92,102 | 8 | 555 |
+  | 62,72,81,82 | 4C:51,52,61,63 | 8 | 264 |
+  | 63,72,73,82 | 4C:71,81,92,93 | 2 | 339 |
+  | 63,73,82,83 | 4C:71,81,92,93 | 1 | 220 |
+  | 72,81,82,91 | 4B:30,39,40,49 | 1 | 211 |
+  | 72,82,91,92 | 4B:36,37,48,49 | 1 | 100 |
+  | 73,82,83,92 | 4B:18,28,39,49 | 1 | 205 |
+  | 73,83,92,93 | 4B:36,37,48,49 | 1 | 77 |
+  | 80,82,91,92 | 4B:30,39,40,49 | 2 | 218 |
+  | 81,82,83 | 4B:36,37,48,49 | 1 | 420 |
+  | 81,83,92,93 | 4B:57,58,69,70 | 2 | 289 |
+  | 81,91,100,101 | 4B:30,39,40,49 | 1 | 94 |
+  | 81,92,103,114 | 4B:18,28,39,49 | 21 | 840 |
+  | 91,93,102,103 | 4B:71,80,81,90 | 1 | 237 |
+
+  The winning move was red's first try for 14 of the 30 replies done in this run (tries,
+  sorted: 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 8, 8, 21). The first reply of a new kind is the dear one: against the
+  first straight four (`4I:81,92,103,114`) red's win was the 21st try, 14 minutes. Red's winning
+  moves so far: `4B:36,37,48,49` (6), `4B:18,28,39,49` (4), `4C:29,30,39,50` (3), `4B:30,39,40,49` (3). All of them grow the centre tile with a piece of four.
+- **What this does not show:** nothing about the 141 open classes. The order has taken the
+  four-cell replies first; whether the small pieces are as quick to refute is not known. At the
+  rate so far the rest is about 10 hours of this PC, more if a reply holds.
+- **To go on:** the run can be stopped at any time and the same command continues from the
+  results file. `python tools/certificate.py work/long/ply1_results.txt` lists what is proved
+  and says so when every class has a reply that loses.
+- **Before the result is claimed:** each line of the certificate is a position that another
+  program can check (after `1:60`, blue's reply and red's move, blue to move loses). With
+  `frozen/par-v9.exe bench` that is about 172 times 5 minutes; the reference solver would be
+  the independent check.
