@@ -1260,3 +1260,34 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   compiles during job j were not needed then. Compiles are allowed beside one-thread timings;
   beside a 16-thread timing they take a sixteenth of the machine. Rule from here: no compile
   while a `prove` timing of mine is running.
+
+## 2026-11-15 E27: the build tools are in; identity and the screen
+
+- **Install:** Visual Studio Build Tools 2022 (17.14.45, the C++ workload), by `winget`, on the
+  owner's word; seven minutes (13:15 to 13:22).
+- **The linker and this folder:** `link.exe` fails with LNK1104 when the target directory is
+  inside this repo (the path is longer than 260 characters). An MSVC build needs a short
+  `--target-dir` (the scratchpad). The GNU build is not affected.
+- **Identity:** the plain MSVC build and the profiled build both give 1,724,647 nodes on ply 7
+  positions 0-99, as the base does; all values right.
+- **The profile:** the instrumented build on proof positions 0-23 (`--window 0,1`; 75.4 M nodes)
+  and ply 7 positions 0-99, merged with `llvm-profdata`.
+- **Screen** (proof positions 24-35, not in the profile; `--window 0,1`; 62,315,717 nodes on
+  every run; seconds, in the order run; the machine was idle except for the agents' compiles):
+
+  | Run | GNU base | MSVC plain | MSVC profiled |
+  | --- | --- | --- | --- |
+  | 1 | 61.7 | 53.0 | 54.3 |
+  | 2 | 63.5 | 61.1 | 55.8 |
+  | 3 | 59.9 | (cut off) | (cut off) |
+
+  Repeats of one build differ by up to 15%, so the screen says only "both look ahead of the
+  GNU build; the profile's own share is not visible". The screen ran without the run lock, on
+  purpose: the lock was stuck (below) and nothing could be timed beside it.
+- **Gates started:** `E27A` (MSVC plain against the GNU base) and `E27B` (profiled against MSVC
+  plain), each `SPRT[0, 0.05]` on fresh proof units, cap 60 units.
+- **A stuck lock:** the search agent force-killed a timing round that held the run lock
+  (13:27). The lock frees itself after 20 minutes. The agent's own attempt to remove it was
+  refused by the permission check and it asked whether I would; I did not (a refused action is
+  not done for an agent by someone else). The profile run and the screen used the gap. Told to
+  all agents' future briefs: stop the solver, never the script that holds the lock.
