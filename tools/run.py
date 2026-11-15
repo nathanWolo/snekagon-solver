@@ -117,6 +117,13 @@ def main():
     os.makedirs(FROZEN, exist_ok=True)
 
     if a.kind == "freeze":
+        # only what passed its gate becomes the base: same key, verdict pass, the same executable
+        gates = [json.loads(l) for l in open(RUNLOG, encoding="utf-8") if l.strip()]
+        gates = [r for r in gates if r.get("key") == a.key and r.get("kind") == "gate"]
+        if not gates or gates[-1].get("verdict") != "pass":
+            sys.exit(f"no passed gate under the key {a.key}: nothing frozen")
+        if gates[-1].get("cand") != sha(a.cand):
+            sys.exit(f"{a.cand} is not the executable that passed the gate {a.key}: nothing frozen")
         shutil.copyfile(a.cand, BASE)
         git = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
         dirty = subprocess.run(["git", "-C", ROOT, "status", "--porcelain", "--", "src", "Cargo.toml"], capture_output=True, text=True).stdout.strip()

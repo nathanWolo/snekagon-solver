@@ -487,3 +487,19 @@ test decided, (confirm) fixed length on fresh units.
 - **Risks:** the test is the source of proofs: `verify` checks it against brute force over every
   sequence (hands of one to three), and the labels are checked on every set.
 - **Test:** node counts against v7 on the tune files; gate `E12` at ply 7, `SPRT[0, 0.05]`, cap 100.
+- **Built:** in `can_reach_touching`, for hands of one and two pieces: the snakes that can be the
+  longest old snake of a snake of the target length (by size); the first piece touches one of them;
+  before a position is built for the second piece, the size check counts only snakes not yet joined
+  and no longer than the longest joined, and a snake that must still come in has to have an end
+  within (second piece + 1) steps (`geo.within`). Switch `--no-longest`.
+- **Identity:** node counts equal to v7 with the switch on and off (1,901,619 and 5,467,404).
+  `verify 150 11`: 4,504 reach checks against brute force, all equal.
+- **Correctness:** all of plies 8-11, 590 of ply 7, 380 of ply 6: none wrong.
+- **Screen `E12-S`** (ply 7, tune units 0-29): +23.7% [+20.0%, +27.6%], time 0.827x.
+- **Gate `E12`** (ply 7, unused gate units 149-178): PASS at unit 30. +28.0% [+22.2%, +34.2%], time
+  0.800x (3.20 s to 2.56 s), nodes identical (5,251,293).
+- **Verdict:** accepted. Frozen as v8 (`a5a28e371f18`, commit `2adb793`).
+- **What it taught:** counting what a routine does (7.5 positions built per "no") found more than
+  timing it. The size check was sound and almost useless, because it counted the same snake twice.
+- **Process note:** I chained the freeze to the gate command in one line. The verdict was a pass, but
+  a line like that would also have frozen a fail. The freeze now checks the verdict first.
