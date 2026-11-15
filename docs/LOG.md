@@ -965,3 +965,65 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
   program can check (after `1:60`, blue's reply and red's move, blue to move loses). With
   `frozen/par-v9.exe bench` that is about 172 times 5 minutes; the reference solver would be
   the independent check.
+
+## 2026-11-15 Pot sizing: would a proof-number search with better heuristics beat alpha-beta? (no build)
+
+- **Question** (the owner's, 2026-11-15): alpha-beta leads through its move order and its
+  depth-first commitment, and a proof-number search can be given both. E5 was the textbook form
+  on v2 (start numbers from the reply count and the rank, every child expanded once), so its
+  28-60x says little about a good one. Asked before building: with the same order, what is left
+  for a proof-number search to win?
+- **What it adds over the same order:** it moves effort between the candidates of a node as their
+  numbers rise. That pays when the first move in order is dear and a later one is cheap. Two
+  readings of recorded data, no new solves.
+- **1. Spread against commit** (`python tools/spreadsim.py work/rootmoves_ply06.csv ...` on the
+  four files of `snek rootmoves`; won positions only; moves in the model's order; each move's
+  nodes are those of its own solve; moves of unknown value count as not winning). "Spread k"
+  keeps the k best unsolved moves alive at the same rate, a refuted move leaves and the next
+  joins, and it stops at the first proof: a proof-number search with a window of k that knows
+  nothing of costs and pays nothing to come back to a node.
+
+  | Policy | Ply 6 (37 positions) | Ply 6b (37) | Ply 7 (49) | Ply 8 (101) |
+  | --- | --- | --- | --- | --- |
+  | Commit: in order, each to the end (alpha-beta) | 2.60 M nodes | 1.15 M | 0.52 M | 0.16 M |
+  | Spread 2 | 1.22x | 1.62x | 1.27x | 1.22x |
+  | Spread 3 | 1.47x | 2.16x | 1.50x | 1.46x |
+  | Spread 5 | 1.98x | 3.12x | 1.89x | 1.87x |
+  | Spread 3, each place a quarter of the rate above | 1.11x | 1.23x | 1.11x | 1.10x |
+  | Only the first winning move in the order | 0.45x | 0.79x | 0.39x | 0.37x |
+  | Only the cheapest winning move | 0.23x | 0.32x | 0.22x | 0.22x |
+
+  The model's first move wins in 62%, 76%, 67% and 64% of these positions.
+- **2. Where the centre-opening run spends its time** (`python tools/jobsplit.py
+  work/long/ply1_results.txt`, the 70 replies refuted in the run by about 11:50): red's winning
+  tries 70 jobs, 17,856 s (67%), median 208 s, quartiles 142 and 322 s, dearest 733 s; red's
+  failed tries 158 jobs, 8,728 s (33%), median 32 s, dearest 322 s; 41 failed tries took more
+  than 60 s (5,844 s together). The first try won for 34 of the 70.
+- **Reading.**
+  1. Spreading without knowledge of costs loses at every window, 10% in its mildest form. With
+     the model's order a proof-number search is at its best when it commits as alpha-beta does.
+  2. The pot is real and it is a pot for prediction: a perfect guess of win or loss is worth
+     1.3-2.7x, a perfect guess of the cheapest win 3-4.5x (the earlier study, against the order
+     of that time, said 5-8x at ply 6). Proof numbers are one such guess. Their native signal, the reply count,
+     goes with the log of the cost among winning moves at +0.40 within a position
+     (`tools/rootcost.py`), and as a move order it lost time (E5b).
+  3. At the top of the long proof a failed try costs a fifth to a sixth of a winning one (mean,
+     median), and a third of the
+     time goes to failed tries. Leaving a dear failing try early can recover at most part of that
+     third.
+- **Limits.** The simulation treats the moves of a node as independent (no shared table) and
+  spreads blindly; a real search lies between "spread" and "cheapest win", nearer the first unless
+  its numbers predict cost. The positions are plies 6-8. Nothing here is a timed run of a
+  proof-number search with the model's order: this is a prediction (near parity with alpha-beta
+  at best), not a result.
+- **From the owner's link** (minimax.dev, a solver for Ultimate Tic Tac Toe after Pawlewicz's
+  Hex solver): a proof-number tree kept in memory at the top, df-pn workers below with a work
+  budget, "virtual" proof numbers so that free workers pick different nodes, and a node split
+  into its children once enough work has gone into it. The proof driver has the same skeleton
+  with alpha-beta workers. It lacks the work budget (a job runs to its end), the split by work
+  done (the depth is fixed) and many single-thread jobs at a node whose children are all needed
+  (the long run uses one job of 16 threads at a time; on the ply-4 position 16 single-thread
+  workers took 42.8 s against 51.9-61.4 s, E18).
+- **Would settle it:** df-pn on v9 with start numbers from the model, a window on the best few
+  children, and alpha-beta below six pieces, screened on node counts at plies 6 and 7 against v9.
+  Not built; the owner's call.
