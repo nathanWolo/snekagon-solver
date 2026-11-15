@@ -547,3 +547,24 @@ test decided, (confirm) fixed length on fresh units.
 - **Expected:** unknown; a guess of 5-15% fewer nodes at ply 6 and 7, more at ply 5.
 - **Test:** node counts on the tune units of plies 7 and 6 for a few sizes of the bonus and levels
   (screen); if a setting gives 5% fewer nodes on both, gate `E14` at ply 7, `SPRT[0, 0.05]`, cap 100.
+- **Built:** in the move loop, after a move that did not cut: the first killer one ply down is the
+  reply that refuted it; every remaining move that covers one of that reply's cells gets a bonus
+  larger than any score, once per reply. `--answer-bonus 0` turns it off.
+- **Screen, node counts** (tune; ply 7 positions 0-299 and ply 6 positions 0-149; v8: 5.64 M and
+  8.02 M): cover or touch the reply 4.59 M and 6.48 M; **cover only 4.35 M and 5.62 M**; the threat
+  zone of the reply 4.23 M and 5.97 M; a bonus per covered cell 4.54 M and 8.55 M (worse); only with
+  seven or more pieces left 4.64 M and 6.47 M; small bonuses the same or a little worse. Chosen:
+  cover only, bonus above all scores, every level. The choice among the first three is within the
+  noise of an ordering change; I took the simplest.
+- **At ply 5** (tune): 30 positions 26.87 M to 15.82 M nodes, 13.25 s to 8.21 s; ten of the
+  refutation positions 38.03 M to 33.13 M.
+- **Identity and correctness:** bonus 0 gives v8's node counts; all of plies 8-11, 590 of ply 7 and
+  380 of ply 6 have the label's value.
+- **Screen `E14-S`** (ply 7, all 59 tune units): +27.0% [+18.3%, +36.4%], time 0.771x, nodes 0.769x,
+  sd 0.28 a unit.
+- **Gate `E14`** (ply 7, unused gate units 179-208): PASS at unit 30. +24.7% [+14.6%, +35.7%], time
+  0.836x (2.27 s to 1.90 s), nodes 0.863x.
+- **Verdict:** accepted. Frozen as v9 (`2deb69fb855b`, commit `84e8f3b`).
+- **What it taught:** the information a failed move leaves behind (which reply beat it) was being
+  used only when that reply won by the bounds at once. Used as an order, it is worth more than the
+  whole fitted model was at ply 7. The variants were chosen on tune units and the gate ran once.
