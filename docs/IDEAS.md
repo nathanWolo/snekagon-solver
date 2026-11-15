@@ -31,6 +31,22 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    model is at the limit of its eight features (a refit on five times the data gave the same
    weights), and re-ranking by look-ahead features gave nothing. It needs information of another
    kind.
+2a. **The GPU (owner's question, 2026-11-15): "could we write a solver to run on gpu and leverage
+   that parallelism? could it be fast?"** Assessment, not yet a measurement. *As the search:*
+   unlikely. A node here is not cheap arithmetic but a branchy proof step (reach tests 29% of the
+   time, threat scans 22%); the tree is cut by order and by a shared table (red's first move cuts
+   85-94% of the time), which is sequential knowledge; and plain enumeration is already not the
+   cost (`perft 3`: a billion placements a second on one thread). A brute-force GPU bottom would
+   have to beat alpha-beta's square-root tree, which it can only within about three plies of the
+   end, and those are already closed form. *As the trainer of a move-ordering model:* this is
+   where a measured pot is (Open 2: cheapest win first is 0.22-0.32x at the top of a proof, and
+   a third of a proof's time goes to red tries that fail). The fitted model has 8 hand-made
+   features and a refit on five times the data gave the same weights; a network over the board,
+   trained on the solved positions with the owner's JAX set-up and evaluated only in the first
+   plies (4% of the nodes are at six pieces left or more), is a different model class. *First
+   step (no GPU needed):* size it: can any model trained on the labelled positions and the
+   proof's records beat the current order on held-out positions, in nodes paid before the first
+   winning move.
 3. **Merge the parallel solve** (branch `parallel-v9`): exact, 3.4x wall-clock on 8 threads, about 2%
    with one thread on v4. Owner's call. The proof driver on the same branch (`prove`, E18) hands
    whole positions to workers and keeps every result in a file, so a solve can be stopped and
