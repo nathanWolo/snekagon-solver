@@ -11,6 +11,10 @@ piece shapes alone, not taken from the solver, so the last lines are a check of 
 symmetry rule as well: the centre opening is a red win when every class has a reply that is
 known to lose. `--open` lists one reply of every class that is still open.
 
+A reply counts as lost here only when the file also holds the job behind it: the position after
+red's winning move, blue to move, searched to a loss. So the claim rests on the search results
+in the file and on this script, not on the bookkeeping of the driver's coordinator.
+
 Cell numbers are (r + 5) * 11 + (q + 5), as in the move texts.
 """
 import sys
@@ -78,6 +82,7 @@ def main():
     wins = {}
     holds = {}
     tries = {}
+    lost_jobs = set()  # (red cells, blue cells) of positions with blue to move that are lost
     for line in open(path):
         f = line.split()
         if len(f) < 6:
@@ -101,10 +106,22 @@ def main():
             if hi <= -1:
                 t[1] += 1
             t[2] += int(f[4]) / 1000
+            if hi <= -1:
+                lost_jobs.add((tuple(cells(red)), key))
     print(f"{len(wins)} blue replies to 1:60 are known to lose; {len(holds)} are known to hold")
+    unbacked = []
     for key in sorted(wins):
         t = tries.get(key, [0, 0, 0.0])
-        print(f"  blue {','.join(map(str, key)):16s} loses to red {wins[key]:18s} ({t[0]} red moves tried, {t[2]:.0f} s)")
+        red_after = tuple(sorted([60] + [int(c) for c in wins[key].split(":")[1].split(",")]))
+        note = ""
+        if (red_after, key) not in lost_jobs:
+            unbacked.append(key)
+            note = "  NO JOB RECORD"
+        print(f"  blue {','.join(map(str, key)):16s} loses to red {wins[key]:18s} ({t[0]} red moves tried, {t[2]:.0f} s){note}")
+    for key in unbacked:
+        del wins[key]
+    if unbacked:
+        print(f"  WARNING: {len(unbacked)} of these have no searched position behind them in the file and are not counted below")
     for key in sorted(holds):
         print(f"  blue {','.join(map(str, key)):16s} HOLDS (red cannot win)")
 
