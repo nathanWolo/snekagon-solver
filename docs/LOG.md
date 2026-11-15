@@ -1156,3 +1156,14 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   ply 5 positions 0-29, proof positions 0-23. Three runs an arm, interleaved. Then the gate on
   fresh proof positions through `tools/run.py` (unit: 2 positions) if a screen shows 2% or more.
 - **Bar:** `SPRT[0, 0.05]` as before; the guard on total time.
+
+## 2026-11-15 Pot sizing: the same position twice in a proof, up to symmetry (nothing there)
+
+- **Idea:** with three coordinator plies the driver would solve positions four moves in one by
+  one; key its results by the canonical position (the least of the twelve mirror images), so
+  that a position reached under two blue replies is solved once.
+- **Measured without building** (`python tools/sharepot.py work/long/ply1_results_paused.txt`):
+  the 74 positions searched to a loss for blue have 66,585 children. 66,567 are distinct as they
+  stand, 66,433 up to symmetry over all parents (0.2% repeat), and no parent has a symmetry of
+  its own. Red's answers differ from reply to reply, so the transpositions do not meet.
+- **Verdict:** dropped before a build. Reopen only if red's answers are chosen to coincide.
