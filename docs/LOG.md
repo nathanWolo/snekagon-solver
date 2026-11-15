@@ -1199,3 +1199,12 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   later; jobs g to j).
 - **Worktrees:** the app's own worktree isolation fails here (the folder's path is too long for
   git), so the worktrees were made by hand in a shorter place.
+- **Gate for the driver:** `tools/provegate.py` reads base against candidate on whole proof jobs
+  (wall-clock, a job a unit, fixed length, every solve under the lock). Reserved for it: jobs g to
+  j and eight more made today from the paused proof's results (`work/e24/k.pos` to `r.pos`, the
+  next eight by the time the proof spent on them: 113 to 142 s). Twelve jobs cannot feed a
+  sequential test (it takes no decision before 30 units), so a driver read is of fixed length
+  and passes when its 95% interval excludes zero.
+- **Owner, on the build tools for profile-guided optimisation (E27):** "I'll install them". E27
+  is open again once the C++ linker is on the machine. It will be two reads, not one: the MSVC
+  toolchain against the GNU one (the environment pin changes), then the profile on top.
