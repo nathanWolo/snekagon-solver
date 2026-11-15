@@ -5,6 +5,15 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 
 ## Open, by expected gain for the effort
 
+0. **Finish the centre opening.** `1:60` has 172 blue replies after symmetry; one is refuted
+   (`4B:16,27,28,39`, by red's `4B:70,81,82,93`). If every one loses, the start position is a
+   win for red. The run is set up and can be resumed (CLAUDE.md, "Right now"). What decides its
+   length is how soon red's winning move comes up in the order at ply 2: a red move that only
+   draws costs about 20 s, the win about 5 minutes. The driver tries the last winning moves and
+   their mirror images first (not measured). If a blue reply holds, showing it costs all of
+   red's moves (hours); a wide window there, and a better guess of the first red move, are the
+   next things to build.
+
 1. **More from what the search already knows.** E14 (cover the reply that refuted the last move)
    was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Six follow-ups of the
    same kind failed on node counts (E15-E17, E19-E21, below), a history table among them. Rules of
