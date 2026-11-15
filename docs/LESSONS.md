@@ -32,11 +32,13 @@ machine, and were not reproduced here.
 - **Bounds that answer the same question are paid twice.** The cluster bound cut one node in eight
   where the exact reach test also applied, and the exact test ran at the other seven anyway (E10).
 - **Each earlier ply costs about ten times more** (v0: ply 9 0.5 ms, ply 8 6 ms, ply 7 50 ms).
-- **A drawn position is two proofs, and which question is asked matters more than who schedules
-  the work.** On the drawn ply-3 position one search with the wide window took 140 s; the same
-  engine asked "can the mover draw" and then "can the mover win" took 195 s. The narrow pass asks
-  "does the opponent at least draw" after every move, where the wide search proved "the opponent
-  wins" after the losing ones, and the win is the proof it finds faster (E18).
+- **A drawn position is two proofs, and one wide search does them cheaper than two narrow ones.**
+  On the drawn ply-3 position the wide window took 140 s and the same engine asked "can the mover
+  draw" and then "can the mover win" took 195 s; on drawn tune positions the two passes cost
+  1.15-1.23x the nodes. For a decisive position the right single pass costs 0.82-1.03x and the
+  wrong one first 1.39x. The weaker true statement is always the cheaper proof (0.57-0.65x of the
+  wide search): my guess that a win is found faster than "at least a draw" was wrong (LOG, the
+  window study).
 - **Drawing moves searched side by side each pay for the exact proof.** A parallel driver with the
   wide window had several drawing moves of the root under way before the first raised alpha:
   7.4 billion nodes where 1.8 billion do (E18).
@@ -87,6 +89,9 @@ machine, and were not reproduced here.
 - **Before blaming a new driver, run the old engine on the same questions.** The driver was 1.4x
   slower than the shared-table solve on the ply-3 position. Giving the old engine the driver's two
   narrow windows reproduced the whole gap in one run: the loss was in the questions (E18).
+- **Test the explanation too.** I wrote down why the narrow passes lost ("a win is the cheaper
+  proof") before testing it. A count of nodes by window on labelled positions took two minutes and
+  showed the opposite.
 
 ## Open questions for the owner
 

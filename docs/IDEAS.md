@@ -20,11 +20,12 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    resumed. It beats the shared-table solve where every root move must be refuted (42.8 s against
    51.9 s) and loses on a drawn position (191 s against 140 s), because it asks two narrow
    questions.
-3a. **Ask the stronger question first** (the fix for the driver's loss). At a node that needs "at
-   least a draw", "a win" is often true and its proof is found faster. Try the first move with the
-   decisive window and a node budget before the narrow one; or keep the wide window and search one
-   move at a time until alpha has risen. Size: the 1.4x between 195 s and 140 s on the drawn ply-3
-   position. Also worth a study: why the win proof is cheaper (threat zones in the decisive window).
+3a. **The driver's window.** Two narrow passes cost 1.15-1.4x on a drawn position and 1.39x when
+   the first question is the wrong one; the right single pass costs 0.82-1.03x of a wide search
+   (LOG, the window study). So: a wide window at the root when its moves are searched one at a
+   time (safe, not built); a guess of the value to choose the first pass (the sign of the lead
+   after a shallow search). "Ask for a win first" is refuted: the weaker statement is the cheaper
+   proof.
 4. **Node speed, what is left** (v8, share of time): reach tests 29%, threat scans 16%, last pieces
    10%, killer threats 6%, generating 5%, the rest (table, copy, play) 28%. The generator's
    per-orientation cost is behind most of these. A witness kept from a reach test that said "yes"
