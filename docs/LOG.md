@@ -568,3 +568,67 @@ test decided, (confirm) fixed length on fresh units.
 - **What it taught:** the information a failed move leaves behind (which reply beat it) was being
   used only when that reply won by the bounds at once. Used as an order, it is worth more than the
   whole fitted model was at ply 7. The variants were chosen on tune units and the gate ran once.
+
+## 2026-11-15 E15: use the last known refuting reply before the first move as well
+
+- **Hypothesis** (written before the run): E14 uses the reply that refuted a move only after a move
+  has failed at this node. When no table move or killer is available, the first move is picked
+  without it, although the first killer one ply down (the reply that beat a move at a sibling) is
+  often still the opponent's best reply here. A bonus at generation for moves that cover its cells
+  should raise the first-move success. Order only.
+- **Expected:** a few percent fewer nodes; the first move already cuts 94-97% of the time below the
+  root, so the pot is the root and the nodes without a killer.
+- **Test:** node counts on tune units of plies 7 and 6 for a few bonus sizes; gate at ply 7 only if
+  a setting gives 5% fewer nodes on both.
+- **Built and reverted.** Node counts (tune, ply 7 positions 0-589 and ply 6 positions 0-199; v9: 8.08 M
+  and 7.14 M): bonus 32: 8.25 M and 7.18 M; 128: 8.10 M and 7.45 M; 1024: 8.26 M and 7.30 M. Nothing
+  better than v9 at either ply.
+- **Verdict:** dropped at the screen; no gate run.
+- **What it taught:** the reply that refuted *this* node's move is information; a reply left over
+  from a sibling is not, once the node's own killer has been tried.
+
+## 2026-11-15 Side study: refitting the ordering model on five times the data (no change)
+
+- **What:** every root move of all tune positions of plies 6 and 7 solved with v8 (`work/rm3/`,
+  197,000 moves, 706 positions with a win), `tools/rootfit.py --win-only`, train on four files, test
+  on two.
+- **Result:** weights `21,17,14,-1,2,-2,8,-6` against the solver's `21,17,21,-1,1,-3,9,-7`: the same
+  model. Held-apart cost 4.14 M nodes against 6.39 M for the static order and 1.57 M for the ideal;
+  the first move wins 59% of the time.
+- **Verdict:** no experiment. More data does not move these eight features; the gap to the ideal
+  (2.6 times) needs different information. E14 found some of it in the search itself.
+
+## 2026-11-15 E16: remember the reply that beat each move (a counter-move table)
+
+- **Hypothesis** (written before the run): where the first killer does not cut, the node tries
+  static-ordered moves. The reply that last beat the very move just played (by either side, anywhere
+  in the tree) is a better first guess than a general killer in those cases, and the same move comes
+  up in many sibling subtrees. A table of one reply per (side, move), tried with the killers before
+  the list is generated. Order only.
+- **Expected:** later cuts are 3-6% of the searching nodes below the root; if half become first-move
+  cuts, a few percent fewer nodes.
+- **Test:** node counts on tune units of plies 7 and 6, with the counter-move before and after the
+  killers; gate at ply 7 only if a setting gives 5% fewer nodes on both.
+- **Built and reverted.** Node counts (tune, ply 7 positions 0-589 and ply 6 positions 0-199; v9: 8.08 M
+  and 7.14 M): counter-move after the killers 8.28 M and 7.83 M; before the killers 16.69 M and
+  16.82 M (twice the nodes).
+- **Verdict:** dropped at the screen; no gate run.
+- **What it taught:** the killer is strong here because the same reply beats nearly every move at a
+  node (the side being refuted has no good move); a reply tied to one particular move is a worse
+  guess than the reply that just beat its sibling.
+
+## 2026-11-15 E17: when the killer is blocked, try the moves that overlap it
+
+- **Hypothesis** (written before the run): E14 makes the side being refuted cover the killer's
+  cells. The killer is then illegal and the refuting side falls back on the static order. The moves
+  most like the killer (sharing cells with it) are the natural next tries. A bonus at generation for
+  moves that overlap a killer that is not legal here. Order only.
+- **Expected:** a few percent fewer nodes.
+- **Test:** node counts on tune units of plies 7 and 6 for a few bonus sizes; gate at ply 7 only if
+  a setting gives 5% fewer nodes on both.
+- **Built and reverted.** Node counts (tune, ply 7 positions 0-589 and ply 6 positions 0-199; v9: 8.08 M
+  and 7.14 M): bonus 64: 8.36 M and 7.52 M; 256: 8.93 M and 8.61 M; 2048: 9.31 M and 9.02 M. Worse
+  the larger the bonus.
+- **Verdict:** dropped at the screen; no gate run.
+- **What it taught:** three order ideas built on E14's success failed in ten minutes at no cost in
+  gate units. Screening on node counts is what makes guessing affordable.
