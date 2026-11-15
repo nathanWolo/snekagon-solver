@@ -595,8 +595,13 @@ impl Solver {
         if pos.left[opp] >> b.piece & 1 == 0 || !pos.legal_placement(t, opp, b) {
             return;
         }
-        let my_upper = upper_bound_ex(t, pos, me, b.cells, None);
         let opp_len = pos.longest_after(opp, b) as i32;
+        // only a bound of at most opp_len makes a threat: the flood may stop once it is above
+        let my_upper = if pos.left[me] == 0 {
+            pos.longest[me] as i32
+        } else {
+            upper_bound_cells_upto(t, &BoundCtx::new(pos, me), growable(pos, me) & !b.cells, opp_len)
+        };
         let value = if my_upper < opp_len {
             -1
         } else if my_upper <= opp_len {
