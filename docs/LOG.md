@@ -632,3 +632,30 @@ test decided, (confirm) fixed length on fresh units.
 - **Verdict:** dropped at the screen; no gate run.
 - **What it taught:** three order ideas built on E14's success failed in ten minutes at no cost in
   gate units. Screening on node counts is what makes guessing affordable.
+
+## 2026-11-15 E8 again: the parallel solve ported onto v9 (branch `parallel-v9`)
+
+- **What:** the branch `parallel` was built from v4. The same changes (shared atomic table, busy
+  table, set-aside moves, unwinding, the search compiled twice) were put onto v9 by a script
+  (`parv9_patch.py`), fitted around v9's first-move step and answer bonus. Commit `d609ccb` on the
+  new branch `parallel-v9`; a built copy is `frozen/par-v9.exe`. `main` is unchanged.
+- **Identity:** one thread gives v9's node counts exactly (8,076,471 on ply 7 positions 0-589 and
+  7,136,589 on ply 6 positions 0-199). `verify 40` passes.
+- **Correctness:** 16 threads on all of plies 8-11, 590 of ply 7 and 380 of ply 6, then 8 threads
+  on ply 8 and the same tune positions: 21,940 solves, none wrong.
+- **Wall-clock** (tune, ply 5 positions 0-29; v9 one thread 8.16 s, 15.8 M nodes; the same build with
+  one thread 8.22 s):
+
+  | Threads | Seconds | Speed-up | Nodes |
+  | --- | --- | --- | --- |
+  | 2 | 4.69 | 1.74x | 17.3 M |
+  | 4 | 3.06 | 2.67x | 22.4 M |
+  | 8 | 2.44 | 3.35x | 30.6 M |
+  | 16 | 2.18 | 3.74x | 34.5 M |
+
+  The speed-up at 8 threads is a little lower than on v4 (3.9x): v9's tree is leaner, so there is
+  less to share. In absolute terms the 30 positions went from 6.1 s (v4, 8 threads) to 2.4 s.
+- **The ply-4 position again** (`1:60 4B:16,27,28,39 4A:7,8,9,20 4I:15,25,35,45`, 8 threads,
+  `--tt 24`): value -1 for red as before; 570.2 M nodes, 62.2 s (v4-based build: 768.2 M, 134.5 s).
+- **Not measured:** the one-thread cost of this build against v9 by SPRT (the 0.8% above is one
+  reading). On v4 the same plumbing cost 1.9% [0.7%, 3.1%].
