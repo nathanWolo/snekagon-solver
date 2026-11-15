@@ -1,0 +1,56 @@
+== study proof 0-23
+# positions 24 nodes 75382224 seconds 223.783 wrong 0 unknown 0
+# study: total nodes 75382224
+# waste (nodes under failed moves at nodes that cut, outermost): red-to-move nodes 17071505 (22.6%), blue-to-move nodes 0 (0.0%)
+# waste by pieces left of the wasted node: left nodes | under red's failed moves, under blue's failed moves (share of the level)
+#   2:   7741213 |   4995059  64.5%         0   0.0%
+#   3:  16707298 |   4333001  25.9%         0   0.0%
+#   4:  13314659 |   6111930  45.9%         0   0.0%
+#   5:  34465960 |   1108913   3.2%         0   0.0%
+#   6:   1611822 |    494785  30.7%         0   0.0%
+#   7:   1516049 |     22228   1.5%         0   0.0%
+#   8:     15288 |      5495  35.9%         0   0.0%
+#   9:      9873 |        80   0.8%         0   0.0%
+#  10:        38 |        14  36.8%         0   0.0%
+#  11:        24 |         0   0.0%         0   0.0%
+# all-fail nodes: left count | moves/node distinct-replies/node top-reply-share-of-moves top-reply-share-of-nodes nodes/node | kinds of children: bound, table, first-cut, later-cut, other
+#   4: 1593923 |    8.6  0.90  28.9%  41.6%     10.9 | 8411339 2016679 3130384 146289 0
+#   5:  295171 |   19.1  1.16  50.6%  70.3%     39.6 | 1899263 1253309 2434536 50865 0
+#   6:  981233 |   34.7  1.41  24.7%  49.1%     60.3 | 17151739 9427694 7338619 97547 0
+#   7:    5373 |   84.9  4.33  71.7%  70.3%   2082.5 | 1722 94647 351044 8817 0
+#   8:    9827 |  153.2  5.66  73.2%  75.3%   6346.3 | 1118 375687 1120694 7812 0
+#   9:      14 |  308.2  9.21  64.3%  53.8% 527182.6 | 0 0 4079 236 0
+#  10:      24 |  408.0  7.54  68.7%  58.8% 2751115.8 | 0 0 9490 303 0
+# reach threats at all-fail nodes: left | tests threats work/test | in order: moves pruned, nodes under them | oracle: moves, nodes
+#   4: 1440931  912438      5.5 |  6331342    7634094 |  8098244   10191843
+#   5:  342272  160520     16.4 |  2275015    3643802 |  2555304    4190558
+#   6: 1375257  632846     41.5 | 13626056   18371071 | 15374352   21428481
+#   7:   21110    1430     45.5 |    53776     713092 |    59517     805285
+#   8:   47430    2328     47.4 |   115793    1395876 |   123812    1550686
+#   9:      92       0      2.5 |        0          0 |        0          0
+#  10:     147       0      3.3 |        0          0 |        0          0
+# reach threats, exclusive nodes saved: in order 30593697 (40.6%), oracle 36052460 (47.8%)
+# one-player optimum at open nodes: left | nodes tests decided work/test out-of-work | separated (whole) separated (relevant clusters)
+#   4:  4897589      298      298      1.0      0 |      0   1632
+#   5:  7851224   540945    82434     10.9      0 |      0     83
+#   6:  1459935  1459935   361035     26.8      0 |      0      2
+#   7:  1138901  1138901    21376      7.9      0 |      0      0
+#   8:    15276    15276        0      5.0      0 |      0      0
+#   9:     9873     9873        0      2.4      0 |      0      0
+#  10:       38       38        0      2.5      0 |      0      0
+#  11:       24       24        0      1.7      0 |      0      0
+# exclusive nodes saved: one-player optimum 8423694 (11.2%), separation 9939 (0.0%)
+# slack of the upper bound over the one-player optimum (sample), by pieces left and hand: counts of slack 0..7+
+#   4 hand 1: [23, 3, 2, 1, 2, 0, 0, 10]
+#   4 hand 2: [573388, 45461, 62820, 136099, 187383, 35573, 36150, 147518]
+#   4 hand 3: [1, 0, 0, 4, 3, 1, 3, 29]
+#   5 hand 2: [251451, 29012, 52532, 121004, 251348, 48453, 53895, 174144]
+#   5 hand 3: [803685, 22638, 30695, 51700, 46266, 6042, 5860, 14953]
+#   6 hand 3: [190840, 4945, 14598, 34913, 43678, 8579, 14227, 53676]
+#   7 hand 3: [27543, 1583, 7282, 19909, 25401, 6954, 12650, 40428]
+#   7 hand 4: [133223, 64, 3644, 2302, 1579, 313, 301, 321]
+#   8 hand 4: [2922, 5, 141, 408, 310, 27, 35, 96]
+#   9 hand 4: [848, 2, 61, 149, 84, 1, 1, 4]
+#   9 hand 5: [1175, 0, 0, 1, 1, 0, 1, 0]
+#  10 hand 5: [4, 0, 0, 0, 0, 0, 0, 0]
+work/run6.sh: line 8: ork/study3.exe: No such file or directory

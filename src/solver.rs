@@ -62,11 +62,15 @@ pub struct Config {
     pub reach_threat: u32,
     /// The work budget of one reach-threat test.
     pub reach_threat_work: u32,
+    /// Reach threats only at nodes with at most this many pieces left.
+    pub reach_threat_max: u32,
+    /// Reach threats asked with `can_reach_touching` instead of `can_reach_alone`.
+    pub reach_threat_touch: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: false, tt_skip: 0, study: false, study_work: 20000, reach_threat: 99, reach_threat_work: 2000 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: false, tt_skip: 0, study: false, study_work: 20000, reach_threat: 99, reach_threat_work: 2000, reach_threat_max: 99, reach_threat_touch: false }
     }
 }
 
@@ -304,6 +308,8 @@ pub struct Solver {
     replies: Vec<(u32, BB)>,
     /// Study build only.
     pub st: Box<StudyStats>,
+    /// Reach-threat tests by pieces left: tests, threats found, work used.
+    pub rtc: [[std::cell::Cell<u64>; 3]; 16],
     ret_kind: u8,
     ret_mv: u16,
     recs: Vec<Vec<Rec>>,
@@ -347,6 +353,7 @@ impl Solver {
             defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
             replies: Vec::with_capacity(1024),
             st: Box::new(StudyStats::new()),
+            rtc: Default::default(),
             ret_kind: 0,
             ret_mv: PASS,
             recs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
@@ -642,7 +649,7 @@ impl Solver {
             return;
         }
         let level = pos.left[0].count_ones() + pos.left[1].count_ones();
-        let deep = deep && level >= self.cfg.reach_threat && th.nrtried < MAX_TRIED && !th.rtried[..th.nrtried].contains(&m);
+        let deep = deep && level >= self.cfg.reach_threat && level <= self.cfg.reach_threat_max && th.nrtried < MAX_TRIED && !th.rtried[..th.nrtried].contains(&m);
         let first_time = th.ntried < MAX_TRIED && !th.tried[..th.ntried].contains(&m);
         if !first_time && !deep {
             return;
@@ -682,13 +689,21 @@ impl Solver {
             let mut child = *pos;
             child.place_for(t, opp, m);
             let mut work = self.cfg.reach_threat_work;
-            if !can_reach_alone(t, &child, me, opp_len, &mut work) {
+            let c = &self.rtc[(level as usize).min(15)];
+            c[0].set(c[0].get() + 1);
+            let reach = |c: &Pos, target: i32, w: &mut u32| if self.cfg.reach_threat_touch { can_reach_touching(t, c, me, target, w) } else { can_reach_alone(t, c, me, target, w) };
+            if !reach(&child, opp_len, &mut work) {
                 rv = -1;
             } else if value == 2 && alpha >= 0 {
-                let mut work = self.cfg.reach_threat_work;
-                if !can_reach_alone(t, &child, me, opp_len + 1, &mut work) {
+                c[2].set(c[2].get() + (self.cfg.reach_threat_work - work) as u64);
+                work = self.cfg.reach_threat_work;
+                if !reach(&child, opp_len + 1, &mut work) {
                     rv = 0;
                 }
+            }
+            c[2].set(c[2].get() + (self.cfg.reach_threat_work - work) as u64);
+            if rv <= 0 {
+                c[1].set(c[1].get() + 1);
             }
         }
         if rv <= 0 {

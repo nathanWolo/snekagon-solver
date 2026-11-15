@@ -1,0 +1,10 @@
+== 
+# positions 12 nodes 40986167 seconds 39.914 wrong 0 unknown 0
+== --reach-threat 0
+# positions 12 nodes 23466022 seconds 40.043 wrong 0 unknown 0
+== --reach-threat 0 --reach-threat-work 200
+# positions 12 nodes 24425461 seconds 39.404 wrong 0 unknown 0
+== --reach-threat 5
+# positions 12 nodes 27660742 seconds 40.646 wrong 0 unknown 0
+== --reach-threat 6
+# positions 12 nodes 29912576 seconds 39.286 wrong 0 unknown 0

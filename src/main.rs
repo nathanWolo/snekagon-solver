@@ -216,6 +216,8 @@ fn parse_opts(args: &[String]) -> Opts {
             "--answer-bonus" => o.cfg.answer_bonus = val().parse().unwrap(),
             "--prefetch" => o.cfg.prefetch = true,
             "--study" => o.cfg.study = true,
+            "--reach-threat-max" => o.cfg.reach_threat_max = val().parse().unwrap(),
+            "--reach-threat-touch" => o.cfg.reach_threat_touch = true,
             "--reach-threat" => o.cfg.reach_threat = val().parse().unwrap(),
             "--reach-threat-work" => o.cfg.reach_threat_work = val().parse().unwrap(),
             "--study-work" => o.cfg.study_work = val().parse().unwrap(),
@@ -382,6 +384,8 @@ fn bench(t: &Tables, o: &Opts) {
             writeln!(out, "# {:2}: {:9} | {:?}", l, solver.by_left[l], solver.prof[l]).unwrap();
         }
         writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
+        let rtc: Vec<[u64; 3]> = solver.rtc.iter().map(|c| [c[0].get(), c[1].get(), c[2].get()]).collect();
+        writeln!(out, "# reach-threat tests by pieces left [tests, threats, work]: {:?}", &rtc[..12]).unwrap();
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
     }
     if o.cfg.study {
