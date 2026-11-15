@@ -1208,3 +1208,24 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
 - **Owner, on the build tools for profile-guided optimisation (E27):** "I'll install them". E27
   is open again once the C++ linker is on the machine. It will be two reads, not one: the MSVC
   toolchain against the GNU one (the environment pin changes), then the profile on top.
+
+## 2026-11-15 E27 open again: the plan, written before the build tools are in
+
+- **Owner:** asked whether I could install the build tools myself; told what it takes (the
+  package manager, Microsoft's licence accepted on the owner's behalf, the administrator prompt
+  theirs to click, a few gigabytes): "Yes, install it". The installer runs holding the run lock
+  (kept fresh every four minutes), and the three agents were told that the lock is held long.
+- **Two questions, kept apart.** Both toolchains are rustc 1.97.1.
+  - **E27a, the toolchain:** the unchanged source built for `x86_64-pc-windows-msvc` against the
+    GNU build. Same compiler and LLVM; the linker and the C runtime differ. Expected: within 2%
+    either way. It is read because E27b's base has to be the plain MSVC build.
+  - **E27b, the profile:** the MSVC build made with a profile of the tune positions (proof
+    positions 0-23 with `--window 0,1`, and ply 7 positions 0-99) against the plain MSVC build.
+    Expected: 5-15% less time. Node counts must be the base's exactly (same source).
+- **How it would be used.** A profiled build is packaging, not a change of the program: day to
+  day, candidate and base are both plain builds, so a gate keeps comparing like with like. The
+  profile goes onto the build that does the long proofs, and its gain is read again at each
+  freeze.
+- **Test:** screen on proof positions 0-23, three runs an arm, interleaved, one thread, under
+  the lock. Gate on fresh proof units through `tools/run.py --set proof4` if the screen shows
+  2% or more. **Bar:** `SPRT[0, 0.05]`, wrong values 0, node counts identical.
