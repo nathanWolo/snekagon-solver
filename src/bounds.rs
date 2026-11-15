@@ -195,6 +195,47 @@ pub fn can_reach_alone(t: &Tables, pos: &Pos, player: usize, target: i32, work: 
 /// an old snake; its new pieces can be ordered outward from that snake, so the first piece touches an
 /// own snake and each later piece touches what has been built.
 pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32) -> bool {
+    let mut wit = Witness::NONE;
+    can_reach_touching_w(t, pos, player, target, work, &mut wit)
+}
+
+/// A sequence of placements that builds a snake of `len` cells for a player with the cells `own`
+/// and the pieces `left`, the opponent frozen. `mask`: the cells the sequence needs empty (its cells,
+/// and the border of a piece that starts a new snake). It proves "yes" for any target up to `len` in
+/// every position where the player has the same cells and pieces and `mask` is empty: placing a piece
+/// that grows a snake depends only on the own cells and on its cells being empty, and a new snake also
+/// on its border being empty. len = 0: no witness.
+#[derive(Clone, Copy)]
+pub struct Witness {
+    pub own: BB,
+    pub mask: BB,
+    pub left: u8,
+    pub len: i32,
+}
+
+impl Witness {
+    pub const NONE: Witness = Witness { own: 0, mask: 0, left: 0, len: 0 };
+
+    /// Whether this witness proves that `player` reaches `target` in `pos`.
+    #[inline(always)]
+    pub fn proves(&self, pos: &Pos, player: usize, target: i32) -> bool {
+        self.len >= target && self.own == pos.cells[player] && self.left == pos.left[player] && self.mask & pos.occupied() == 0
+    }
+}
+
+/// The cells placement `p` needs empty when played with the own cells `own`.
+#[inline(always)]
+fn needs_empty(p: &Placement, own: BB) -> BB {
+    if p.border & own != 0 {
+        p.cells
+    } else {
+        p.cells | p.border
+    }
+}
+
+/// `can_reach_touching`; when it answers yes from a sequence it found, the sequence goes to `wit`
+/// (otherwise `wit` is left alone). The answer is exactly that of `can_reach_touching`.
+pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32, wit: &mut Witness) -> bool {
     if pos.longest[player] as i32 >= target {
         return true;
     }
@@ -256,7 +297,13 @@ pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, wor
                     len += len_of[j];
                 }
             }
-            len >= target
+            if len >= target {
+                let own = pos.cells[player];
+                *wit = Witness { own, mask: needs_empty(p, own), left, len };
+                true
+            } else {
+                false
+            }
         });
     }
     if *work == 0 {
@@ -280,6 +327,8 @@ pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, wor
             }
         }
         if len >= target {
+            let own = pos.cells[player];
+            *wit = Witness { own, mask: needs_empty(p, own), left, len };
             return true;
         }
         let last = rem - p.n as i32; // the size of the other piece
@@ -312,7 +361,36 @@ pub fn can_reach_touching(t: &Tables, pos: &Pos, player: usize, target: i32, wor
         }
         let mut child = *pos;
         let built = child.place_for(t, player, m);
-        reach_from(t, &child, player, target, built, 0, work)
+        // the last piece (reach_from with one piece left, keeping the sequence it finds)
+        if *work == 0 {
+            return true;
+        }
+        *work -= 1;
+        let cns = child.nsnakes[player] as usize;
+        let mut found = PASS;
+        let mut flen = 0;
+        let ok = child.find_move(t, player, child.left[player], built, |m2| {
+            let p2 = &t.placements[m2 as usize];
+            let mut len2 = p2.n as i32;
+            for j in 0..cns {
+                if child.snakes[player][j] & p2.border != 0 {
+                    len2 += count(child.snakes[player][j]) as i32;
+                }
+            }
+            if len2 >= target {
+                found = m2;
+                flen = len2;
+                true
+            } else {
+                false
+            }
+        });
+        if ok {
+            let own = pos.cells[player];
+            let p2 = &t.placements[found as usize];
+            *wit = Witness { own, mask: needs_empty(p, own) | needs_empty(p2, own | p.cells), left, len: flen };
+        }
+        ok
     })
 }
 

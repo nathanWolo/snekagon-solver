@@ -182,6 +182,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-narrow" => o.cfg.narrow = false,
             "--answer-bonus" => o.cfg.answer_bonus = val().parse().unwrap(),
             "--prefetch" => o.cfg.prefetch = true,
+            "--no-witness" => o.cfg.witness = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
@@ -346,6 +347,7 @@ fn bench(t: &Tables, o: &Opts) {
         }
         writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
+        writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
     }
     if wrong > 0 {
         std::process::exit(1);
