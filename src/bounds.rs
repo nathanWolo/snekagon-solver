@@ -447,7 +447,7 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
         let cns = child.nsnakes[player] as usize;
         let mut found = PASS;
         let mut flen = 0;
-        let ok = child.find_move(t, player, child.left[player], built, |m2| {
+        let check = |m2: u16| {
             let p2 = &t.placements[m2 as usize];
             let mut len2 = p2.n as i32;
             for j in 0..cns {
@@ -462,7 +462,20 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
             } else {
                 false
             }
-        });
+        };
+        let ok = if gap > 0 {
+            // The last piece touches the built snake and at most one other (a piece has at most two
+            // outside own neighbours): only a snake of at least `gap` cells can be that one.
+            let mut other: BB = 0;
+            for j in 0..ns {
+                if joined >> j & 1 == 0 && len_of[j] >= gap {
+                    other |= pos.snakes[player][j];
+                }
+            }
+            child.find_move_both(t, player, child.left[player], built, other, check)
+        } else {
+            child.find_move(t, player, child.left[player], built, check)
+        };
         if ok {
             let own = pos.cells[player];
             let p2 = &t.placements[found as usize];
