@@ -823,3 +823,41 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
 - **What they taught:** six order ideas after E14 have now failed on node counts (E15-E17, E19-E21).
   The order above the model is at a local best for rules of this kind; the next gain in nodes
   needs a different kind of information (IDEAS, "cheapest win first"), or better bounds.
+
+## 2026-11-15 Long solve: the position after two moves is a win for red
+
+- **What:** `1:60 4B:16,27,28,39`, red to move. The reference reports that red's `4C:40,41,50,52`
+  draws here; whether red can win was open. Solved with the proof driver:
+  `frozen/prove.exe prove work/long/ply2.txt --threads 1 --job-threads 16 --depth 1 --tt 27 --out
+  work/long/ply2_results.txt` (build `ef60f52`): the root's moves one at a time, each solved by 16
+  threads on one shared table, every root move's result appended to the results file.
+- **Seed:** the results file started with one line, the value 0 of the position after red's 4C
+  (the ply-3 long solve above, which agrees with the reference). That answered the first question
+  ("can red at least draw") at once. A first attempt without the seed was stopped after five
+  minutes inside that question.
+- **Result: value +1. Red wins with `4B:70,81,82,93`**, the 72nd move in the order. The 4B piece
+  goes on the far side of the centre from blue's piece and joins red's centre cell, a snake of 5.
+  - Root moves 2 to 71 (4C, 4A and 4B placements): after each, blue has a reply that at least
+    draws. 70 jobs, 20.6 billion nodes, 1,549 s; the cheapest 1.1 s, the median 13.8 s, the
+    dearest 94 s. Blue's holding reply was one of the last two that had held in 25 of these
+    (mean 11.8 s) and another one in 42 (mean 28.1 s).
+  - Root move 72: every blue reply loses. 4.32 billion nodes, 318 s.
+  - Whole run: 24.96 billion nodes, 1,868 s (31 minutes) on 16 threads.
+- **Checks, because the result is new and matters:**
+  1. `frozen/par-v9.exe bench work/long/ply3_redwin.txt --threads 16 --tt 27` (the plain
+     shared-table solve: another binary, a cold table, the wide window) on the position after red's
+     move: value -1 for blue. 4.95 billion nodes, 371 s.
+  2. `frozen/par.exe` (the parallel solve built from v4, without E9, E10, E11, E12 and E14) on the
+     same position, 16 threads: value -1 for blue. 14.73 billion nodes, 1,745 s (other runs of mine
+     were going beside it for part of that time).
+  3. What stands behind every engine: all labelled positions of plies 5 to 11 (about 17,000, values
+     from the reference's data), and the two long solves that reproduce the reference's published
+     results for this very opening (the ply-4 blue win, the ply-3 draw after 4C).
+- **Not checked:** the reference solver was not run on this position (it is downloaded code and
+  was not run here at all). A proof by an independent program is the check that would settle it
+  for a reader who does not trust this one; the command for the owner is in the report.
+- **What it means:** blue's reply `4B:16,27,28,39` to the centre opening loses. With the
+  reference's result that this reply wins against red's `4A:7,8,9,20`, the reply is sound only
+  against the wrong answer. Whether blue has any reply to `1:60` that holds is now the question
+  that decides the centre opening, and with twelve symmetries there are about 135 replies to
+  check, not 1,589.
