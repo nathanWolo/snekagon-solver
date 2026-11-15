@@ -1114,3 +1114,17 @@ copy of the search, the option off gave v9's counts exactly, and the source was 
   (`--pn --pn-ab 9 --pn-model --pn-probe --pn-killers --pn-width 3 --pn-rank 1`).
 - **Reopen if:** a cost predictor exists that the numbers could carry (see "cheapest win
   first"), or positions appear where the first moves in order are dear and wrong.
+
+## 2026-11-15 E24: a proof job as many single-thread jobs, not one job of 16 threads
+
+- **Hypothesis** (written before the run; the idea is the two-level search of the owner's
+  link): the dear jobs of the paused proof are positions where every blue move must be refuted
+  (about 900 moves, each about 4 s on one thread). The run gave each such position to one
+  shared-table search on 16 threads, whose nodes grow about 2x at 16 threads. The driver with a
+  coordinator ply and 16 single-thread workers on different blue moves wastes less.
+- **Expected:** 1.2-1.4x less wall-clock (E18 on the ply-4 position: 42.8 s against 51.9-61.4 s).
+- **Test:** the three cheapest winning jobs of the run (77, 78 and 88 s there), each solved from
+  a cold table by `frozen/prove.exe` four ways with 16 threads in all: one job of 16 threads
+  (`--depth 0`, what the run did), 16 single-thread workers at depth 1 and at depth 2, four
+  workers of four threads at depth 1. One at a time on a quiet machine, `--tt 27`.
+- **Bar:** at least 10% less wall-clock than the job of 16 threads on each of the three.
