@@ -38,7 +38,8 @@ CAND = os.path.join(ROOT, "target", "release", "snek.exe")
 HC = os.path.join(ROOT, "tools", "hc.py")
 GROUP = 10
 # sets that are not a ply file of tests/set1: their file and their positions a unit
-OTHER_SETS = {"proof4": (os.path.join(ROOT, "tests", "proof4", "positions.txt"), 2)}
+OTHER_SETS = {"proof4": (os.path.join(ROOT, "tests", "proof4", "positions.txt"), 2),
+              "proof4b": (os.path.join(ROOT, "tests", "proof4b", "positions.txt"), 2)}
 # shares of each set, in units: tune, gate, confirm, held-out
 SHARES = (0.15, 0.60, 0.15, 0.10)
 MIN_GATE_UNITS = 30  # the default --min-units of hc.py sprt

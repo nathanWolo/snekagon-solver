@@ -1,6 +1,9 @@
 """Builds the proof benchmark: positions four moves in that the proof of the centre opening needs.
 
     python tools/mkproof.py work/long/ply1_results.txt tests/proof4 [--per-parent 8] [--seed 1]
+                            [--exclude tests/proof4/positions.txt] [--exe frozen/climb-base.exe]
+
+--exclude leaves out the positions of an earlier sample, so a second set shares none with it.
 
 The results file of `snek prove` holds positions after `1:60`, a blue reply and red's winning
 answer that were searched to a loss for blue (blue to move). Every blue move from such a
@@ -35,12 +38,20 @@ def main():
     with open(tmp, "w", newline="\n") as fh:
         for p in parents:
             fh.write(f"-1 {p}\n")
-    exe = os.path.join("target", "release", "snek.exe")
+    exe = sys.argv[sys.argv.index("--exe") + 1] if "--exe" in sys.argv else os.path.join("target", "release", "snek.exe")
+    exe = os.path.abspath(exe)
+    excluded = set()
+    if "--exclude" in sys.argv:
+        for line in open(sys.argv[sys.argv.index("--exclude") + 1]):
+            f = line.split()
+            if len(f) >= 2:
+                excluded.add(f[1])
     listing = subprocess.run([exe, "children", tmp], capture_output=True, text=True, check=True).stdout
     kids = {}
     for line in listing.splitlines():
         i, text = line.split()
-        kids.setdefault(int(i), []).append(text)
+        if text not in excluded:
+            kids.setdefault(int(i), []).append(text)
     rng = random.Random(seed)
     chosen = []
     for i in range(len(parents)):
@@ -54,7 +65,8 @@ def main():
     with open(os.path.join(out, "MANIFEST.txt"), "w", newline="\n") as fh:
         fh.write(f"positions.txt {len(chosen)} positions sha256 {digest}\n")
         fh.write(f"  from {len(parents)} parents (lost for blue, three moves in) of {results}; "
-                 f"{sum(len(v) for v in kids.values())} children in all; {per_parent} a parent, seed {seed}\n")
+                 f"{sum(len(v) for v in kids.values())} children in all; {per_parent} a parent, seed {seed}"
+                 f"{'; ' + str(len(excluded)) + ' positions of an earlier sample left out' if excluded else ''}\n")
         fh.write("  label 1: red to move wins (each is a child of a position searched to a loss for blue)\n")
     print(open(os.path.join(out, "MANIFEST.txt")).read())
 

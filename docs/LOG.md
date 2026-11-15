@@ -1483,3 +1483,7 @@ that branch). Four pots, ranked:
   memory; four jobs resolve about 12%, so this guard can only catch a large loss).
 - **Gate units:** the proof set's gate range has 57 units left (164-220). More positions are
   needed before the reach-threat gate: a second sample of children from the same parents.
+- **More gate units:** `tests/proof4b/` (1,184 positions, 16 children a parent, seed 2, none of
+  them in `tests/proof4/`; `tools/mkproof.py --exclude`). `tools/run.py --set proof4b`: tune
+  units 0-87, gate 88-442. A first draw of it overlapped the first set in 13 positions,
+  because my patch of the sampler had not applied; redrawn, overlap 0.

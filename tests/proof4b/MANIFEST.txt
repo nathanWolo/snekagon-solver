@@ -1,0 +1,3 @@
+positions.txt 1184 positions sha256 6728376aea75976e6a80db29aa66bb40b747c0d6b1b7ee4dc21deab898f18f9e
+  from 74 parents (lost for blue, three moves in) of work/long/ply1_results_paused.txt; 65993 children in all; 16 a parent, seed 2; 592 positions of an earlier sample left out
+  label 1: red to move wins (each is a child of a position searched to a loss for blue)
