@@ -5,6 +5,7 @@ mod pieces;
 mod pns;
 mod pos;
 mod solver;
+mod study;
 
 use geom::*;
 use pieces::*;
@@ -243,6 +244,10 @@ fn bench(t: &Tables, o: &Opts) {
     }
     if o.profile {
         writeln!(out, "# nodes by pieces left: {:?}", solver.by_left).unwrap();
+        writeln!(out, "# left: nodes | table cuts, bound cuts, searched nodes, moves searched, first-move cuts, no cut, moves left unsearched, scans").unwrap();
+        for l in 2..12 {
+            writeln!(out, "# {:2}: {:9} | {:?}", l, solver.by_left[l], solver.prof[l]).unwrap();
+        }
         writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
     }
@@ -283,6 +288,10 @@ fn main() {
             let start = Instant::now();
             let v = solver.solve(&pos, -1, 1, o.nodes);
             println!("value {} nodes {} seconds {:.3}", v, solver.nodes, start.elapsed().as_secs_f64());
+        }
+        "rootmoves" => {
+            let o = parse_opts(&args[2..]);
+            study::root_moves(t, &o.rest[0], o.from, o.to, o.cfg, o.nodes);
         }
         "bench" => {
             let o = parse_opts(&args[2..]);

@@ -105,7 +105,7 @@ test decided, (confirm) fixed length on fresh units.
   move rank help a little (6.6 M). Alpha-beta: 1.76 M. Not gated; set aside for the two measurements
   below, to be resumed as a hybrid (proof numbers above, alpha-beta below).
 
-## 2026-11-15 Pot sizing: where can the nodes go?
+## 2026-11-14 Pot sizing: where can the nodes go?
 
 - **Ordering oracle** (tune; `--oracle` solves each position twice, the second time trying the first
   solve's best move first where the table still has it): ply 7 (100 positions) 4.30 M to 2.81 M nodes;
@@ -115,7 +115,7 @@ test decided, (confirm) fixed length on fresh units.
 - **Reading:** the reference's 10x lead in nodes at ply 5 cannot come from ordering alone; it has to
   come from deciding nodes with five pieces left or fewer without searching them. E3 before E4.
 
-## 2026-11-15 E3: can the mover still reach the length it needs?
+## 2026-11-14 E3: can the mover still reach the length it needs?
 
 - **Hypothesis** (written before the run): the cluster bound is loose near the end: it assumes every
   snake of a cluster joins and every remaining piece fits. A snake grows only at its two ends, so
@@ -152,3 +152,52 @@ test decided, (confirm) fixed length on fresh units.
   once a test cost a fraction of a microsecond. After E3 the first 100 ply-7 positions have 16 k nodes
   with six pieces left and 261 k with five: the side being refuted at six pieces left still tries 16
   moves a node. That is the next pot: more threats (so smaller zones) or better refutation order.
+
+## 2026-11-15 Two cheap forms of the proof-number idea, inside alpha-beta (tune only, both dropped)
+
+- **Why:** before putting more work into df-pn, test what it rests on: that the effort a move needs
+  can be read from the number of replies it leaves, and that spreading effort over the moves of a
+  node beats committing to the first.
+- **Profile of v3 at ply 6** (tune, first 60 positions, `--profile`): below the root the winner's first
+  move cuts 69-89% of the time, but at the root 1,745 moves are searched for 60 positions.
+- **E5b, fewest replies first** (`--order-level L`: with at least L pieces left, order moves by the
+  number of replies they leave after threat zones): nodes 5.17 M to 4.81 M at the root only (L = 9),
+  4.55 M for L = 8, 4.26 M for L = 6; time 4.3 s to 4.2 / 6.2 / 25.5 s. The count is a weak predictor
+  and costs a scan per move. Dropped.
+- **E5c, budgeted rounds** (`--budget-level L --budget-nodes B`: every move gets B nodes, the undecided
+  ones go to the next round with 4B): 35 M to 96 M nodes against 5.17 M, for every L in 7-9 and B in
+  200-5000. Far worse. Dropped.
+- **What it taught:** most moves at a winner's node are either wins that are expensive to prove or
+  losses that are cheap to refute. Spreading effort pays for every expensive win in part; committing
+  to one pays once. That is the reverse of the shape proof-number search is built for, and it
+  explains the first df-pn's 60x deficit. The lever at the winner's nodes is a better first guess.
+- **Reopen if:** positions appear where the first moves in order are expensive losses (deep ties).
+
+## 2026-11-15 Study: what predicts a cheap winning move? (tune)
+
+- **Tool:** `snek rootmoves FILE` solves every legal move of each position on its own (window "does
+  this move win", empty table, 300 k node cap) and prints features of the move, the answer and the
+  nodes. `tools/rootstudy.py` and `tools/rootfit.py` read it.
+- **Ply 6, tune positions 0-39** (10,717 moves; 37 positions have a win): 69 of 270 moves win on
+  average. Nodes an ordering pays at the root (every move up to and including the first win, summed):
+  cheapest win first 0.61 M; any win first 1.82 M; the solver's static order 5.01 M (first move wins
+  35%, mean rank of the first win 13.7). So the root alone holds a factor of 2.7 to 8.
+- **Single features** that beat the static order when put in front of it: opponent's upper bound after
+  the move low (first move wins 49%), few free cells at the opponent's snake ends (57%).
+- **Logistic model** of "this move wins" on all 15 features, fit on the same positions: 1.90 M, first
+  move wins 70%, mean rank 3.1. Largest weights: lead after the move (+), free cells at the opponent's
+  ends (-), free cells at our ends (+), our mobility after the move (+).
+
+## 2026-11-15 E4: order the upper moves by a fitted model
+
+- **Hypothesis** (written before the run): with seven or more pieces left the static order (size,
+  grows, blocks an end) finds a winning move first only about a third of the time; a logistic model
+  on a few cheap features of the move finds one first about twice as often, and each miss costs a
+  whole refutation. Fit on tune positions only (plies 6-8), validate on other tune positions, then
+  use the integer weights in the solver for nodes with at least L pieces left. Expected from the
+  study: up to 2.5x fewer nodes at the root of ply 6; less in total because lower levels keep the
+  static order; more at ply 5.
+- **Risks:** the model is fit on root positions, the tree holds stranger ones; feature cost at every
+  upper node; the fit could be particular to these 40 positions (hence the validation files).
+- **Test:** flag `--no-model` restores v3 (identity). Choose features and L on tune by node counts
+  and time. Gate `E4` on ply 6 with `SPRT[0, 0.05]`; scaling check on ply 5 tune.

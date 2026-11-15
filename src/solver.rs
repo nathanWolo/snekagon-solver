@@ -98,6 +98,9 @@ pub struct Solver {
     pub nodes: u64,
     /// Nodes by the number of pieces both players still hold (a profile, not used by the search).
     pub by_left: [u64; 16],
+    /// By pieces left: table cuts, bound cuts, nodes searched, moves searched, nodes cut by their
+    /// first move, nodes where every move failed, moves skipped by threats, nodes that scanned.
+    pub prof: [[u64; 8]; 16],
     /// Reach tests by kind (0 the mover, 1 the opponent) and pieces left: [tests, decided].
     pub reach_by: [[[u64; 2]; 16]; 2],
     node_limit: u64,
@@ -128,6 +131,7 @@ impl Solver {
             gen: 1,
             nodes: 0,
             by_left: [0; 16],
+            prof: [[0; 8]; 16],
             reach_by: [[[0; 2]; 16]; 2],
             node_limit: u64::MAX,
             aborted: false,
@@ -365,7 +369,8 @@ impl Solver {
             self.aborted = true;
             return 0;
         }
-        self.by_left[((pos.left[0].count_ones() + pos.left[1].count_ones()) as usize).min(15)] += 1;
+        let level = ((pos.left[0].count_ones() + pos.left[1].count_ones()) as usize).min(15);
+        self.by_left[level] += 1;
         if pos.is_over() {
             return game_result(pos);
         }
@@ -387,9 +392,11 @@ impl Solver {
             hi = e.hi as i32;
             tt_move = e.mv;
             if lo >= hi || lo >= beta {
+                self.prof[level][0] += 1;
                 return lo;
             }
             if hi <= alpha {
+                self.prof[level][0] += 1;
                 return hi;
             }
         } else if self.hint {
@@ -429,9 +436,11 @@ impl Solver {
             lo = lo.max(blo);
             hi = hi.min(bhi);
             if lo >= hi || lo >= beta {
+                self.prof[level][1] += 1;
                 return lo;
             }
             if hi <= alpha {
+                self.prof[level][1] += 1;
                 return hi;
             }
         }
@@ -517,6 +526,8 @@ impl Solver {
         }
 
         // 5. search them, best-scored first
+        self.prof[level][2] += 1;
+        let mut searched = 0u64;
         let mut best = -2;
         let mut best_move = PASS;
         if buf.is_empty() && skipped == -2 {
@@ -547,6 +558,7 @@ impl Solver {
                 }
                 let mut child = *pos;
                 child.play(t, m);
+                searched += 1;
                 let v = -self.search(&child, -beta, -alpha);
                 if self.aborted {
                     break;
@@ -563,6 +575,9 @@ impl Solver {
                         self.killers[ply][1] = self.killers[ply][0];
                         self.killers[ply][0] = m;
                     }
+                    if searched == 1 {
+                        self.prof[level][4] += 1;
+                    }
                     break;
                 }
                 // The refutation just found may be a threat against the remaining moves. And once the
@@ -572,11 +587,17 @@ impl Solver {
                     self.try_threat(pos, self.killers[ply + 1][0], &mut th);
                     if !scanned {
                         scanned = true;
+                        self.prof[level][7] += 1;
                         self.scan_threats(pos, &my_clusters, alpha, &mut th);
                     }
                 }
             }
             best = best.max(skipped);
+            self.prof[level][3] += searched;
+            self.prof[level][6] += (n as u64).saturating_sub(searched);
+            if alpha < beta {
+                self.prof[level][5] += 1;
+            }
         }
         self.bufs[ply] = buf;
         if self.aborted {
