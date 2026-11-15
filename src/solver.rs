@@ -678,7 +678,8 @@ impl Solver {
                     }
                 }
                 if covered != 0 {
-                    upper = upper.max(upper_bound_cells(t, &ctx, covered & !b.cells, None));
+                    // only whether it is at most `need` matters: the flood may stop once it is above
+                    upper = upper.max(upper_bound_cells_upto(t, &ctx, covered & !b.cells, need));
                 }
                 upper
             } else {

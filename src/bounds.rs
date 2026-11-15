@@ -158,6 +158,84 @@ pub fn upper_bound_cells(t: &Tables, ctx: &BoundCtx, mut rest: BB, mut rec: Opti
     upper
 }
 
+/// `upper_bound_cells` without clusters recorded, for a caller that only asks whether the bound is
+/// at most `limit`: the exact bound when it is, else some number above `limit` (as soon as a cluster
+/// is seen to exceed it, part-built: a cluster's bound only grows as regions and snakes join it).
+#[inline]
+pub fn upper_bound_cells_upto(t: &Tables, ctx: &BoundCtx, mut rest: BB, limit: i32) -> i32 {
+    let lower = ctx.lower;
+    let fill = &t.best_fill[ctx.left as usize];
+    let joinable = ctx.left.count_ones() as usize + 1;
+    let ns = ctx.ns;
+    let snake_nb = &ctx.snake_nb;
+    let snake_len = &ctx.snake_len;
+    let mut upper = lower;
+    let mut used = 0u32;
+    while rest != 0 {
+        let mut cluster = flood(bit(first(rest)), rest);
+        let mut capacity = fill[count(cluster) as usize] as usize;
+        rest &= !cluster;
+        let mut lens = [0i32; MAX_SNAKES];
+        let mut nl = 0;
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for j in 0..ns {
+                if used >> j & 1 == 0 && snake_nb[j] & cluster != 0 {
+                    used |= 1 << j;
+                    lens[nl] = snake_len[j];
+                    nl += 1;
+                    let mut more = snake_nb[j] & rest;
+                    while more != 0 {
+                        let region = flood(bit(first(more)), rest);
+                        rest &= !region;
+                        more &= !region;
+                        capacity += fill[count(region) as usize] as usize;
+                        cluster |= region;
+                        changed = true;
+                    }
+                    // the part built so far: the joinable longest snakes and the capacity
+                    let mut own = 0;
+                    if nl > joinable {
+                        let mut l2 = lens;
+                        l2[..nl].sort_unstable_by(|a, b| b.cmp(a));
+                        for l in &l2[..joinable] {
+                            own += l;
+                        }
+                    } else {
+                        for l in &lens[..nl] {
+                            own += l;
+                        }
+                    }
+                    let reach = own + fill[capacity.min(GRID)] as i32;
+                    if reach > limit {
+                        return reach;
+                    }
+                }
+            }
+        }
+        let mut own = 0;
+        if nl > joinable {
+            lens[..nl].sort_unstable_by(|a, b| b.cmp(a));
+            for l in &lens[..joinable] {
+                own += l;
+            }
+        } else {
+            for l in &lens[..nl] {
+                own += l;
+            }
+        }
+        let reach = own + fill[capacity.min(GRID)] as i32;
+        if reach > upper {
+            upper = reach;
+        }
+        if upper > limit {
+            return upper;
+        }
+    }
+    upper
+}
+
 /// Can `player` still build a snake of at least `target` cells? The opponent is frozen: its moves
 /// only take placements away, so false is a proof for the real game too. `work` is the number of
 /// positions the search may still look at; when it runs out the answer is true (no proof).
