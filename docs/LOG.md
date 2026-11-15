@@ -399,3 +399,17 @@ test decided, (confirm) fixed length on fresh units.
   force, and the labels are checked on every set.
 - **Test:** flag off gives v5's node counts exactly. Screen on ply 6 tune. Gate `E10`: time against v5,
   ply 6, `SPRT[0, 0.05]`, unused gate units.
+- **Built:** `can_reach_touching` (no clusters; the first piece touches an own snake when the target
+  is more than the cells in hand), checked against brute force in `verify`; in `search`, the exact
+  tests come before the bounds, a side with a test gets no cluster bound, and the mover's clusters
+  are computed when a scan first needs them. Flag `--no-lazy`.
+- **Identity:** `--no-lazy` gives v5's node counts exactly (1,897,508 and 5,459,285 on the first 100
+  tune positions of plies 7 and 6). `verify 100 3` passes (2,796 reach checks).
+- **Correctness:** all of plies 8-11 (16,000 positions), 590 of ply 7, 380 of ply 6: none wrong.
+- **Screen `E10-S`** (ply 6, tune units 0-19): +15.5% [+12.3%, +18.9%], time 0.859x, nodes 1.0015x.
+- **Gate `E10`** (ply 6, unused gate units 138-167): PASS at unit 30. +16.7% [+13.3%, +20.3%], time
+  0.857x (13.33 s to 11.43 s), nodes 1.003x.
+- **Verdict:** accepted. Frozen as v6 (`ab0ef6e42b6d`, commit `5c09458`).
+- **What it taught:** two tests that answer the same question were both being paid for. The cheap,
+  loose one was a filter that cut one time in eight; the exact one was run the other seven times
+  anyway. Less than the 20% expected: the test without the cluster filter costs a little more.
