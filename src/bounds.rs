@@ -53,26 +53,52 @@ pub fn upper_bound(t: &Tables, pos: &Pos, player: usize) -> i32 {
 /// with `rec`, the clusters are recorded there.
 #[inline]
 pub fn upper_bound_ex(t: &Tables, pos: &Pos, player: usize, blocked: BB, mut rec: Option<&mut Clusters>) -> i32 {
-    let lower = pos.longest[player] as i32;
-    let left = pos.left[player];
     if let Some(r) = rec.as_deref_mut() {
         r.n = 0;
         r.overflow = false;
     }
-    if left == 0 {
-        return lower;
+    if pos.left[player] == 0 {
+        return pos.longest[player] as i32;
     }
-    let fill = &t.best_fill[left as usize];
-    let joinable = left.count_ones() as usize + 1;
-    let ns = pos.nsnakes[player] as usize;
-    let mut snake_nb = [0u128; MAX_SNAKES];
-    let mut snake_len = [0i32; MAX_SNAKES];
-    for j in 0..ns {
-        snake_nb[j] = neighbours(pos.snakes[player][j]);
-        snake_len[j] = count(pos.snakes[player][j]) as i32;
+    let ctx = BoundCtx::new(pos, player);
+    upper_bound_cells(t, &ctx, growable(pos, player) & !blocked, rec)
+}
+
+/// What the upper bound needs to know about a player's snakes: the same for every set of cells.
+pub struct BoundCtx {
+    lower: i32,
+    left: u8,
+    ns: usize,
+    snake_nb: [BB; MAX_SNAKES],
+    snake_len: [i32; MAX_SNAKES],
+}
+
+impl BoundCtx {
+    #[inline(always)]
+    pub fn new(pos: &Pos, player: usize) -> BoundCtx {
+        let ns = pos.nsnakes[player] as usize;
+        let mut snake_nb = [0u128; MAX_SNAKES];
+        let mut snake_len = [0i32; MAX_SNAKES];
+        for j in 0..ns {
+            snake_nb[j] = neighbours(pos.snakes[player][j]);
+            snake_len[j] = count(pos.snakes[player][j]) as i32;
+        }
+        BoundCtx { lower: pos.longest[player] as i32, left: pos.left[player], ns, snake_nb, snake_len }
     }
+}
+
+/// The bound over the growable cells `rest` alone: the longest snake now, or the best cluster made
+/// of those cells and the snakes touching them. `rest` must be whole clusters (minus blocked cells):
+/// then the snakes touching it touch no growable cell outside it. The player has a piece left.
+#[inline(always)]
+pub fn upper_bound_cells(t: &Tables, ctx: &BoundCtx, mut rest: BB, mut rec: Option<&mut Clusters>) -> i32 {
+    let lower = ctx.lower;
+    let fill = &t.best_fill[ctx.left as usize];
+    let joinable = ctx.left.count_ones() as usize + 1;
+    let ns = ctx.ns;
+    let snake_nb = &ctx.snake_nb;
+    let snake_len = &ctx.snake_len;
     let mut upper = lower;
-    let mut rest = growable(pos, player) & !blocked;
     let mut used = 0u32; // snakes already inside a cluster
     while rest != 0 {
         // one cluster: flood a region, pull in the snakes touching it, flood the regions they touch

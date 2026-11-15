@@ -34,11 +34,13 @@ pub struct Config {
     pub staged: bool,
     /// Where the reach test applies to a player, ask it first and skip that player's cluster bound.
     pub lazy: bool,
+    /// In a threat scan, recompute only the clusters a placement covers.
+    pub narrow: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22, staged: true, lazy: true }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, tt_bits: 22, staged: true, lazy: true, narrow: true }
     }
 }
 
@@ -329,6 +331,9 @@ impl Solver {
         }
         let mut found: [(u32, BB, i32); MAX_FOUND] = [(0, 0, 0); MAX_FOUND];
         let mut nf = 0;
+        // a placement changes only the clusters it covers: the others keep their bound
+        let narrow = self.cfg.narrow && !mine.overflow && pos.left[me] != 0;
+        let ctx = BoundCtx::new(pos, me);
         pos.for_each_move(t, opp, pos.left[opp], |m| {
             if nf >= MAX_FOUND {
                 return;
@@ -349,7 +354,23 @@ impl Solver {
                     }
                 }
             }
-            let my_upper = upper_bound_ex(t, pos, me, b.cells, None);
+            let my_upper = if narrow {
+                let mut upper = my_lower;
+                let mut covered: BB = 0;
+                for i in 0..mine.n {
+                    if mine.cells[i] & b.cells != 0 {
+                        covered |= mine.cells[i];
+                    } else if mine.upper[i] > upper {
+                        upper = mine.upper[i];
+                    }
+                }
+                if covered != 0 {
+                    upper = upper.max(upper_bound_cells(t, &ctx, covered & !b.cells, None));
+                }
+                upper
+            } else {
+                upper_bound_ex(t, pos, me, b.cells, None)
+            };
             let value = if my_upper < opp_len {
                 -1
             } else if my_upper <= opp_len {

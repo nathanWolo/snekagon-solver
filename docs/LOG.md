@@ -413,3 +413,38 @@ test decided, (confirm) fixed length on fresh units.
 - **What it taught:** two tests that answer the same question were both being paid for. The cheap,
   loose one was a filter that cut one time in eight; the exact one was run the other seven times
   anyway. Less than the 20% expected: the test without the cluster filter costs a little more.
+
+## 2026-11-15 Study: where v6's time goes
+
+- **What:** the study build again (`timing2_patch.py`: cycles per routine, split by caller), on the
+  first 100 ply-6 tune positions (5.47 M nodes, 3.5 s, about 15,800 M cycles).
+- **Shares:** reach tests 37% (3.07 M tests at 1,890 cycles), threat scans 18% (371 K scans at 7,490
+  cycles, of which 80% is 4.34 M upper bounds at 509 cycles), last pieces 8%, killer threats 5%,
+  generating 4%, upper bounds in the search 3.5%, the rest (table, copy, play, the search itself) 25%.
+
+## 2026-11-15 E11: in a threat scan, recompute only the clusters the placement covers
+
+- **Hypothesis** (written before the run): a scan computes the mover's whole upper bound again for
+  each candidate placement (11.7 times a scan), although a placement changes only the clusters it
+  covers, and the player's shape and snake neighbourhoods do not change at all between candidates.
+  Computing those once per scan and flooding only the covered clusters gives the same number for
+  less: the node counts must be identical to v6.
+- **Expected:** the bound inside a scan is 14% of the time; if it drops by 60%, about 8% less time.
+- **Test:** identity by node counts on the tune files. Gate `E11`: time against v6, ply 6,
+  `SPRT[0, 0.05]`, unused gate units.
+- **Built:** `BoundCtx` (a player's snake lengths and neighbourhoods) and `upper_bound_cells` (the
+  cluster loop over a given set of cells); `upper_bound_ex` now calls them, and a scan builds the
+  context once and passes only the covered clusters. Flag `--no-narrow`.
+- **Identity:** node counts equal to v6 with the flag on and off (1,901,619 and 5,467,404 on the
+  first 100 tune positions of plies 7 and 6). `verify 60 5` passes.
+- **Screen `E11-S`** (ply 6, tune units 0-19): +5.2% [+4.7%, +5.8%], time 0.951x. Less than expected:
+  a covered cluster is usually the large one, so the flood is not much smaller.
+- **Gate `E11`** (ply 6): **void, my mistake.** Only 24 unused gate units were left in the ply-6
+  range (E3, E4, E9 and E10 used the rest) and the test takes no decision before 30 units, so this
+  gate could only end undecided. I did not check before starting it. Its reading on those 24 fresh
+  units: +5.3% [+4.4%, +6.2%], time ratio in line with the screen, nodes identical.
+- **What I did about it:** `tools/run.py` now refuses a gate with fewer than 30 unused units. The
+  ply-6 gate range is used up; gates from here on run at ply 7 (177 unused gate units). Because the
+  void gate's reading was in favour, running a second one cannot select for a lucky result, so E11
+  gets one properly sized gate at ply 7, declared here before it runs: key `E11-P7`, time against
+  v6, `SPRT[0, 0.05]`, cap 100. The owner may overrule this and revert the commit.

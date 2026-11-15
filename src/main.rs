@@ -165,6 +165,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-reach" => o.cfg.reach = false,
             "--no-staged" => o.cfg.staged = false,
             "--no-lazy" => o.cfg.lazy = false,
+            "--no-narrow" => o.cfg.narrow = false,
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
             "--model" => {

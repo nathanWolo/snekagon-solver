@@ -39,6 +39,7 @@ HC = os.path.join(ROOT, "tools", "hc.py")
 GROUP = 10
 # shares of each set, in units: tune, gate, confirm, held-out
 SHARES = (0.15, 0.60, 0.15, 0.10)
+MIN_GATE_UNITS = 30  # the default --min-units of hc.py sprt
 
 
 def sha(path):
@@ -150,6 +151,9 @@ def main():
         total = min(a.cap if a.kind == "gate" else a.units, limit - u0)
     if total <= 0:
         sys.exit(f"no unused {a.kind} units left in {a.set}")
+    if a.kind == "gate" and total < MIN_GATE_UNITS:
+        # hc.py takes no decision before this many units: such a gate can only end undecided
+        sys.exit(f"only {total} unused gate units left in {a.set}; the test decides nothing before {MIN_GATE_UNITS}. Gate on another set.")
 
     rows, blocked, verdict, sprt_text = [], None, None, ""
     done = 0
