@@ -549,6 +549,37 @@ fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good
         if len + rem - p.n as i32 + extra[later.min(ns)] < target {
             return false;
         }
+        if later == 1 {
+            // The last piece, on the position after p without building it (what reach_from on that
+            // position does, with the same work): it grows the snake p built (p and the snakes it
+            // joined, `len` cells), and adds the other snakes it touches.
+            if *work == 0 {
+                return true;
+            }
+            *work -= 1;
+            let mut joined: u32 = 0;
+            let mut joined_cells: BB = 0;
+            for j in 0..ns {
+                if pos.snakes[player][j] & p.border != 0 {
+                    joined |= 1 << j;
+                    joined_cells |= pos.snakes[player][j];
+                }
+            }
+            let built = p.cells | joined_cells;
+            let own2 = pos.cells[player] | p.cells;
+            let occ2 = pos.occupied() | p.cells;
+            let left2 = left & !(1u8 << p.piece);
+            return find_grow(t, own2, occ2, left2, built, |m2| {
+                let p2 = &t.placements[m2 as usize];
+                let mut len2 = p2.n as i32 + len;
+                for j in 0..ns {
+                    if joined >> j & 1 == 0 && pos.snakes[player][j] & p2.border != 0 {
+                        len2 += len_of[j];
+                    }
+                }
+                len2 >= target
+            });
+        }
         let mut child = *pos;
         let joined = child.place_for(t, player, m);
         if later > 1 && upper_bound(t, &child, player) < target {
