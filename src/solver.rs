@@ -255,6 +255,10 @@ pub struct Solver {
     pub reach_reused: u64,
     /// The last sequence a reach test found, by ply and player.
     wit: [[Witness; 2]; MAX_PLY],
+    /// The last sequence a reach-threat test found, by ply (for the mover at that ply).
+    rwit: [Witness; MAX_PLY],
+    /// Reach-threat tests: [tests, answered by a witness, threats found].
+    pub rt_stats: [u64; 3],
     node_limit: u64,
     aborted: bool,
     /// Parallel solve: the ply of the root, the nodes on the path from it by ply (hash and window at
@@ -298,6 +302,8 @@ impl Solver {
             reach_by: [[[0; 2]; 16]; 2],
             reach_reused: 0,
             wit: [[Witness::NONE; 2]; MAX_PLY],
+            rwit: [Witness::NONE; MAX_PLY],
+            rt_stats: [0; 3],
             node_limit: u64::MAX,
             aborted: false,
             root_ply: 0,
@@ -595,7 +601,7 @@ impl Solver {
 
     /// Adds the opponent placement `m` to the threats if the bounds decide the game after it.
     /// `deep` (after a failed move, with `reach_threat`): also test it as a reach threat.
-    fn try_threat(&self, pos: &Pos, m: u16, alpha: i32, deep: bool, th: &mut Threats) {
+    fn try_threat(&mut self, pos: &Pos, ply: usize, m: u16, alpha: i32, deep: bool, th: &mut Threats) {
         if m == PASS || th.n >= MAX_THREATS {
             return;
         }
@@ -645,18 +651,16 @@ impl Solver {
         if deep && pos.left[me] != 0 && (value == 2 || (value == 0 && alpha < 0)) {
             let mut child = *pos;
             child.place_for(t, opp, m);
-            let mut work = self.cfg.reach_threat_work;
-            let rv = if !can_reach_alone(t, &child, me, opp_len, &mut work) {
+            self.rt_stats[0] += 1;
+            let rv = if !self.threat_reach(&child, ply, me, opp_len) {
                 -1
-            } else if value == 2 && alpha >= 0 && {
-                work = self.cfg.reach_threat_work;
-                !can_reach_alone(t, &child, me, opp_len + 1, &mut work)
-            } {
+            } else if value == 2 && alpha >= 0 && !self.threat_reach(&child, ply, me, opp_len + 1) {
                 0
             } else {
                 2
             };
             if rv <= 0 {
+                self.rt_stats[2] += 1;
                 th.zone[th.n] = b.cells | b.border;
                 th.value[th.n] = rv;
                 th.n += 1;
@@ -668,6 +672,22 @@ impl Solver {
             th.value[th.n] = value;
             th.n += 1;
         }
+    }
+
+    /// The reach test of a reach threat: can `me` still build `need` cells in `child` (the position
+    /// with the threat placed)? A witness found earlier at this ply (by a threat test, or by an
+    /// ordinary reach test here or one ply up) answers yes when it still applies: the mover's cells
+    /// and pieces are those of the node, and the witness checks that its cells are empty in `child`.
+    #[inline]
+    fn threat_reach(&mut self, child: &Pos, ply: usize, me: usize, need: i32) -> bool {
+        if self.cfg.witness
+            && (self.rwit[ply].proves(child, me, need) || self.wit[ply][me].proves(child, me, need) || (ply > 0 && self.wit[ply - 1][me].proves(child, me, need)))
+        {
+            self.rt_stats[1] += 1;
+            return true;
+        }
+        let mut work = self.cfg.reach_threat_work;
+        can_reach_touching_w(self.t, child, me, need, &mut work, &mut self.rwit[ply])
     }
 
     /// Adds every opponent placement after which our value is at most alpha by the bounds.
@@ -1044,8 +1064,8 @@ impl Solver {
             }
         }
         if threats_on {
-            self.try_threat(pos, self.killers[ply + 1][0], alpha, false, &mut th);
-            self.try_threat(pos, self.killers[ply + 1][1], alpha, false, &mut th);
+            self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, false, &mut th);
+            self.try_threat(pos, ply, self.killers[ply + 1][1], alpha, false, &mut th);
         }
         let mut skipped = -2; // the best bound of the moves skipped because of threats
         let mut scanned = !threats_on;
@@ -1308,7 +1328,7 @@ impl Solver {
                 // first move has failed this is probably a node where every move must be refuted, so
                 // look for all of the opponent's threats.
                 if threats_on && first_pass && i + 1 < n {
-                    self.try_threat(pos, self.killers[ply + 1][0], alpha, self.cfg.reach_threat, &mut th);
+                    self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, self.cfg.reach_threat, &mut th);
                     if !scanned {
                         scanned = true;
                         self.prof[level][7] += 1;

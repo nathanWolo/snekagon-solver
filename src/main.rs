@@ -387,6 +387,7 @@ fn bench(t: &Tables, o: &Opts) {
         writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
         writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
+        writeln!(out, "# reach-threat tests, answered by a witness, threats: {:?}", solver.rt_stats).unwrap();
     }
     if wrong > 0 {
         std::process::exit(1);
