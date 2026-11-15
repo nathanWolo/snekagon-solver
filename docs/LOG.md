@@ -1321,3 +1321,29 @@ decide their node; at five pieces left 32% of the nodes end on the table, 49% on
   - The agents now at work started from GNU builds. Their screens stand as screens; their
     changes are gated on profiled builds.
 - **Gate units:** the proof set's gate range has 117 units left (104-220).
+
+## 2026-11-15 The proof driver against itself: two runs of one setting differ by 12% (sd)
+
+- **Run** `DRV-AA` (`tools/provegate.py`): the profiled base against itself, 16 single-thread
+  workers at depth 1, jobs g to j, every solve under the lock.
+
+  | Job | First run (s) | Second run (s) | Ratio | Nodes, first and second |
+  | --- | --- | --- | --- | --- |
+  | g | 77.2 | 75.5 | 0.978 | 1,023 M and 1,028 M |
+  | h | 76.2 | 71.5 | 0.939 | 1,004 M and 946 M |
+  | i | 98.5 | 99.3 | 1.008 | 1,198 M and 1,277 M |
+  | j | 91.1 | 110.9 | 1.217 | 1,102 M and 1,383 M |
+
+- **Reading:** the sd of the log ratio is 0.115 a job. The time follows the nodes: which
+  worker finishes first changes what the others know, and job j searched a quarter more
+  positions on its second run. So one run a job cannot rank two settings that differ by
+  less than about a quarter, which is what E24's table looked like.
+- **What a driver read resolves:** twelve jobs, one run an arm: a 95% interval of about plus or
+  minus 7%. Two runs an arm: about 5%. A driver change has to be worth 10% to be seen with the
+  jobs at hand; smaller ones need more jobs (62 more proved positions exist in the paused
+  proof's results, at 2 to 12 minutes a solve).
+- **The profiled build on whole jobs** (not a paired read: other runs, other hours): g 77.2 and
+  75.5 s where the GNU build took 82.6 s with the same setting; h 76.2 and 71.5 s against
+  96.2 s.
+- **The spoiled arms of E24** (jobs i and j) are not run again: the base has changed build since,
+  and a driver read pairs candidate and base anyway.
