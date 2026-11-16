@@ -229,6 +229,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-threat-work" => o.cfg.reach_threat_work = val().parse().unwrap(),
             "--no-reach-threat-grow" => o.cfg.reach_threat_grow = false,
             "--reach-threat-after" => o.cfg.reach_threat_after = val().parse().unwrap(),
+            "--reach-threat-start" => o.cfg.reach_threat_start = val().parse().unwrap(),
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
