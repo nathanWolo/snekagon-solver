@@ -3200,7 +3200,7 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - Not started: the board's proof has the machine (78 of 172 at 13:02). The plan when it ends
   or pauses: time one line first, then all 172 (and say what it costs before running them).
 
-## 2026-11-16 An explainer of the prover (owner's request, about 14:30); the table's key is 38 bits strong
+## 2026-11-16 An explainer of the prover (owner's request, written by 13:40); the table's key is 38 bits strong
 
 - Owner: "Can you make an artifact that fully explains how the current prover works? In the
   style of like in depth documentatioj and exposition similar to the page from the nelhage
@@ -3210,7 +3210,7 @@ through its own script under `tools/locked.sh` because the check build needs a f
   page's script from the rules (board, images of a reply, dead cells), so they cannot drift
   from the text. State at the time: 79 of 172 refuted, 0 held, 93 open.
 - The reply `4I:15,25,35,45` fell to `3I:57,67,77` after 2,707 s and 38 failed tries: the
-  only winner so far that is not a piece of four (of 81 winners at 14:40: 4B 60, 4C 19,
+  only winner so far that is not a piece of four (of 81 winners at 13:40: 4B 60, 4C 19,
   4I 1, 3I 1).
 - *Found while writing, not measured:* a table hit compares the full 64-bit key, and the
   bucket index already fixes its low 26 bits (`--tt 27`: 2^26 buckets of two entries). So a
