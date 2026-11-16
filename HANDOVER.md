@@ -1,4 +1,15 @@
-# E32 hand-over (evaluation as the move order), stopped 2026-11-16 ~10:02 for a restart
+# E32 hand-over (evaluation as the move order)
+
+## Round after the restart (agent 2, from 10:27)
+- Task 1 (the order of red's tries at the 25 tune replies, offline): DONE as a first pass.
+  Inputs `work/evalorder/top/` (tune25.txt copied from climb/replay; em.csv = fit3 evalmoves --nodes 1;
+  kids.txt = fit3 children; port.txt = scratch `portmoves.exe refmoves`, built from detached worktree
+  `wt/eoport` at climb/field 5e73da7 + an uncommitted `refmoves` command, never on a branch).
+  Script `work/evalorder/scripts/toprank.py DIR [--perreply ORDERS] [--sim ORDERS] [--top N ORDERS]`;
+  output `top/rank1.txt`. Labels: base 145 F, turns 70 F, paused 42 F (= recorded), 59 known winners, 0 conflicts.
+- Task 2 step 2 (lgA/lgB on 48 val roots): RUNNING/queued, out `fit/val2.jsonl` (copy of val1 + new arms), log `fit/val2.log`.
+
+# Earlier hand-over, stopped 2026-11-16 ~10:02 for a restart
 
 Branches: `climb/evalorder` (candidate, this worktree `wt/eo`), `climb/evalorder-fit` (candidate + `snek evalmoves`
 study command, worktree `wt/eofit`), `eo-emulate` (candidate + cherry-pick of `ab3bf7e` `--emulate`, conflict
