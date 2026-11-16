@@ -720,13 +720,19 @@ impl Prover {
             res: ProveResult { value: UNKNOWN, best: PASS, jobs: 0, stopped: 0, reused: 0, nodes: 0, thread_seconds: 0.0, seconds: 0.0 },
         };
         let table = &self.table;
+        let shared = Mutex::new(if c.cfg.drv_share { SharedHist::new() } else { SharedHist::empty() });
         let (mut lo, mut hi) = (-1, 1);
         let mut best = PASS;
         std::thread::scope(|scope| {
-            for _ in 0..c.threads {
+            // E32: --emulate W: one worker thread with W solvers taking the jobs in turn
+            let emulate = c.cfg.drv_emulate as usize;
+            let shared = &shared;
+            for _ in 0..(if emulate > 0 { 1 } else { c.threads }) {
                 let queue = queue.clone();
                 let tx = tx.clone();
-                let mut solvers: Vec<Solver> = (0..c.job_threads.max(1)).map(|_| Solver::with_table(c.cfg, table.clone())).collect();
+                let nsolvers = if emulate > 0 { emulate } else { c.job_threads.max(1) };
+                let mut solvers: Vec<Solver> = (0..nsolvers).map(|_| Solver::with_table(c.cfg, table.clone())).collect();
+                let mut turn = 0usize;
                 scope.spawn(move || loop {
                     let job = {
                         let mut g = queue.jobs.lock().unwrap();
@@ -744,10 +750,18 @@ impl Prover {
                     let t0 = Instant::now();
                     let (value, best, nodes) = if job.stop.load(Relaxed) {
                         (UNKNOWN, PASS, 0)
-                    } else if solvers.len() == 1 {
-                        let solver = &mut solvers[0];
+                    } else if solvers.len() == 1 || emulate > 0 {
+                        let k = if emulate > 0 { turn % solvers.len() } else { 0 };
+                        turn += 1;
+                        let solver = &mut solvers[k];
                         solver.stop = Some(job.stop.clone());
+                        if solver.cfg.drv_share {
+                            solver.hist_pull(&shared.lock().unwrap());
+                        }
                         let (v, m) = solver.solve_job(&job.pos, job.alpha, job.beta, &mut job.killers);
+                        if solver.cfg.drv_share {
+                            solver.hist_push(&mut shared.lock().unwrap());
+                        }
                         (v, m, solver.nodes)
                     } else {
                         // all threads of this worker search the job together; the first to finish

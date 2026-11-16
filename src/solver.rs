@@ -94,11 +94,21 @@ pub struct Config {
     /// all killers are tried as staged first moves in the history's order, then by recorded cost.
     /// On by default with two slots (E31); `--xk 0` or `--no-cost-order` switches it off.
     pub xk: u32,
+    /// E32, the driver: one worker thread that keeps this many solvers and gives them the jobs in
+    /// turn, with this many jobs out at once (a deterministic stand-in for that many workers, for
+    /// exact node counts). 0 = off.
+    pub drv_emulate: u32,
+    /// E32: a job keeps the killers' costs and the extra slots its solver had, where the killers it is
+    /// handed are the same moves (otherwise a cost is unknown, as before).
+    pub drv_carry: bool,
+    /// E32: the history is merged between the driver's workers at job boundaries (each job starts
+    /// from all the workers' history and adds what it learned).
+    pub drv_share: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, hc_key: 0, hc_job: 0, hc_all: false, hc_select: false, xk: 2 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, hc_key: 0, hc_job: 0, hc_all: false, hc_select: false, xk: 2, drv_emulate: 0, drv_carry: false, drv_share: false }
     }
 }
 
@@ -300,6 +310,9 @@ pub struct Solver {
     hist: Vec<[u64; 4]>,
     /// The entries of `hist` written since the last `clear()`, so that clearing costs what was used.
     hist_used: Vec<u32>,
+    /// E32: what the history was when it was taken from the shared one, and which entries.
+    hist_base: Vec<[u64; 4]>,
+    base_used: Vec<u32>,
     bufs: Vec<Vec<u64>>,
     defer_bufs: Vec<Vec<u16>>,
     replies: Vec<(u32, BB)>,
@@ -324,6 +337,21 @@ pub struct CostStats {
 impl CostStats {
     fn new() -> CostStats {
         CostStats { cut: [[[[[0; 3]; 4]; 4]; 16]; 2], stab: [[[0.0; 6]; 16]; 2], stab_b: [[[0; 6]; 16]; 2], oracle: Vec::new() }
+    }
+}
+
+/// E32: a history shared by the driver's workers (behind a lock; merged at job boundaries).
+pub struct SharedHist {
+    h: Vec<[u64; 4]>,
+    used: Vec<u32>,
+}
+
+impl SharedHist {
+    pub fn new() -> SharedHist {
+        SharedHist { h: vec![[0; 4]; 2 * 16 * tables().placements.len()], used: Vec::new() }
+    }
+    pub fn empty() -> SharedHist {
+        SharedHist { h: Vec::new(), used: Vec::new() }
     }
 }
 
@@ -369,6 +397,8 @@ impl Solver {
             cs: Box::new(CostStats::new()),
             hist: if cfg.hc_k > 0 { vec![[0; 4]; 2 * 16 * tables().placements.len()] } else { Vec::new() },
             hist_used: Vec::new(),
+            hist_base: Vec::new(),
+            base_used: Vec::new(),
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
             defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
             replies: Vec::with_capacity(1024),
@@ -398,6 +428,49 @@ impl Solver {
             self.hist[i as usize] = [0; 4];
         }
         self.hist_used.clear();
+    }
+
+    /// E32: start a job from the shared history.
+    pub(crate) fn hist_pull(&mut self, g: &SharedHist) {
+        if self.hist.is_empty() {
+            return;
+        }
+        if self.hist_base.len() != self.hist.len() {
+            self.hist_base = vec![[0; 4]; self.hist.len()];
+        }
+        for &i in &self.base_used {
+            self.hist_base[i as usize] = [0; 4];
+        }
+        self.base_used.clear();
+        self.clear_hist();
+        for &i in &g.used {
+            let e = g.h[i as usize];
+            self.hist[i as usize] = e;
+            self.hist_base[i as usize] = e;
+            self.base_used.push(i);
+            self.hist_used.push(i);
+        }
+    }
+
+    /// E32: add what this job learned to the shared history.
+    pub(crate) fn hist_push(&mut self, g: &mut SharedHist) {
+        if self.hist.is_empty() || self.hist_base.len() != self.hist.len() {
+            return;
+        }
+        for &i in &self.hist_used {
+            let (l, b) = (self.hist[i as usize], self.hist_base[i as usize]);
+            let d = [l[0].saturating_sub(b[0]), l[1].saturating_sub(b[1]), l[2].saturating_sub(b[2]), l[3].saturating_sub(b[3])];
+            if d == [0; 4] {
+                continue;
+            }
+            let e = &mut g.h[i as usize];
+            if *e == [0; 4] {
+                g.used.push(i);
+            }
+            for k in 0..4 {
+                e[k] += d[k];
+            }
+        }
     }
 
     /// E30b: halve the history (the driver between jobs); entries that reach zero are forgotten.
@@ -443,9 +516,34 @@ impl Solver {
         self.aborted = false;
         self.root_ply = (pos.ply as usize).min(MAX_PLY - 2);
         self.unwind_to = NO_UNWIND;
+        if self.cfg.drv_carry {
+            // the costs of the killers handed out that this solver knows; its other killers go to
+            // the extra slots
+            let n = (self.cfg.xk as usize).min(2);
+            for ply in 0..MAX_PLY {
+                let (ok, oc, ox, oxc) = (self.killers[ply], self.kcost[ply], self.xk[ply], self.xkc[ply]);
+                let nk = killers[ply];
+                let old = [(ok[0], oc[0]), (ok[1], oc[1]), (ox[0], oxc[0]), (ox[1], oxc[1])];
+                let cost = |m: u16| if m == PASS { 0 } else { old.iter().find(|e| e.0 == m).map_or(0, |e| e.1) };
+                self.kcost[ply] = [cost(nk[0]), cost(nk[1])];
+                let mut x = [PASS; 2];
+                let mut xc = [0; 2];
+                let mut j = 0;
+                for &(m, c) in old.iter() {
+                    if j < n && m != PASS && m != nk[0] && m != nk[1] && !x[..j].contains(&m) {
+                        x[j] = m;
+                        xc[j] = c;
+                        j += 1;
+                    }
+                }
+                self.xk[ply] = x;
+                self.xkc[ply] = xc;
+            }
+        } else {
+            self.kcost = [[0; 2]; MAX_PLY];
+            self.xk = [[PASS; 2]; MAX_PLY];
+        }
         self.killers = *killers;
-        self.kcost = [[0; 2]; MAX_PLY];
-        self.xk = [[PASS; 2]; MAX_PLY];
         match self.cfg.hc_job {
             1 => self.clear_hist(),
             2 => self.halve_hist(),
