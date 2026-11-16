@@ -296,7 +296,7 @@
     } else if (here && !live && here.status) {
       html = here.status === "cancelled" ? `<span class="v-unk">cancelled</span>` :
         here.status === "error" ? `<span class="v-loss">error: ${esc(here.message || "")}</span>` :
-        `<span class="v-unk">not solved within ${here.seconds} s</span>`;
+        `<span class="v-unk">not solved${here.seconds ? ` within ${here.seconds} s` : ""}</span>`;
     }
     setHtml(v, html);
     if ($("bBest")) {
@@ -399,7 +399,8 @@
   };
 
   async function startRun(mode) {
-    const seconds = Math.max(1, +$("iSec").value || 30);
+    const rawSec = $("iSec").value.trim();
+    const seconds = rawSec === "" || isNaN(+rawSec) ? 30 : Math.max(0, +rawSec); // 0 = no limit
     const procs = Math.max(1, Math.min(64, Math.floor(+$("iProcs").value || 1)));
     const text = posText();
     const j = await post("/api/run", { mode, position: text, seconds, procs, lock: $("iLock").checked, client });

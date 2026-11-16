@@ -817,8 +817,8 @@ def make_handler(app):
                         raise BadPosition("the game is over")
                     seconds = float(b.get("seconds", 10))
                     procs = int(b.get("procs", 1))
-                    if not (0 < seconds <= 7 * 86400) or not (1 <= procs <= 64):
-                        raise BadPosition("the limit is 0 to a week of seconds and 1 to 64 processes")
+                    if not (0 <= seconds <= 7 * 86400) or not (1 <= procs <= 64):
+                        raise BadPosition("the limit is 0 (no limit) to a week of seconds and 1 to 64 processes")
                     r = app.start(mode, text, seconds, procs, bool(b.get("lock", True)), str(b.get("client") or ""))
                     self.send_json({"ok": True, "run": r.id})
                 elif u.path == "/api/cancel":
