@@ -2251,3 +2251,53 @@ start3 and the new defaults; it is not held back for a cheaper test. My own chec
 profiled pair and the tune screen are prepared meanwhile (they do not depend on the
 verdict; the gate and the freeze do). The cheaper test is the agent's round five, on top,
 and each of its changes goes to the verifier before it can be a default.
+
+## 2026-11-16 The top of the proof, first report: replies are 2-5x faster than at the pause; the pot is red's order, bounded at 21%
+
+Agent's report (the ordering agent's round five). Nothing built, nothing committed. Its
+numbers; one run a reply.
+
+- **Six refuted replies re-proved with today's base**, each as its own root (red to move
+  after `1:60` and the reply), `prove --threads 16 --job-threads 1 --depth 2 --tt 27
+  --upper-first`, a fresh results file each (the paused proof's files untouched):
+
+  | Reply (blue cells) | Paused run: tries, s | Today: tries, wall s | Today / then |
+  | --- | --- | --- | --- |
+  | 10,20,29,30 | 1, 113 | 1, 58.2 | 0.52x |
+  | 18,28,37,38 | 3, 208 | 1, 90.7 | 0.44x |
+  | 20,30,39,40 | 4, 248 | 1, 94.1 | 0.38x |
+  | 69,80,91,102 | 5, 465 | 2, 144.5 | 0.31x |
+  | 57,68,79,90 | 19, 1227 | 4, 228.0 | 0.19x |
+  | 81,91,100,101 | 1, 94 | 11 or more, stopped at 836 | worse than 8.9x |
+
+  Then against now mixes three things: the build, the driver setting (16 single-thread
+  workers instead of one job of 16 threads) and the order of red's tries, which today
+  starts cold at every root (no winners from earlier replies). Five replies are two to five
+  times faster. The sixth shows what the missing history costs: the paused run found its
+  winner at the first try, an image of an earlier winner; cold, eleven tries had not found it.
+- **`--upper-first` matters here:** without it the first reply also ran a (-1,0) pass and took
+  113.9 s instead of 58.2 s. Red's node at ply 2 needs only "does red win".
+- **A failed try is not searched further than the proof needs** (`src/prove.rs`: the child
+  window at line 440, the job's window at 615, what is stored at 188-196): a red try gets
+  (-1,0) and stops as soon as blue is shown not to lose. 231 of the 232 failed tries in the
+  paused file are stored as [0,1]. Nothing exact to cut there.
+- **What is lost today instead:** red tries the coordinator starts beside the first and
+  stops when the first wins: 3-26% of the job seconds on the five good replies. At a single
+  reply's root nothing else waits for the workers, so the whole proof would lose less.
+- **The pot in the order of red's tries** (simulated online on the paused run's recorded
+  tries of the 25 tune replies; a rule can only rank moves that were tried, which flatters
+  it): the winner first would pay 0.788x. Images of earlier winners by count 0.954x;
+  nearness of the reply 0.980x; exact repeats 0.971x. 21 of the 25 winners are images of an
+  earlier winner, but so were 36 of the 42 failed tries, so the image bonus is also what
+  puts the failures first.
+- **The agent's recommendation:** build the measurement before any rule: a `prove` option
+  that keeps the winners (and the known results) across the roots of one position file, so
+  the tune replies can be re-proved in the proof's order with today's base and today's full
+  rule. Then two candidates: the image bonus capped, and no second try at a red ply-2 node
+  while other work waits.
+
+**Decision.** The tool is built now (it costs no machine time); its runs wait until the
+reach-threat gate is through, because a replay of 25 replies is about an hour of all 16
+threads an arm and the lock is the bottleneck tonight. The replay is also the missing ruler
+for the proof itself: seconds a reply, in the proof's order, with everything the driver
+knows. Any frozen change should be read on it once.
