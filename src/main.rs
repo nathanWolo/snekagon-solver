@@ -264,6 +264,17 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-threat-after" => o.cfg.reach_threat_after = val().parse().unwrap(),
             "--reach-threat-start" => o.cfg.reach_threat_start = val().parse().unwrap(),
             "--rt-study" => o.cfg.rt_study = true,
+            "--rt-effort5" => o.cfg.rt_effort[5] = val().parse().unwrap(),
+            "--rt-effort6" => o.cfg.rt_effort[6] = val().parse().unwrap(),
+            "--rt-effort7" => o.cfg.rt_effort[7] = val().parse().unwrap(),
+            "--rt-effort" => {
+                let v: u64 = val().parse().unwrap();
+                for l in 5..8 {
+                    o.cfg.rt_effort[l] = v;
+                }
+            }
+            "--rt-margin-lo" => o.cfg.rt_margin_lo = val().parse().unwrap(),
+            "--rt-margin-hi" => o.cfg.rt_margin_hi = val().parse().unwrap(),
             "--reach-threat-cache" => o.cfg.reach_threat_cache = true,
             "--no-reach-threat-cache" => o.cfg.reach_threat_cache = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
@@ -451,6 +462,13 @@ fn bench(t: &Tables, o: &Opts) {
                 }
                 writeln!(out, "# L{} hand {}: {:?}", l, h, r.margin[l][h]).unwrap();
             }
+        }
+        writeln!(out, "# rt-study effort at the test (nodes spent at the node: <16 <64 <256 <1024 <4096 more): [tests, threats, cycles, skipped moves, est nodes under them]").unwrap();
+        for l in 2..12 {
+            if r.eff[l].iter().all(|x| x[0] == 0) {
+                continue;
+            }
+            writeln!(out, "# E{}: {:?}", l, r.eff[l]).unwrap();
         }
         writeln!(out, "# rt-study moves left outside the zone (0,1-2,3-5,6-10,11-20,21-40,41+): [tests, threats, positions]").unwrap();
         for l in 2..12 {

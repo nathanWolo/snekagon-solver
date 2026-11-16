@@ -99,6 +99,13 @@ pub struct Config {
     pub rt_study: bool,
     /// Keep the "cannot reach" answers of reach-threat tests and reuse them where they still hold.
     pub reach_threat_cache: bool,
+    /// Above `reach_threat_max` pieces left, a reach threat is still tested after a failed move once
+    /// the node has spent at least this many nodes (by pieces left, 7 = 7 or more; MAX = never).
+    pub rt_effort: [u64; 8],
+    /// Skip a reach-threat test when the cluster bound after the reply is more than this above the
+    /// reply's length (at most `reach_threat_max` pieces left / above it; 99 = no limit).
+    pub rt_margin_lo: i32,
+    pub rt_margin_hi: i32,
 }
 
 /// A "cannot reach" answer: the player with the cells `own` and the pieces `left` cannot build
@@ -126,11 +133,26 @@ pub struct RtStudy {
     pub skip: [[u64; 5]; 16],
     pub work: u64,
     pub outside_now: u32,
+    /// [effort bucket: nodes spent at the node when the test is asked, <16, <64, <256, <1024,
+    /// <4096, more] -> [tests, threats, cycles, moves skipped only by reach threats, estimated nodes
+    /// under them] (skips go to the bucket of the node's first test)
+    pub eff: [[[u64; 5]; 6]; 16],
+}
+
+pub fn effort_bucket(e: u64) -> usize {
+    match e {
+        0..=15 => 0,
+        16..=63 => 1,
+        64..=255 => 2,
+        256..=1023 => 3,
+        1024..=4095 => 4,
+        _ => 5,
+    }
 }
 
 impl RtStudy {
     pub fn new() -> RtStudy {
-        RtStudy { by_ans: [[[0; 3]; 2]; 16], margin: [[[[0; 3]; 8]; 4]; 16], outside: [[[0; 3]; 7]; 16], skip: [[0; 5]; 16], work: 0, outside_now: 0 }
+        RtStudy { by_ans: [[[0; 3]; 2]; 16], margin: [[[[0; 3]; 8]; 4]; 16], outside: [[[0; 3]; 7]; 16], skip: [[0; 5]; 16], work: 0, outside_now: 0, eff: [[[0; 5]; 6]; 16] }
     }
 }
 
@@ -148,7 +170,7 @@ pub fn outside_bucket(n: u32) -> usize {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4, rt_study: false, reach_threat_cache: false }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99 }
     }
 }
 
@@ -375,6 +397,8 @@ pub struct Solver {
     /// Reach-threat tests: [tests, answered by a witness, threats found].
     pub rt_stats: [u64; 3],
     pub rts: Box<RtStudy>,
+    /// The nodes the current node has spent when it asks for a threat test.
+    rt_effort_now: u64,
     no_reach: Vec<NoReach>,
     node_limit: u64,
     aborted: bool,
@@ -452,6 +476,7 @@ impl Solver {
             rwit: [Witness::NONE; MAX_PLY],
             rt_stats: [0; 3],
             rts: Box::new(RtStudy::new()),
+            rt_effort_now: 0,
             no_reach: vec![NoReach { own: 0, opp: 0, left: 0, need: 0 }; 1 << NO_REACH_BITS],
             node_limit: u64::MAX,
             aborted: false,
@@ -766,10 +791,10 @@ impl Solver {
             return;
         }
         let first_time = th.ntried < MAX_TRIED && !th.tried[..th.ntried].contains(&m);
-        let deep = deep && th.nrtried < MAX_TRIED && !th.rtried[..th.nrtried].contains(&m) && {
-            let level = pos.left[0].count_ones() + pos.left[1].count_ones();
-            level >= self.cfg.reach_threat_min && level <= self.cfg.reach_threat_max
-        };
+        let lv = pos.left[0].count_ones() + pos.left[1].count_ones();
+        let low = lv <= self.cfg.reach_threat_max;
+        let deep = deep && th.nrtried < MAX_TRIED && !th.rtried[..th.nrtried].contains(&m) && lv >= self.cfg.reach_threat_min
+            && (low || self.rt_effort_now >= self.cfg.rt_effort[(lv as usize).min(7)]);
         if !first_time && !deep {
             return;
         }
@@ -790,11 +815,15 @@ impl Solver {
         }
         let opp_len = pos.longest_after(opp, b) as i32;
         // only a bound of at most opp_len makes a threat: the flood may stop once it is above
+        let mlim = if low { self.cfg.rt_margin_lo } else { self.cfg.rt_margin_hi };
+        let use_m = deep && mlim < 99;
         let my_upper = if pos.left[me] == 0 {
             pos.longest[me] as i32
         } else {
-            upper_bound_cells_upto(t, &BoundCtx::new(pos, me), growable(pos, me) & !b.cells, opp_len)
+            upper_bound_cells_upto(t, &BoundCtx::new(pos, me), growable(pos, me) & !b.cells, opp_len + if use_m { mlim } else { 0 })
         };
+        // a reply with a wide margin rarely makes a reach threat: no test (`rt_margin_*`)
+        let deep = deep && (!use_m || my_upper <= opp_len + mlim);
         let value = if my_upper < opp_len {
             -1
         } else if my_upper <= opp_len {
@@ -837,6 +866,10 @@ impl Solver {
                 g[0] += 1;
                 g[1] += found;
                 g[2] += work;
+                let e = &mut self.rts.eff[lv][effort_bucket(self.rt_effort_now)];
+                e[0] += 1;
+                e[1] += found;
+                e[2] += cyc;
                 let ob = outside_bucket(self.rts.outside_now);
                 let o = &mut self.rts.outside[lv][ob];
                 o[0] += 1;
@@ -1357,11 +1390,13 @@ impl Solver {
         }
         if threats_on {
             let deep = self.cfg.reach_threat && (level as u32) <= self.cfg.reach_threat_start;
+            self.rt_effort_now = 0;
             self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, deep, &mut th);
             self.try_threat(pos, ply, self.killers[ply + 1][1], alpha, deep, &mut th);
         }
         let mut skipped = -2; // the best bound of the moves skipped because of threats
         let mut rskip = 0u64; // study: moves skipped only because of reach threats
+        let mut first_eb = usize::MAX; // study: the effort bucket of the node's first reach-threat test
         let nodes_before_moves = self.nodes;
         let mut scanned = !threats_on;
 
@@ -1716,7 +1751,12 @@ impl Solver {
                             self.rts.outside_now = buf[i..n].iter().filter(|e| t.placements[(**e & 0xFFFF) as usize].cells & z == 0).count() as u32;
                         }
                     }
+                    self.rt_effort_now = self.nodes - nodes_at_start;
+                    let tests_before = self.rt_stats[0];
                     self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, self.cfg.reach_threat && searched >= self.cfg.reach_threat_after, &mut th);
+                    if self.cfg.rt_study && first_eb == usize::MAX && self.rt_stats[0] > tests_before {
+                        first_eb = effort_bucket(self.nodes - nodes_at_start);
+                    }
                     if !scanned {
                         scanned = true;
                         self.prof[level][7] += 1;
@@ -1740,6 +1780,11 @@ impl Solver {
                 s[2] += 1;
                 s[3] += searched;
                 s[4] += under;
+                if first_eb != usize::MAX {
+                    let e = &mut self.rts.eff[level][first_eb];
+                    e[3] += rskip;
+                    e[4] += rskip * under / searched.max(1);
+                }
             }
             self.prof[level][3] += searched;
             self.prof[level][6] += (n as u64).saturating_sub(searched);
