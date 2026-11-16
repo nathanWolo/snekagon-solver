@@ -72,7 +72,7 @@ def feats(node, extended):
         own, th = enc(node["own"]), enc(node["theirs"])
         mvb = np.array([enc(mv["cells"]) for mv in ms])
         bdb = np.array([enc(mv["border"]) for mv in ms])
-        X = np.hstack([X, mvb, bdb, mvb * 0 + own, mvb * 0 + th, bdb * own, bdb * th])
+        X = np.hstack([X, mvb, bdb, bdb * own, bdb * th, mvb * 0 + own]).astype(np.float32)
     return X
 
 
@@ -196,7 +196,9 @@ for L in levels:
     models["extended p/E[cost] (win & fail costs)"] = lambda n: (lambda F: (lambda p: p / (p * np.exp(rw(F)) + (1 - p) * np.exp(rl(F))))(fx(F)))(feats(n, True))
     del models["extended p/exp(logcost) by win-cost"]
     if "--board" in args:
-        Xb, yb, cb, gb = stack(tr, "board")
+        import random as _r
+        sub = _r.Random(3).sample(tr, min(1500, len(tr)))
+        Xb, yb, cb, gb = stack(sub, "board")
         fb = mlp(Xb, yb, cb, hidden=64, epochs=40)
         models["MLP 64 board+ext p/exp(logcost)"] = lambda n: (lambda pc: pc[0] / np.exp(pc[1]))(fb(feats(n, "board")))
         models["MLP 64 board+ext p(win)"] = lambda n: fb(feats(n, "board"))[0]
@@ -222,5 +224,24 @@ for L in levels:
         for mname, fn in models.items():
             report(mname, ns, score(ns, fn), base[0], ch, an)
         report("ext. Smith, no table move/killers", ns, score(ns, models["extended p(win)/exp(logcost) Smith"], ttk=False), base[0], ch, an)
+        for K in (3, 10):
+            def topk(n, K=K):
+                keys = [sim.today_key(n, mv) for mv in n["moves"]]
+                order = sorted(range(len(keys)), key=lambda j: (keys[j], n["moves"][j]["m"]), reverse=True)[:K]
+                w = [n["moves"][j]["nodes"] for j in order if n["moves"][j]["win"] == "1"]
+                return min(w) if w else sim.replay(n, keys)[0]
+            v = sum(n["w"] * topk(n) for n in ns)
+            print(f"  {'oracle: cheapest win in first ' + str(K):34s} {v:12.0f}  x{v / base[0]:5.3f} today")
+        # how well the cost head ranks winning moves: weighted share of nodes where the Smith key's
+        # best winning move is the cheapest winning move
+        hit = 0.0
+        for n in ns:
+            k = models["extended p(win)/exp(logcost) Smith"](n)
+            wins = [j for j, mv in enumerate(n["moves"]) if mv["win"] == "1"]
+            if len(wins) > 1:
+                bj = max(wins, key=lambda j: k[j])
+                hit += n["w"] * (n["moves"][bj]["nodes"] == min(n["moves"][j]["nodes"] for j in wins))
+        multi = sum(n["w"] for n in ns if sum(mv["win"] == "1" for mv in n["moves"]) > 1)
+        print(f"  Smith key picks the cheapest win (nodes with 2+ wins, weighted): {hit / max(multi, 1e-9):.1%}")
         # perfect win label, today's order among wins: what a perfect classifier would get
         report("perfect p(win), today's key in ties", ns, score(ns, lambda n: [(1e9 if mv["win"] == "1" else 0) + sim.today_key(n, mv) for mv in n["moves"]]), base[0], ch, an)

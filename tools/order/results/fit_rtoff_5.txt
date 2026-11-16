@@ -1,0 +1,31 @@
+# nodes labelled 1323, usable (a win, no capped move) 1323
+level 5 train: nodes 1207 roots 19 parents 15; today's first move wins 87.2%; oracles: cheapest 1126812 any 4418385 mean-win 6962845; in the tree at these nodes 3621000 nodes, 248397 under failed moves
+  today (replayed)                        4080237  x1.000 today  x  3.62 cheapest  x 0.92 any   fails      283208 wins     3797028
+  today, no table move/killers            5237712  x1.284 today  x  4.65 cheapest  x 1.19 any   fails      900870 wins     4336841
+  model order at this level (8 feat)      4009697  x0.983 today  x  3.56 cheapest  x 0.91 any   fails      243425 wins     3766271
+  8-feature logistic (refit)              3993978  x0.979 today  x  3.54 cheapest  x 0.90 any   fails      226346 wins     3767632
+  extended logistic p(win)                3963244  x0.971 today  x  3.52 cheapest  x 0.90 any   fails      212706 wins     3750538
+  extended p(win)/exp(logcost) Smith      3961289  x0.971 today  x  3.52 cheapest  x 0.90 any   fails      219081 wins     3742208
+  extended p/E[cost] (win & fail costs)      3962118  x0.971 today  x  3.52 cheapest  x 0.90 any   fails      220606 wins     3741512
+  MLP 32 p/exp(logcost)                   3953216  x0.969 today  x  3.51 cheapest  x 0.89 any   fails      209774 wins     3743441
+  MLP 32 p(win)                           3967234  x0.972 today  x  3.52 cheapest  x 0.90 any   fails      209837 wins     3757396
+  ext. Smith, no table move/killers       1884191  x0.462 today  x  1.67 cheapest  x 0.43 any   fails      199964 wins     1684226
+  oracle: cheapest win in first 3         2744580  x0.673 today
+  oracle: cheapest win in first 10        1575999  x0.386 today
+  Smith key picks the cheapest win (nodes with 2+ wins, weighted): 86.4%
+  perfect p(win), today's key in ties      3976554  x0.975 today  x  3.53 cheapest  x 0.90 any   fails      166306 wins     3810247
+level 5 test: nodes 116 roots 5 parents 5; today's first move wins 87.9%; oracles: cheapest 203899 any 561581 mean-win 1021527; in the tree at these nodes 347999 nodes, 20950 under failed moves
+  today (replayed)                         397800  x1.000 today  x  1.95 cheapest  x 0.71 any   fails       28370 wins      369429
+  today, no table move/killers             606298  x1.524 today  x  2.97 cheapest  x 1.08 any   fails       53820 wins      552478
+  model order at this level (8 feat)       393437  x0.989 today  x  1.93 cheapest  x 0.70 any   fails       24879 wins      368558
+  8-feature logistic (refit)               396933  x0.998 today  x  1.95 cheapest  x 0.71 any   fails       30651 wins      366281
+  extended logistic p(win)                 389448  x0.979 today  x  1.91 cheapest  x 0.69 any   fails       21127 wins      368321
+  extended p(win)/exp(logcost) Smith       390597  x0.982 today  x  1.92 cheapest  x 0.70 any   fails       23150 wins      367446
+  extended p/E[cost] (win & fail costs)       389341  x0.979 today  x  1.91 cheapest  x 0.69 any   fails       21127 wins      368214
+  MLP 32 p/exp(logcost)                    390165  x0.981 today  x  1.91 cheapest  x 0.69 any   fails       21207 wins      368958
+  MLP 32 p(win)                            388844  x0.977 today  x  1.91 cheapest  x 0.69 any   fails       21127 wins      367717
+  ext. Smith, no table move/killers        306339  x0.770 today  x  1.50 cheapest  x 0.55 any   fails       25727 wins      280612
+  oracle: cheapest win in first 3          448322  x1.127 today
+  oracle: cheapest win in first 10         228051  x0.573 today
+  Smith key picks the cheapest win (nodes with 2+ wins, weighted): 87.0%
+  perfect p(win), today's key in ties       390766  x0.982 today  x  1.92 cheapest  x 0.70 any   fails       21127 wins      369638
