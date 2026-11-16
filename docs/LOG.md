@@ -1770,3 +1770,47 @@ base's node counts). Every option only reorders moves, so no value can change.
   a true effect down to about 0.10. An effect smaller than that would end undecided, which
   for a change that screened at 0.77x would itself be news.
 - **Gate `E30`:** `proof4b` gate units from 88, profiled builds, `--window 0,1`.
+
+## 2026-11-15 E29: the independent verifier found no way to break reach threats
+
+A second Opus agent that did not write the rule (branch `climb/verify-rt`, commits `56f1b58`,
+`7c11643`, on `climb/threats` at `09807d5`) was asked to break it. It found no
+counterexample and gives an argument for every variant.
+
+- **The argument, in short.** R is legal where it is tested, so it does not matter that it
+  came from a sibling. A move m of the mover outside R's cells and border leaves R legal, and
+  R leaves m legal (adjacency is symmetric); the mover's placements after (m, R) are
+  placements after R alone, so the one-player optimum after (m, R) is at most that after R,
+  which is below the opponent's length with R. Opponent placements only take placements
+  away. So m loses; with alpha >= 0 the same gives "at most a draw", a bound that is true in
+  any window. In the grow refinement m and R both grow snakes on disjoint cells; a grow is
+  legal by empty cells and the player's own cells alone, so they commute. Every pruned move
+  has a bound that is true whatever the window, path, killers or thread, so what is stored
+  at such a node stays valid. Witnesses can only say yes, and only a no prunes.
+- **In-tree check** (`--features shadow`, `src/shadow.rs`): every move pruned by a reach
+  threat alone is solved exactly with the rule off, on a table of its own, and the run stops
+  if its value beats the bound the rule assumed; each node with such a prune is also solved
+  exactly and compared with the value returned and the bounds stored; every "cannot reach"
+  is asked again with unlimited work. Five settings (default, all levels, each without the
+  grow refinement, all levels with the cache) on ply 6 (0-199), ply 7 (0-589), ply 8 (all),
+  one ply-5 file, proof positions 0-23 narrow and 0-2 with the full window, and four runs on
+  8 threads: about 190 million pruned moves and 9 million nodes checked, **0 mismatches**.
+  At the defaults every pruned move was checked; at all levels about 99% (sampled above 5
+  pieces left).
+- **The check can fail:** with the zone cut down to R's cells it stopped at
+  `00098250821c80901a01800000000000_0000418851004809811040100c000000_18_18_1_11_0`, move
+  `4I:8,19,30,41` (assumed -1, true value 1) while every root value of that run stayed
+  right. That is the case the root labels cannot see.
+- **Values below the root:** 2,703 positions sampled from inside the trees (2 to 11 pieces
+  left, both sides, 1,619 of the lines from nodes where the rule had pruned), each solved with
+  the rule off and then on in four settings and three windows on fresh tables: about 50,400
+  solves, 0 mismatches.
+- **Not covered:** proof positions 24-87 and `proof4b`; `--reach-threat-min`, other work
+  limits, `--reach-threat-after` above 1 (each only prunes less); `prove` and PN search do
+  not use the rule.
+- **Fragile though correct** (the verifier's list): the zones rest on two facts of the rules
+  (a grow needs only empty cells and one's own cells; opponent cells never enable a
+  placement); "touches own cells, so it grows" is computed by hand at three call sites; the
+  cache reads `need >= e.need` and is never cleared (sound because entries are facts);
+  `try_threat` now serves two paths behind two flags.
+- **Verdict:** cleared for its speed gate, which waits for E30 (the base will change).
