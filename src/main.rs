@@ -192,6 +192,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--kc-evict" => o.cfg.kc_evict = true,
             "--hc" => o.cfg.hc_k = val().parse().unwrap(),
             "--hc-level" => o.cfg.hc_level = val().parse().unwrap(),
+            "--hc-staged" => o.cfg.hc_staged = true,
             "--hc-min" => o.cfg.hc_min = val().parse().unwrap(),
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),

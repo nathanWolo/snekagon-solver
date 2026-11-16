@@ -76,11 +76,13 @@ pub struct Config {
     pub hc_k: u32,
     pub hc_level: u32,
     pub hc_min: u32,
+    /// E30 idea 2: keep the staged first move (table move, then the killer that the history prefers).
+    pub hc_staged: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 0, kc_level: 0, kc_mode: 0, kc_evict: false, hc_k: 0, hc_level: 7, hc_min: 1 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 0, kc_level: 0, kc_mode: 0, kc_evict: false, hc_k: 0, hc_level: 7, hc_min: 1, hc_staged: false }
     }
 }
 
@@ -1155,7 +1157,18 @@ impl Solver {
         if self.cfg.staged {
             let now = pos.pieces_now();
             let mut first = PASS;
-            for cand in if hc_on { [tt_move, PASS, PASS] } else { [tt_move, k1, k2] } {
+            if hc_on && self.cfg.hc_staged && k1 != PASS && k2 != PASS {
+                let np = t.placements.len();
+                let base = (me * 16 + level) * np;
+                let key = |m: u16, s: &Solver| {
+                    let h = if (m as usize) < np { s.hist[base + m as usize] } else { [0, 0] };
+                    if h[0] >= s.cfg.hc_min as u64 { h[1] / h[0] } else { u64::MAX }
+                };
+                if key(k2, self) < key(k1, self) {
+                    std::mem::swap(&mut k1, &mut k2);
+                }
+            }
+            for cand in if hc_on && !self.cfg.hc_staged { [tt_move, PASS, PASS] } else { [tt_move, k1, k2] } {
                 if cand == PASS {
                     continue;
                 }
