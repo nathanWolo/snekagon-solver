@@ -240,6 +240,7 @@ pub fn rtcheck(path: &str, base: Config, cfgs: &[(&str, Config)], from: usize, t
         }
         n += 1;
         by_level[level.min(15)][fired] += 1;
+        println!("{} level {} fired {} window ({}, {}) exact {} ok", i, level, fired, a, b, e);
     }
     println!("rtcheck ok: {} positions, {} solves with reach threats on, mismatches 0", n, solves);
     for l in 0..16 {
