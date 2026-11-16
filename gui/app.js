@@ -165,9 +165,9 @@
     if (tw && st.cur === tw.ctx.k + 1 && !drag) {
       const at = new Map();
       for (const t of tw.tries.list) {
-        if (t.state !== "work") continue;
-        const fr = t.total ? t.done / t.total : 0;
-        for (const c of t.cells) if (!at.has(c) || fr > at.get(c)) at.set(c, fr);
+        if (t.s !== "w") continue;
+        const fr = t.t ? t.d / t.t : 0;
+        for (const c of tryCells(t)) if (!at.has(c) || fr > at.get(c)) at.set(c, fr);
       }
       for (const [c, fr] of at)
         parts.push(`<polygon class="trymark" transform="translate(${cx(c).toFixed(3)},${cy(c).toFixed(3)}) scale(0.86)" points="${HEX}" style="stroke-opacity:${(0.25 + 0.75 * fr).toFixed(2)}"/>`);
@@ -411,32 +411,34 @@
     return { ctx, row, tries: ctx.pr.tries };
   }
   const CAP = 12;
+  // a try as the server sends it: m move, s state (w in work, f failed, x won), d replies shown lost, t replies, r refuting reply
+  function tryCells(t) { const pl = SN.BY_KEY.get(t.m); return pl ? pl.cells : []; }
   function renderTries() {
     const el = $("tries"), tw = triesHere();
     if (!tw) { el.hidden = true; setHtml(el, ""); return; }
-    const work = tw.tries.list.filter(t => t.state === "work")
-      .sort((a, b) => (b.total ? b.done / b.total : 0) - (a.total ? a.done / a.total : 0) || b.done - a.done);
-    const failed = tw.tries.list.filter(t => t.state === "failed");
-    const won = tw.tries.list.filter(t => t.state === "won");
+    const fr = t => (t.t ? t.d / t.t : 0);
+    const work = tw.tries.list.filter(t => t.s === "w").sort((a, b) => fr(b) - fr(a) || b.d - a.d);
+    const failed = tw.tries.list.filter(t => t.s === "f").reverse();
+    const won = tw.tries.list.filter(t => t.s === "x");
     const all = won.concat(work, failed);
     const lines = all.slice(0, CAP).map(t => {
-      const fr = t.total ? t.done / t.total : 0;
-      if (t.state === "failed")
-        return `<li class="failed" data-m="${esc(t.move)}"><span class="mv">${esc(t.move)}</span><span class="rep">${esc(t.reply || "")}</span></li>`;
-      return `<li class="${t.state}" data-m="${esc(t.move)}"><span class="mv">${esc(t.move)}</span>` +
-        `<span class="bar"><i style="width:${(100 * fr).toFixed(1)}%"></i></span><span class="n">${t.done}/${t.total ?? "?"}</span></li>`;
+      if (t.s === "f")
+        return `<li class="failed" data-m="${esc(t.m)}"><span class="mv">${esc(t.m)}</span><span class="rep">${esc(t.r || "")}</span></li>`;
+      return `<li class="${t.s === "x" ? "won" : "work"}" data-m="${esc(t.m)}"><span class="mv">${esc(t.m)}</span>` +
+        `<span class="bar"><i style="width:${(100 * fr(t)).toFixed(1)}%"></i></span><span class="n">${t.d}/${t.t ?? "?"}</span></li>`;
     });
-    if (all.length > CAP) lines.push(`<li class="more">+${all.length - CAP}</li>`);
+    const total = tw.tries.work + tw.tries.failed + tw.tries.won;
+    if (total > CAP) lines.push(`<li class="more">+${total - CAP}</li>`);
     el.hidden = false;
     setHtml(el, lines.join(""));
   }
   function tryAt(li) {
     const tw = triesHere();
-    return tw && li && li.dataset.m ? { tw, t: tw.tries.list.find(t => t.move === li.dataset.m) } : null;
+    return tw && li && li.dataset.m ? { tw, t: tw.tries.list.find(t => t.m === li.dataset.m) } : null;
   }
   $("tries").addEventListener("mouseover", e => {
     const x = tryAt(e.target.closest("li"));
-    const cells = x && x.t ? x.t.cells : null;
+    const cells = x && x.t ? tryCells(x.t) : null;
     if (String(cells) !== String(hint)) { hint = cells; renderBoard(); }
   });
   $("tries").addEventListener("mouseleave", () => { hint = null; renderBoard(); });
@@ -445,7 +447,7 @@
     const x = tryAt(e.target.closest("li"));
     if (!x || !x.t) return;
     const get = m => (m === "pass" ? null : SN.BY_KEY.get(m));
-    const moves = [x.tw.row.move, x.t.move].concat(x.t.state === "failed" && x.t.reply ? [x.t.reply] : []).map(get);
+    const moves = [x.tw.row.move, x.t.m].concat(x.t.s === "f" && x.t.r ? [x.t.r] : []).map(get);
     if (moves.some(m => m === undefined)) return;
     setLine(st.base, st.baseText, st.line.slice(0, x.tw.ctx.k).concat(moves));
   });
@@ -609,13 +611,23 @@
     cache.set(text, e);
     return e;
   }
-  function connect() {
-    const es = new EventSource("/api/events?client=" + client);
-    es.addEventListener("state", e => {
-      run = JSON.parse(e.data);
+  let jumped = false;
+  function onState(r) {
+      // a state without its rows: they have not changed since the ones the page has (rows_v)
+      if (r.prove && r.prove.rows == null) {
+        const old = proofs.get(r.position);
+        if (old && old.rows) r.prove.rows = old.rows;
+        else { r.prove = null; } // no rows to keep: the next poll or event brings them
+      }
+      run = r;
       run._at = Date.now();
       if (run.mode === "prove") {
         if (run.prove && run.prove.n) proofs.set(run.position, Object.assign({ exists: true }, run.prove));
+        // a page opened while a proof runs starts on the proof's position
+        if (!jumped && run.status === "running" && st.line.length === 0 && !st.baseText) {
+          try { const got = SN.parseInput(run.position); setLine(got.base, got.baseText, got.moves); } catch (e) {}
+        }
+        jumped = true;
         if (run.message && run.status === "error") say(run.message);
         follow();
         renderRun();
@@ -631,13 +643,28 @@
       if (run.message && ["error"].includes(run.status)) say(run.message);
       renderRun();
       if (c && run.position === posText()) renderBoard();
-    });
-    es.addEventListener("result", e => {
-      const r = JSON.parse(e.data);
+  }
+  function onResult(r) {
       const c = entryFor(r.run, r.position, null, null);
       if (r.move !== null) c.results.set(r.move, r);
       if (r.position === posText()) { renderBoard(); renderVerdict(); }
-    });
+  }
+  let lastStream = 0;
+  function connect() {
+    const es = new EventSource("/api/events?client=" + client);
+    es.addEventListener("state", e => { lastStream = Date.now(); onState(JSON.parse(e.data)); });
+    es.addEventListener("result", e => { lastStream = Date.now(); onResult(JSON.parse(e.data)); });
+    // A tunnel can hold the event stream back. While the stream is silent, ask for the state instead.
+    setInterval(async () => {
+      if (document.hidden || Date.now() - lastStream < 10000) return;
+      try {
+        const pr = run && run.mode === "prove" ? proofs.get(run.position) : null;
+        const j = await (await fetch("/api/status" + (pr && pr.rows_v ? "?rows=" + pr.rows_v : ""))).json();
+        if (!j.run || (run && run.id === j.run.id && JSON.stringify(run) === JSON.stringify(j.run))) return;
+        for (const r of j.run.results || []) onResult(Object.assign({ run: j.run.id, position: j.run.position }, r));
+        onState(j.run);
+      } catch (e) {}
+    }, 5000);
   }
 
   $("iProcs").addEventListener("input", () => { $("iProcs").dataset.touched = "1"; });
