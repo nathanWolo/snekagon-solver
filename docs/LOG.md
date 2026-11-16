@@ -2509,3 +2509,41 @@ off by default. No replay was run (the lock was kept for the reach-threat gate).
 **Decision.** Nothing here is gated or run yet. After the reach-threat gate: one replay of
 `tune25.txt` with the base of that moment (the baseline and the estimate for the owner),
 then `--win-turns` on the same file as a screen. The 49 other replies stay unused for a gate.
+
+## 2026-11-16 E29 round three: my checks, the screen, and the gate's hypothesis and cap
+
+Written before the first gate unit. Candidate: `f24a2d2` (`climb/threats`), built by me:
+plain `b630a2fab0bf`, profiled `440dfbb757aa` (`work/e29r3/`, record in
+`work/e29r3/checks.txt`). Base: `frozen/climb-base.exe` `03e5963b7ba5`.
+
+- **Identity, the rule off** (`--no-reach-threat`): proof 0-23 narrow 56,301,796; ply07
+  0-589 6,404,487; ply06 0-199 5,846,840: the frozen base's counts. **The old setting**
+  (`--reach-threat-max 4 --reach-threat-start 4 --no-reach-start3`): 49,334,737 and
+  5,255,948: `6057bd7`'s counts. The profiled build: 6,404,487 with the rule off.
+- **Labels with the new defaults,** all values right, none unknown, every count equal to
+  the agent's: proof 0-23 narrow 26,095,441; 24-47 36,202,062; proof 0-11 full window
+  19,741,708; ply07 4,174,807; ply06 3,669,218; ply08 4,223,127; the five ply-5 files
+  6,839,041 / 6,914,528 / 8,005,501 / 4,585,644 / 26,853,486 (53,198,200 together; the
+  reference solver needs 59,709,026). `verify 100` passes. 16 threads on ply06: 9,624,368
+  nodes, all right.
+- **Screen `E29R3-S`** (proof4b tune units 50-79, profiled builds, `--window 0,1`): total
+  time 117.57 s against 107.55 s, **0.915x**; nodes 0.557x; per unit the log ratio is
+  +0.115 +/- 0.099, **sd 0.277 a unit**. 25 units faster (down to 0.57x), 5 slower. Two
+  outliers carry the spread: unit 75 at 1.47x with half the nodes (the tests cost more than
+  they save there), and unit 55 at 2.68x with 1.39x the NODES (8,993,217 to 12,512,261).
+  The extra prunes are exact, so the larger tree there is a worse order: what the verifier
+  found at proof position 23, where the prunes change what feeds E30's cost history. No
+  run from the analysis board without the lock fell in the screen's window.
+- **`hc.py plan`** on the screen: SPRT[0, 0.05] needs about 163 units if the truth is either
+  hypothesis and 266 halfway. 325 gate units of `proof4b` are unused (118-442).
+
+**Hypothesis.** Reach threats at every level, tested at node start too, with the
+three-piece reach test from the longest snake, cut the time of fresh proof positions (one
+thread, profiled builds, `--window 0,1`): at least 5% against no gain. Expected: about
+0.89x a unit (the screen), 0.83-0.92x in total (the agent's profiled pairs and the
+screen). **Test:** `E29R3`, one gate, SPRT[0, 0.05] on the per-unit log ratio of time,
+`proof4b` gate units from 118, **cap 266**. On a pass: the guards (ply 5 scaling on 10 tune
+units; driver jobs a-d), then the freeze with the test commit `64d2bf4`. On a fail or at
+the cap undecided: no freeze, no second gate; the cost of the reach test (round six) and
+the order effect seen at unit 55 are then the things to work on, and what comes back is a
+new change on new units.
