@@ -36,6 +36,11 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    model is at the limit of its eight features (a refit on five times the data gave the same
    weights), and re-ranking by look-ahead features gave nothing. It needs information of another
    kind.
+2b. **Cheapest win first, from what the search has seen (E30, in work).** The ordering study
+   (LOG, 2026-11-15): a learned order pays 0.97-1.00x on held-out parents; the pot is the cost
+   of the win that is taken (today pays 5.9x the cheapest win at 7 left, by standalone costs),
+   and no feature of the position predicts it. Cost-aware killers and history use what
+   neighbouring nodes paid. Branch `climb/cost`.
 2a. **The GPU (owner's question, 2026-11-15): "could we write a solver to run on gpu and leverage
    that parallelism? could it be fast?"** Assessment, not yet a measurement. *As the search:*
    unlikely. A node here is not cheap arithmetic but a branchy proof step (reach tests 29% of the
@@ -49,7 +54,7 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    features and a refit on five times the data gave the same weights; a network over the board,
    trained on the solved positions with the owner's JAX set-up and evaluated only in the first
    plies (4% of the nodes are at six pieces left or more), is a different model class. *First
-   step (no GPU needed):* size it: can any model trained on the labelled positions and the
+   step (no GPU needed), done 2026-11-15: no (item 2b; LOG, "The ordering study").* The plan was to size it: can any model trained on the labelled positions and the
    proof's records beat the current order on held-out positions, in nodes paid before the first
    winning move.
 3. **Merge the parallel solve** (branch `parallel-v9`): exact, 3.4x wall-clock on 8 threads, about 2%

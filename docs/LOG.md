@@ -1564,3 +1564,39 @@ default; with both off the driver does what the base does.
 - **Closed:** a shared table for the workers; more scheduling work on single jobs. *Reopen* the
   driver only for what a long proof with many roots shows (idle workers between roots, the
   order of roots).
+
+## 2026-11-15 The ordering study: a learned order is worth nothing here; the pot is the cost of the win chosen
+
+Branch `climb/order` (Opus sub-agent; commits `508d81d`, `239ad89`; tools in `tools/order/`,
+results in `tools/order/results/`). The owner's GPU question, measured. Data rule kept: 24 of the
+74 parents never dumped, labelled or fitted; the other 50 split 38 train and 12 test by parent;
+all training and test positions are children that are not in `tests/proof4`.
+
+- **Verdict: not worth building, and nothing for a GPU to do.** Every learned order (the 8-feature
+  linear model refitted in distribution, an extended logistic model, a cost-aware "win
+  probability per unit of cost" model, networks of 32 and 64 units, one over a board encoding)
+  pays 0.97x to 1.00x of today's nodes on held-out parents at 7 and at 5 pieces left (792 and
+  248 test nodes with reach threats on). In sample 0.96-0.99x. A model of this size fits on
+  the processor in seconds.
+- **Why:** today's first move already wins 84-94% of the time at these nodes (98-99% of the red
+  nodes that reach the move loop cut on their first move), so failed moves are only 3-10% of
+  what a node pays. A perfect win/lose classifier would still pay 0.95-0.99x.
+- **Where the pot is:** in *which* win is taken. Against "cheapest winning move first" today's
+  order pays 5.9x at 7 left, 1.8x at 5 left, 7.9x at 9 left (reach threats on; costs are each
+  move's own solve with a fresh table, which overstates: 1.3-1.7x against the tree, and killers
+  look dear alone). The cheapest win among today's first three moves would pay 0.53-0.61x at
+  7 left. No cheap feature of the position predicts which win is cheap: the cost-aware model's
+  winning pick is the cheapest win at 24-43% of the nodes at 7 left.
+- **The pot by the level of the node that chose the move** (share of all nodes under failed
+  moves at red cut nodes; reach threats off / on): 11 left (the root) 16.8% / 16.7%; 9 left
+  9.7% / 12.1%; 7 left 4.4% / 6.4%; 5 left 1.9% / 3.2%. The first study counted by the level of
+  the wasted node, which is why it said "5 and 7".
+- **Budget:** at 7 left a 1.2% gain is about 0.5 microseconds a red node, 3 ns a move; at 5 left
+  70 ns a node.
+- **Not measured:** any order inside the solver; the root; level 9 is partial; test sets are five
+  parents, so a few percent are not resolved.
+- **What it points to (E30, hypothesis):** the search itself sees what a win cost at the nodes
+  next to this one. A killer today is the last move that cut; the cheapest move that cut is
+  information of another kind than a feature of the position. Expected: unknown; earlier
+  order ideas from the search's own knowledge gave 0.77x once (E14) and nothing five times
+  (E15-E17, E20, E21). Screened in the tree on node counts, which are exact.
