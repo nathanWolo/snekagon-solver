@@ -35,10 +35,15 @@ Update this section in the same change that freezes a version.
   (the compile takes the run lock); a deciding read compares two `--pgo` builds.
   `frozen/climb-base-plain.exe` is the same source without the profile, for screens.
 - **In work (sub-agents, Opus):**
-  - The top of the proof (branch `climb/replay`): `prove --replay` proves a file of replies in the
-    proof's order (`sh tools/replay.sh EXE FILE DIR`, `tests/replay/tune25.txt`); orders of red's
-    tries behind options (`--win-turns`, `--win-cap N`, `--win-recent K`), none run on the 25
-    tune replies yet. The other 49 refuted replies are kept for a gate.
+  - The top of the proof (branch `climb/replay`, `a762d50`): `prove --replay` proves a file of
+    replies in the proof's order (`sh tools/replay.sh EXE FILE DIR`, `tests/replay/tune25.txt`;
+    `tools/replay_sum.py FILE DIR` sums a run and checks its certificates). **On the 25 tune
+    replies base 4 takes 373 s a reply, no less than the paused run (326 s): each try is
+    cheaper but failed tries take about 70% of the wall-clock** (recorded arms in
+    `work/replay/base4` and `work/replay/turns`; LOG, "The top of the proof, fourth report").
+    `--win-turns` read 0.771x there (35% better a reply, interval [+0.04%, +83%]): held, not
+    gated, 49 replies cannot decide it. The other 49 refuted replies are kept for a gate.
+  - Ending a failed try sooner (E34, branch `climb/failtry`): a driver change, read on the replay.
   - The field study is done (branch `climb/field`, `5e73da7`; LOG, "The field study"). The
     reference's lead is its move order near the root (a learned child evaluation); its tight
     bounds cut nodes and cost time. **The port of its evaluation (`--ref-eval L`) is a
@@ -66,6 +71,9 @@ Update this section in the same change that freezes a version.
 - **Gate units:** `tests/proof4` has 57 unused gate units (164-220); `tests/proof4b` (1,184
   positions, none shared) has 295 (148-442). A learned order is gated only on positions whose
   parents were kept out of its training.
+- **A change is not a faster proof until the replay says so.** `tests/proof4`, `proof4b` and the
+  proof jobs are red-win jobs and winning tries: they measure what a try costs, not how many
+  tries a reply takes or what a failed try wastes.
 - **Absolute times drift with the machine:** with agents at work the same executable ran a
   third slower than the night before. Only paired reads count; a long proof wants the machine
   to itself.

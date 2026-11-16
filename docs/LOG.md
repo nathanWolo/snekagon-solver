@@ -2771,3 +2771,130 @@ other kind is 7% with no test set of its own yet.
 - *Test:* a check build that searches every node the rule decides without the rule and
   compares; `verify 100 1 8 8`; an agent who did not write it; a screen on tune units; one
   gate as above. Labels and node counts are no evidence for it.
+
+## 2026-11-16 The top of the proof, fourth report: the 25 tune replies replayed; a reply costs what it did at the pause, and failed tries are why
+
+Agent's report (the ordering agent's round eight), `climb/replay` at `a762d50` (merge
+`ac67ec6` of climb base 4, then two fixes of `replay_sum.py`). Profiled build
+`c9cf438f95c7`; with every replay option off it gives the base's counts (26,095,441 and
+4,174,807) and `cargo test` passes. Both arms: `--threads 16 --job-threads 1 --depth 2 --tt 27
+--upper-first --replay` on `tests/replay/tune25.txt`, in pieces of at most 900 s under the
+lock, **one run an arm**. Outputs: `work/replay/base4`, `work/replay/turns`.
+
+| | Tries (failed) | Wall s | Thread-s | Lost on stopped jobs, s |
+| --- | --- | --- | --- | --- |
+| Base 4 as it is (images of earlier winners first) | 170 (145) | 9,316 | 144,240 | 13,906 |
+| `--win-turns` (the model's order and the images in turn) | 95 (70) | 7,179 | 110,491 | 9,941 |
+| The paused run, same 25 replies (recorded) | 67 (42) | 8,145 | | |
+
+`--win-turns` over the base: 0.771x in total wall-clock; paired by reply **35.3% better,
+interval [+0.04%, +82.9%], sd 0.77 a reply** (thread-seconds: 34.5% [+0.2%, +80.6%]). A screen.
+
+Per reply, in the proof's order (tries/failed, wall s; base, then turns):
+
+| # | Reply | Base | Turns | Turns/base |
+| --- | --- | --- | --- | --- |
+| 0 | 91,93,102,103 | 2/1, 96 | 2/1, 104 | 1.09 |
+| 1 | 72,81,82,91 | 4/3, 211 | 2/1, 121 | 0.57 |
+| 2 | 81,91,100,101 | 1/0, 67 | 2/1, 166 | 2.49 |
+| 3 | 63,72,73,82 | 27/26, 809 | 2/1, 171 | 0.21 |
+| 4 | 20,30,39,40 | 4/3, 243 | 3/2, 117 | 0.48 |
+| 5 | 38,39,48 | 1/0, 94 | 1/0, 83 | 0.89 |
+| 6 | 81,82,83 | 23/22, 1523 | 2/1, 221 | 0.15 |
+| 7 | 28,38,47,48 | 4/3, 206 | 3/2, 154 | 0.75 |
+| 8 | 18,28,37,38 | 1/0, 214 | 1/0, 83 | 0.39 |
+| 9 | 27,28,37 | 2/1, 243 | 1/0, 101 | 0.41 |
+| 10 | 51,53,62,63 | 3/2, 386 | 3/2, 788 | 2.04 |
+| 11 | 17,19,28,29 | 2/1, 68 | 1/0, 76 | 1.13 |
+| 12 | 80,81,90 | 1/0, 119 | 1/0, 228 | 1.91 |
+| 13 | 69,80,91,102 | 3/2, 162 | 1/0, 106 | 0.66 |
+| 14 | 57,68,79,90 | 13/12, 432 | 3/2, 282 | 0.65 |
+| 15 | 36,46,55,56 | 1/0, 51 | 1/0, 70 | 1.36 |
+| 16 | 10,20,29,30 | 1/0, 25 | 1/0, 43 | 1.69 |
+| 17 | 7,9,18,19 | 1/0, 124 | 1/0, 135 | 1.09 |
+| 18 | 41,43,52,53 | 3/2, 315 | 1/0, 140 | 0.45 |
+| 19 | 32,42,51,52 | 15/14, 591 | 1/0, 112 | 0.19 |
+| 20 | 82,84,93,94 | 4/3, 518 | 10/9, 521 | 1.01 |
+| 21 | 83,93,102,103 | 2/1, 287 | 2/1, 157 | 0.55 |
+| 22 | 74,83,84,93 | 3/2, 430 | 2/1, 266 | 0.62 |
+| 23 | 73,75,84,85 | 17/16, 822 | 33/32, 2151 | 2.61 |
+| 24 | 93,95,104,105 | 32/31, 1277 | 15/14, 782 | 0.61 |
+
+- Under turns one move (`4C:102,104,113,114`) won 12 of the 25 replies.
+- Where turns lost: a different winner that costs more to prove (replies 2, 11, 12, 15-17);
+  reply 10, the same winner at try 3 with 4,874 s on stopped jobs against 1,668; reply 23,
+  33 tries, three pieces cut off. The agent's doubt: under turns the answer rule lifts moves
+  above the whole list after a failed try.
+- Pieces cut at 900 s: 4 of 12 (base), 4 of 9 (turns); a cut loses the jobs under way, the
+  table and the workers' history. `--win-cap 4` was not run (stopped for time).
+- What the replay leaves out (the agent's list): the 49 other replies in between (more
+  images: more failures under today's rule; more table entries: a little cheaper); idle
+  workers taking other replies' tries (about 10% of the thread-seconds went to stopped
+  jobs here); resumed pieces start cold; the 98 open replies are not a sample like these.
+
+**My checks.** `replay_sum.py` on both directories gives the totals above and "all ok" for
+the certificates (every root a red win; the position after its winning move searched to a
+loss for blue). `hc.py report --ratio --lower-is-better` on the agent's pair files gives its
+intervals. `work/long/` is untouched (74 lose, 0 hold, 98 open).
+
+**What the result files say (mine, from `results.txt` of both arms).**
+
+| | Jobs where red wins | Jobs that refute a try (red does not win) |
+| --- | --- | --- |
+| Base: count, thread-s | 52,016, 112,585 | 144, 10,765 |
+| Base: mean, median, 90%, 99% | 2.16 s, 1.21 s, 4.5 s, 14.8 s | 74.8 s, 55 s, 158 s, max 490 s |
+| Base: over 20 s | 279 | 135 of 144 (none under 5 s) |
+| Turns: count, thread-s | 38,578, 91,419 | 69, 6,625 |
+| Turns: mean, median | 2.37 s, 1.30 s | 96 s, 70 s |
+
+- **A reply costs today what it cost at the pause.** 373 s a reply in the base arm; the
+  paused run recorded 326 s a reply on the same 25 (370 s over all 74). Every try is
+  cheaper (55 s against 122 s), which is what the gates of the last two days bought, and
+  the run makes 2.5 times the tries (170 against 67).
+- **Failed tries are most of the wall-clock.** A reply won at the first try costs 25 to 228 s
+  (mean 99 s over the base's 7, 107 s over turns' 11). At about 105 s a win the 25 winning
+  tries are about 2,600 s: failed tries take about 6,700 of the base's 9,316 s (72%) and
+  about 4,500 of turns' 7,179 s (63%), 46 s and 65 s each. Reply 3 says the same by
+  difference: 25 more failed tries cost 640 s and 9,350 thread-seconds (26 s and 370
+  thread-s each); reply 6: 62 s and 950 thread-s each.
+- **Why a failed try is dear.** It ends when its one refuting job ends, and that job is a
+  single-thread search of about a minute (35 M nodes), 35 times the average job. Until it is
+  back the workers prove red wins under the same try and under the tries beside it. Of a
+  failed try's 370-950 thread-seconds the refuting job is 75.
+- **The rulers measured the parts.** `tests/proof4`, `proof4b` and the proof jobs a-r are
+  red-win jobs and winning tries: what a try costs. They say nothing about how many tries a
+  reply takes or what a failed try wastes, and that is where the top of the proof is.
+
+**Decisions.**
+
+- **`--win-turns` is not gated now.** At sd 0.77 a reply `hc.py plan` asks about 1,255 replies
+  for SPRT[0, 0.05]; there are 49. A gate bound to end undecided only burns them. It stays
+  behind its option on `climb/replay`. *Reopen* after E34: what an order of tries is worth
+  depends on what a failed try costs. (Other bounds or a fixed batch are the owner's call.)
+- **The estimate for the owner:** 98 open replies at 373 s are about 10 hours of the whole
+  machine with base 4 as it is (about 8 with `--win-turns`, on one run). The omissions push
+  both ways and the open replies may be harder than these. Resuming is the owner's call.
+- **Next at the top: E34, below.** The replay is its ruler.
+
+## 2026-11-16 E34: end a failed try sooner (hypothesis, before the agent starts)
+
+- *Hypothesis:* at the top of the proof a failed red try cannot end before its one refuting
+  job does (a single-thread search, median 55 s), and until then the other workers prove red
+  wins that the failure throws away. Ending failed tries sooner cuts the 63-72% of the
+  wall-clock they take. Ways, to be chosen from a measurement: the likely refuting reply
+  first and nearly alone until it is back or has run S seconds; a job that runs long split
+  into its moves (if it is a refutation every one of them is needed, so they divide between
+  the workers) or helped by other workers on the shared table.
+- *Expected:* if a failed try cost a quarter of today's, 0.46x wall-clock on the base replay
+  (0.52x under turns). The bound, failed tries for free: 0.28x.
+- *Against it:* the sharing rule already starts the first replies of several tries side by
+  side; a split throws away the job's own work and makes many small jobs (depth 3 once made
+  the coordinator the bottleneck); 279 red-win jobs also run over 20 s and would be split
+  too; the refuting reply may not be early in blue's order.
+- *Test:* first a job log (start, end, try, place in blue's order) on the first roots of
+  `tune25`: where a failed try's seconds go. If that is not what the hypothesis says, the
+  line stops there. Then one change behind an option (off: the base's tries and counts);
+  certificates on every replay and all values right on the bench files at depths 1-3; a
+  screen on roots 0-9 of `tune25` against the recorded arm (3,706 s; runs of one build
+  differ by 4.5%, so under 10% is no read). The gate is mine: the 49 other refuted replies
+  in the proof's order, pairs by reply, SPRT[0, 0.05], cap from `hc.py plan` on the screen.

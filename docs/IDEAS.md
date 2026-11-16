@@ -36,6 +36,12 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    turn, a cap, recent winners only. Oracle 0.788x of the top's time. To do: the baseline replay
    of `tests/replay/tune25.txt`, then `--win-turns` on it. LOG, "The top of the proof".
 
+0b2. **End a failed try sooner (E34, 2026-11-16).** At the top of the proof failed red tries take
+   63-72% of the wall-clock: each ends only when one single-thread refuting job of about a
+   minute ends, and the other workers meanwhile prove wins the failure throws away. In work
+   on `climb/failtry`. Behind it: the order of red's tries (`--win-turns`, 0.771x on one run,
+   too noisy for 49 replies) and the child evaluation of 0c on red's tries.
+
 0c. **A child evaluation as the move order at the top levels (field study, 2026-11-16).** The
    reference orders every child by a learned territory evaluation where 7 or more pieces are
    left. Its port (`--ref-eval L` on `climb/field`, a yardstick, not ours to merge) reads
