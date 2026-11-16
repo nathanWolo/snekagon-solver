@@ -24,7 +24,9 @@ MAIN="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"
 B="${SNEK_BUILD_DIR:-$(cygpath -m "${TEMP:-/tmp}")/snekb/$(printf %s "$HERE" | cksum | cut -d' ' -f1)}"
 mkdir -p "$B"
 build() { # build TARGET-SUBDIR RUSTFLAGS
-  RUSTFLAGS="$2" cargo +$TC build --release --target-dir "$B/$1" 2>&1 | grep -E "^error|LNK|Finished" | cut -c1-300
+  # the compile takes the machine's run lock too: a build beside a timed run costs that run a
+  # percent or two (2026-11-15, a compile overlapped a gate chunk)
+  RUSTFLAGS="$2" sh "$MAIN/tools/locked.sh" cargo +$TC build --release --target-dir "$B/$1" 2>&1 | grep -E "^error|LNK|Finished" | cut -c1-300
   [ -f "$B/$1/release/snek.exe" ] || { echo "the build failed" >&2; exit 1; }
 }
 if [ $PGO = 0 ]; then
