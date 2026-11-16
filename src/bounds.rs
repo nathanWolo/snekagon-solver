@@ -32,7 +32,7 @@ pub const MAX_CLUSTERS: usize = 24;
 pub static FROM_LONGEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 /// Three or more pieces, target above the cells in hand: the first piece must touch an old snake that
 /// can be the longest old snake of the final snake (`--reach-start3`).
-pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 /// A player's clusters: the growable cells of each and the longest final snake possible inside it.
 pub struct Clusters {
