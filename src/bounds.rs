@@ -317,6 +317,22 @@ fn needs_empty(p: &Placement, own: BB) -> BB {
 /// `can_reach_touching`; when it answers yes from a sequence it found, the sequence goes to `wit`
 /// (otherwise `wit` is left alone). The answer is exactly that of `can_reach_touching`.
 pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32, wit: &mut Witness) -> bool {
+    #[cfg(feature = "shadow")]
+    {
+        return crate::shadow::reach_hook(t, pos, player, target, work, wit);
+    }
+    #[cfg(not(feature = "shadow"))]
+    can_reach_touching_core(t, pos, player, target, work, wit, START3.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// Shadow build only: a planted fault in start3 (0 = none; 1 = no "other snakes" term; 2 = k - 1
+/// other snakes; 3 = ties with S not counted). Set from SHADOW_FAULT; never on in a normal build.
+#[cfg(feature = "shadow")]
+pub static FAULT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// `can_reach_touching_w` with the start3 rule given by `start3` instead of the global switch.
+#[inline(always)]
+pub fn can_reach_touching_core(t: &Tables, pos: &Pos, player: usize, target: i32, work: &mut u32, wit: &mut Witness, start3: bool) -> bool {
     if pos.longest[player] as i32 >= target {
         return true;
     }
@@ -331,7 +347,9 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
     if pieces == 0 {
         return false;
     }
-    if pieces > 2 && target > rem && START3.load(std::sync::atomic::Ordering::Relaxed) {
+    if pieces > 2 && target > rem && start3 {
+        #[cfg(feature = "shadow")]
+        let fault = FAULT.load(std::sync::atomic::Ordering::Relaxed);
         // The final snake holds old snakes; built outward from its longest old snake S, the first
         // piece touches S, every other old snake in it is no longer than S, and each piece brings in
         // at most one more snake (a piece touches own cells only with its two ends): so S can only
@@ -346,6 +364,10 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
         for j in 0..ns {
             let mut top = [0i32; 4]; // the longest other snakes no longer than j, longest first
             for i in 0..ns {
+                #[cfg(feature = "shadow")]
+                if fault == 3 && len_of[i] == len_of[j] {
+                    continue;
+                }
                 if i != j && len_of[i] <= len_of[j] {
                     let mut v = len_of[i];
                     for k in 0..4 {
@@ -356,7 +378,15 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
                 }
             }
             let mut others = 0;
-            for k in 0..(pieces as usize).min(4) {
+            #[cfg(feature = "shadow")]
+            let kk = match fault {
+                1 => 0,
+                2 => (pieces as usize).min(4) - 1,
+                _ => (pieces as usize).min(4),
+            };
+            #[cfg(not(feature = "shadow"))]
+            let kk = (pieces as usize).min(4);
+            for k in 0..kk {
                 others += top[k];
             }
             if len_of[j] + rem + others >= target {

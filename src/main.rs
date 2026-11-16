@@ -570,14 +570,28 @@ fn main() {
         "rtcheck" => {
             let o = parse_opts(&args[2..]);
             let d = o.cfg;
-            let all = Config { reach_threat: true, reach_threat_max: 14, reach_threat_start: 14, ..d };
+            // the new defaults (rule at every level, start3), the same without start3, the old
+            // setting (4 pieces left or fewer), the cache variant
+            let lvl4 = Config { reach_threat: true, reach_threat_max: 4, reach_threat_start: 4, ..d };
             let cfgs = [
-                ("default", d),
-                ("all-levels", all),
-                ("all-levels-nogrow", Config { reach_threat_grow: false, ..all }),
-                ("all-levels-cache-after0", Config { reach_threat_cache: true, reach_threat_after: 0, ..all }),
+                ("default", d, true),
+                ("default-nostart3", d, false),
+                ("level4-nostart3", lvl4, false),
+                ("default-cache-after0", Config { reach_threat_cache: true, reach_threat_after: 0, ..d }, true),
             ];
             shadow::rtcheck(&o.rest[0], d, &cfgs, o.from, o.to);
+        }
+        #[cfg(feature = "shadow")]
+        "rq" => {
+            // one reach query in every mode: snek rq POSITION PLAYER TARGET
+            let pos = Pos::parse(t, &args[2]).expect("bad position");
+            let player: usize = args[3].parse().unwrap();
+            let target: i32 = args[4].parse().unwrap();
+            shadow::rq_params();
+            for s3 in [false, true] {
+                println!("unlimited start3 {}: {:?}", s3, shadow::unlimited(&pos, player, target, s3));
+            }
+            println!("brute force: {:?}", shadow::bf_reach(&pos, player, target, 50_000_000));
         }
         "text" => {
             // the position text of a list of moves, as the results file of `prove` writes it
