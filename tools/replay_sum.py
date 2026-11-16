@@ -63,6 +63,19 @@ def collect(FILE, DIR):
             nxt = min(set(range(len(roots))) - completed, default=None)
             if nxt is not None:
                 cut[nxt] = cut.get(nxt, 0) + 1
+                # the cut-off root's nodes and thread-seconds, from the driver's last progress line
+                # of the piece (written about once a minute: up to a minute of work is missed)
+                try:
+                    err = open(f'{DIR}/piece-{k}.err').readlines()
+                except OSError:
+                    err = []
+                ends = [j for j, l in enumerate(err) if ') gave ' in l]
+                start = ends[-1] + 1 if ends else 0  # after the last root this piece finished
+                prog = [l for l in err[start:] if 'window (' in l and ' jobs ' in l and ' nodes ' in l]
+                if prog:
+                    w = prog[-1].split()
+                    acc[nxt][1] += int(float(w[w.index('nodes') + 1]) * 1e6)
+                    acc[nxt][2] += float(w[w.index('thread-s') + 1])
     rows = []
     for i, r in enumerate(roots):
         f0 = r.split('_')
