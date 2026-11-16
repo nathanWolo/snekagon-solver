@@ -2898,3 +2898,70 @@ intervals. `work/long/` is untouched (74 lose, 0 hold, 98 open).
   screen on roots 0-9 of `tune25` against the recorded arm (3,706 s; runs of one build
   differ by 4.5%, so under 10% is no read). The gate is mine: the 49 other refuted replies
   in the proof's order, pairs by reply, SPRT[0, 0.05], cap from `hc.py plan` on the screen.
+
+## 2026-11-16 Paused for a restart of the PC (owner's request, 10:03)
+
+- *Why:* the owner's screen, mouse and keyboard had taken no input since 01:17 (Windows itself
+  was healthy). Owner, from their phone: "The PC is still frozen. Can you gracefully pause your
+  work and I'll restart it".
+- *What was stopped:* the three Opus agents (E32, E33, E34) stopped their own runs, committed
+  their work and wrote a `HANDOVER.md` on their branches; the analysis board's server was
+  stopped. At 10:03 no solver, build or script of this project was running. `work/long/` was
+  not touched.
+- *What a restart can lose:* the worktrees and the scratch executables were in the session's
+  temporary folder. Every commit is in this repository. The candidate executables are copied to
+  `work/exes/` and the coordinator's patch scripts to `work/scratch-tools/` (both ignored by
+  git). If the worktrees are gone: `git worktree prune`, then `git worktree add DIR BRANCH`.
+- *To go on:* one fresh Opus agent a line, started from `git show BRANCH:HANDOVER.md`.
+
+All numbers below are interim: one run each, tune data, read from the agents' hand-over notes
+and not yet checked by the coordinator.
+
+**E34, end a failed try sooner (`climb/failtry`, `284dd01`).**
+- The measurement is done (job log, roots 0-3 of `tune25`, 30 tries, 26 failed, 1,115 s against
+  1,233 s recorded, certificates all ok). The 26 failed tries used 8,200 thread-s: the refuting
+  jobs themselves 1,214, red-win jobs under the same failed try 6,822 (1,827 before the
+  refuting job started, 4,995 while it ran), 83%. The machine was full throughout (15 of 16
+  workers busy), so wall-clock follows thread-seconds, not idle time. The dear failures come
+  while the root has fewer than two failed tries: the refuting reply is then deep in blue's
+  order (places up to 513) and up to 15 workers prove red wins under the try. The hypothesis
+  holds; the stop rule did not fire.
+- The change: `prove --hold S` (off by default): a coordinator node with a job that has run S
+  seconds or more opens no new move while other work can be handed out. Only the order of
+  hand-outs changes. Chosen over a split and over helper threads because the waste is work on a
+  full machine, which a shorter refuting job does not remove. Its cost: a winning try with a
+  long red-win job is held too.
+- Checks done: option off 26,095,441 (proof4 0-23) and 4,174,807 (ply07, `--to 590`);
+  `cargo test`; with `--hold 0.001` all values right on the five bench files at depths 1-3; a
+  cut results file resumed right.
+- The screen at S=10 was cut by the pause inside root 6: roots 0-5 took 1,353 s against 1,520 s
+  (0.89x, inside the 10% band that is no read); by root 1.02, 0.97, 2.35, 0.78, 0.59, 1.25.
+  Root 2 lost because the winner was held behind its own 60 s and 94 s red-win jobs. Of the
+  jobs that run past S seconds in the base arm, 11% are refutations at S=10, 33% at 20, 48% at
+  30: S=30 is the second setting. `work/failtry/hold10/STOP` must be deleted before that
+  replay goes on. Locked time used: about 1 h 40 min of the two hours given.
+
+**E33, the tight question (`climb/tightq`, `895536e`).**
+- It pays only when asked at exactly 6 pieces left: `--tight-q 6 --tight-q-min 6
+  --tight-q-hand 3` searches 22,770,019 nodes on proof4 0-23 (0.873x of 26,095,441) in about
+  0.88-0.90x of the time (single reads; the base drifted between 33 and 37 s). Asked at 5 it is
+  neutral, at 3-4 or 7 it loses; at every level up to 5: 0.911x nodes, about 1.02x time.
+- An asked node is dear (about 4,100 cycles for the bound, about 20,000 for a reach question
+  with a hand of 3); 52% of asked nodes are decided and each saves a subtree.
+- Not done: `verify 100 1 8 8`, the check builds, proof4 24-47, proof4b, ply 5, the fail jobs,
+  `cargo test` on the current source. Unexplained: with a margin limit of 3 the candidate
+  searched 26,443,223 nodes, more than the base. It is a pruning rule: zero wrong labels is no
+  evidence, and an agent who did not write it judges it before any gate.
+
+**E32, an evaluation as the move order (`climb/evalorder`, `07c92bd`).**
+- No setting of ours is worth a gate yet. The yardstick (the port of the reference's
+  evaluation, not ours to ship) on proof4b tune units 0-175, cold: 0.685x time a unit
+  [0.586, 0.801] at 9 pieces left and above, 0.683x nodes, no wrong value. On the 20 cheapest
+  failing jobs: 0.956x nodes, 1.02x time. Two thirds of its gain is a cheaper win at the root
+  of the position, one third fewer failed root moves.
+- Our own terms: a coordinate search on 48 roots overfitted (0.77x in sample, 0.935x on 48
+  other roots, 1.038x on proof4b). Logistic weights from the level-9 labels read 0.656x on the
+  fit roots and are untested out of sample: that run was cut by the pause. No driver read of a
+  candidate yet (base only: job a 152,253,809 nodes, job b 326,125,056 under `--emulate 16`).
+- The compiler seen outside the lock at 04:46 was `cargo check` (a type check, no link, a few
+  seconds), run several times by this agent. Builds went through `tools/build.sh`.

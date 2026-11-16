@@ -20,6 +20,15 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 
 Update this section in the same change that freezes a version.
 
+- **Paused on 2026-11-16 at 10:03 for a restart of the PC (owner's request); nothing was
+  running.** Three lines stopped mid-work, each with a `HANDOVER.md` on its branch
+  (`git show BRANCH:HANDOVER.md`): `climb/failtry` (E34, `284dd01`), `climb/tightq` (E33,
+  `895536e`), `climb/evalorder` (E32, `07c92bd`). Go on with one fresh Opus agent a line,
+  started from that file. The worktrees and scratch executables were in the session's
+  temporary folder: if they are gone, `git worktree prune`, then `git worktree add DIR BRANCH`;
+  copies of the candidate executables are in `work/exes/`. Delete `work/failtry/hold10/STOP`
+  before that replay goes on. LOG, "Paused for a restart of the PC".
+
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
   move searched before the list is generated, and after a failed move the moves that cover the
@@ -44,14 +53,20 @@ Update this section in the same change that freezes a version.
     `--win-turns` read 0.771x there (35% better a reply, interval [+0.04%, +83%]): held, not
     gated, 49 replies cannot decide it. The other 49 refuted replies are kept for a gate.
   - Ending a failed try sooner (E34, branch `climb/failtry`): a driver change, read on the replay.
+    Measured: 83% of the failed tries' thread-seconds are red-win jobs under the same try, on a
+    full machine. `prove --hold S` is built and checked; its screen at S=10 was cut at root 6
+    (0.89x on roots 0-5, no read); S=30 is next.
   - The field study is done (branch `climb/field`, `5e73da7`; LOG, "The field study"). The
     reference's lead is its move order near the root (a learned child evaluation); its tight
     bounds cut nodes and cost time. **The port of its evaluation (`--ref-eval L`) is a
     yardstick only: its repository has no licence, so its code and weights do not enter the
     base without the owner's word.**
-  - Our own child evaluation as the order at the top levels (branch `climb/evalorder`).
-  - The one tight question at 5 or fewer pieces left, made cheap (branch `climb/tightq`): a
-    change inside a pruning rule.
+  - Our own child evaluation as the order at the top levels (branch `climb/evalorder`): no
+    setting worth a gate yet. The port reads 0.69x cold on proof4b and 1.02x on failing jobs;
+    our fitted weights overfit 48 roots.
+  - The one tight question, made cheap (branch `climb/tightq`): a change inside a pruning
+    rule. It pays only asked at exactly 6 pieces left (0.873x nodes, about 0.89x time, single
+    reads). Not verified: no check build, no `verify`, no independent judge yet.
   - Extra killer slots (E31, branch `climb/xk`, `381560f`): 0.845x nodes on cold single
     positions, 1.003x inside the driver. **Held, not gated** (LOG, "Ordering, round three").
   - Spent: mechanical cuts inside the reach test (branch `climb/threats`, five options, all off,
