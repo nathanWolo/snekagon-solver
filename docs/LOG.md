@@ -1834,3 +1834,35 @@ counterexample and gives an argument for every variant.
   its minimum as here. Three reads agree on 0.77x to 0.80x.
 - **Next:** guards `E30-UP` (ply 5) and `E30-DRV` (whole proof jobs, 16 workers), then merge
   and freeze.
+
+## 2026-11-15 E30 frozen: the climb's base now chooses the cheaper win
+
+- **Guards, both held:**
+  - `E30-UP` (ply 5, the tune range's three units, 30 positions, full window): total time
+    7.30 s against 8.68 s (0.840x), nodes 0.802x.
+  - `E30-DRV` (whole proof jobs on 16 single-thread workers, depth 1, seconds, base then
+    candidate): a 46.2 / 27.0, b 58.3 / 43.9, c 57.3 / 40.7, d 94.2 / 58.5; total 255.9 s against 170.1 s
+    (**0.665x**), nodes 0.659x. One run an arm and a driver sd of 0.115 a job, so
+    four jobs resolve about 12%: the gain on whole proofs is real and at least as large as on
+    single positions. The driver gains more than one thread does, plausibly because a
+    worker's history carries over its jobs, which are siblings (not shown).
+- **Frozen:** `frozen/climb-base.exe` = `03e5963b7ba5` (profiled MSVC build of `8f6adce`, in
+  `parallel-v9` as `98e8167`); `frozen/climb-base-plain.exe` = `46f3a9fb8d8e`, the plain build of
+  the same source. The base before it is `frozen/E25-3d3bd213049b.exe`.
+- **`tools/build.sh` now takes the run lock for the compile** (the fault during the gate).
+  A build waits while a gate runs.
+- **Since this morning on proof positions, one thread** (each read against the base of its
+  time; passes do not add): toolchain 0.960x, profile 0.944x, search bundle 0.916x, prefetch
+  0.949x, cost-aware order 0.796x. The product is 0.63x; a direct read of the morning's
+  build against today's has not been taken.
+- **Lessons:**
+  - The ordering study (a learned order pays 0.97-1.00x) looked like a dead end and was the
+    opposite: it said *which* pot was full. The first move already wins; what varies is what
+    the win costs, and no feature of the position predicts that, but a sibling's cost does
+    (correlation 0.6-0.8 in log). Counting in the tree before building took the agent an hour
+    and picked the idea.
+  - The variant with the fewest nodes was not the fastest (0.698x nodes and 0.823x time
+    against 0.747x and 0.794x): it gave up the staged first move. Third time today that
+    nodes and time disagree; the screen on time chose.
+  - A gate on 30 units sufficed because the effect was six times the test's gap. The cap is
+    for the case where it is not.

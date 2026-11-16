@@ -27,15 +27,20 @@ Update this section in the same change that freezes a version.
 - **Base of the climb:** `frozen/climb-base.exe` on branch `parallel-v9`: a profiled MSVC build
   (E27: the MSVC toolchain +4.9% over the GNU build, the profile +6.3% on top) of v9 plus the
   search agent's same-node speed changes (E28, 0.916x) with table prefetch on by default (E25,
-  0.949x). All gated on proof positions with identical node counts. Build it and every
-  candidate with `sh tools/build.sh [--pgo] OUT.exe`; a deciding read compares two `--pgo`
-  builds. `frozen/climb-base-plain.exe` is the same source without the profile, for screens.
-- **In work (sub-agents, Opus):** reach threats (E29, branch `climb/threats`: an exact rule that
-  halves the nodes of a proof and does not yet save time), a sizing study of a learned move
-  order (`climb/order`, the owner's GPU question), the proof driver (`climb/driver`). A build
-  that runs old and new routines side by side is on `climb/verify` (`--features shadow`).
+  0.949x), and a cost-aware move order (E30, 0.796x: killers and a history prefer the move
+  whose wins were cheap at neighbouring nodes; `--no-cost-order` switches it off). All gated
+  on proof positions. Build it and every candidate with `sh tools/build.sh [--pgo] OUT.exe`
+  (the compile takes the run lock); a deciding read compares two `--pgo` builds.
+  `frozen/climb-base-plain.exe` is the same source without the profile, for screens.
+- **In work (sub-agents, Opus):** reach threats (E29, branch `climb/threats`: an exact rule,
+  cleared by an independent verifier on `climb/verify-rt`, about 0.96x at 4 pieces left or
+  fewer; merged with E30 on `climb/both`, to be gated next); round two of the cost-aware
+  order (`climb/cost`: what pot is left, a budget race between candidates, more killer
+  slots). Kept apart: the driver's `--split` and `--hint` (`climb/driver`), the ordering
+  study (`climb/order`). Shadow builds that re-search what a rule pruned: `climb/verify`,
+  `climb/verify-rt` (`--features shadow`).
 - **Gate units:** `tests/proof4` has 57 unused gate units (164-220); `tests/proof4b` (1,184
-  positions, none shared) has 355 (88-442). A learned order is gated only on positions whose
+  positions, none shared) has 325 (118-442). A learned order is gated only on positions whose
   parents were kept out of its training.
 - **Absolute times drift with the machine:** with agents at work the same executable ran a
   third slower than the night before. Only paired reads count; a long proof wants the machine
@@ -116,7 +121,9 @@ The contract is `docs/TESTING.md`. In short:
   return evidence. Nobody gates their own change.
 - **One machine, one run lock.** Every timed run and anything that uses a processor for more
   than about 15 seconds goes through `sh tools/locked.sh <command>` (one lock for all worktrees;
-  at most 15 minutes a command). Compiling and quick checks do not need it.
+  at most 15 minutes a command). `tools/build.sh` takes the lock for its compile by itself (do
+  not wrap it). Quick checks do not need it. The lock is not fair: a waiter behind a gate
+  usually waits until the gate ends.
 - **Never kill the script that holds the lock.** Stop the solver it runs (the child process):
   the script then ends and gives the lock back. A lock left behind blocks everyone for 20
   minutes (it happened on 2026-11-15).
