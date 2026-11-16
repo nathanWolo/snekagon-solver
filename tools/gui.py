@@ -9,7 +9,7 @@ per position, several at once, each killed when it reaches the time limit or the
 Prove (mode prove) shows that the side to move at P loses: the proof driver (--prover, a build of branch
 climb/replay) refutes P's replies one after another, one reply for each class under P's symmetries, as the
 replies of one proof (`prove ROOTS --replay`, the measured top-of-proof configuration, PROVE_ARGS). Its store
-is work/gui/proofs/<P>/ (roots.txt, results.txt, meta.json); results.txt is the driver's results file and
+is work/gui/proofs/<key of P>/ (roots.txt, results.txt, meta.json); results.txt is the driver's results file and
 the proof's only state, so a cancelled or yielded run goes on from it. The position after 1:60 starts from a
 copy of the paused proof's work/long/ply1_results.txt (read, never written). A reply that is not refuted
 stops the run. GET /api/proof?position=P reads a store without a run.
@@ -22,6 +22,7 @@ solves, lets the running ones finish, gives the lock back and queues again. Ever
 work/gui/runs.log. Solver processes live in a Windows job object, so they die with this server.
 """
 import argparse
+import hashlib
 import json
 import os
 import queue
@@ -722,15 +723,21 @@ def plan_roots(solver, text, seed=None):
     return [(m, c) for _, _, _, (g, m, c) in reps]
 
 
+def store_key(text):
+    """The folder name of P's store: short, because the checkout's own path can be long and Windows stops at
+    260 characters (the position text itself is in meta.json)."""
+    return hashlib.sha1(text.encode()).hexdigest()[:16]
+
+
 class ProofStore:
-    """The proof that every reply of P loses: work/gui/proofs/<P>/ holds roots.txt (one representative a line,
+    """The proof that every reply of P loses: work/gui/proofs/<key of P>/ holds roots.txt (one representative a line,
     as the driver reads it), results.txt (the driver's results file, the only state of the proof) and
     meta.json (the moves, the seconds spent on each root, the order they were finished in)."""
 
     def __init__(self, base, solver, text):
         self.text = text
         self.pos = parse_text(text)
-        self.dir = Path(base) / text
+        self.dir = Path(base) / store_key(text)
         self.roots_path, self.results_path, self.meta_path = self.dir / "roots.txt", self.dir / "results.txt", self.dir / "meta.json"
         self.seed = SEEDS.get(text)
         if self.seed is not None and not self.seed.is_file():

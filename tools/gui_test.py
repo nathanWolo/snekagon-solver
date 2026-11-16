@@ -196,7 +196,7 @@ def prove_tests(a, solver):
         check(s and s["exists"] and s["refuted"] == s["n"] and not s["live"], "after a server restart: refuted %s of %s" % (s and s["refuted"], s and s["n"]))
         s = proof(FAIL3)
         check(s and len(s["held"]) == 1, "after a server restart: the failed try still holds at %s" % (s and s["held"]))
-        shutil.rmtree(proofs / WIN3)
+        shutil.rmtree(proofs / gui.store_key(WIN3))
         code, j = call("/api/run", {"mode": "prove", "position": WIN3, "procs": 16, "lock": False})
         t0, pids = time.time(), set()
         while time.time() - t0 < 30 and not pids:
