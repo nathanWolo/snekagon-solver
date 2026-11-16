@@ -1,0 +1,4 @@
+{"job": "a", "base": 24.944, "cand": 21.168, "base_nodes": 349057695, "cand_nodes": 159525257, "base_thread_seconds": 386.7, "cand_thread_seconds": 321.5, "value": "-1"}
+{"job": "b", "base": 42.349, "cand": 36.774, "base_nodes": 624664785, "cand_nodes": 314740886, "base_thread_seconds": 655.1, "cand_thread_seconds": 579.5, "value": "-1"}
+{"job": "c", "base": 42.702, "cand": 35.409, "base_nodes": 590825286, "cand_nodes": 304535111, "base_thread_seconds": 656.5, "cand_thread_seconds": 562.4, "value": "-1"}
+{"job": "d", "base": 59.103, "cand": 49.402, "base_nodes": 917609223, "cand_nodes": 461316242, "base_thread_seconds": 909.6, "cand_thread_seconds": 771.0, "value": "-1"}

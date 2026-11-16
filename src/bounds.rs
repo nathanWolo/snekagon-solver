@@ -30,6 +30,9 @@ pub const MAX_CLUSTERS: usize = 24;
 
 /// E12: the reach test starts from the longest snake of the target snake (`--no-longest` turns it off).
 pub static FROM_LONGEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+/// Three or more pieces, target above the cells in hand: the first piece must touch an old snake that
+/// can be the longest old snake of the final snake (`--reach-start3`).
+pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 /// A player's clusters: the growable cells of each and the longest final snake possible inside it.
 pub struct Clusters {
@@ -328,6 +331,45 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
     if pieces == 0 {
         return false;
     }
+    if pieces > 2 && target > rem && START3.load(std::sync::atomic::Ordering::Relaxed) {
+        // The final snake holds old snakes; built outward from its longest old snake S, the first
+        // piece touches S, every other old snake in it is no longer than S, and each piece brings in
+        // at most one more snake (a piece touches own cells only with its two ends): so S can only
+        // be a snake whose length, the cells in hand and the `pieces` longest other snakes no
+        // longer than it reach the target.
+        let ns = pos.nsnakes[player] as usize;
+        let mut len_of = [0i32; MAX_SNAKES];
+        for j in 0..ns {
+            len_of[j] = count(pos.snakes[player][j]) as i32;
+        }
+        // `top` keeps 4 lengths and at most min(pieces, 4) of them are summed. That is enough: every
+        // snake was started by a piece already placed, and a player has 8 pieces in all (blue 7), so
+        // snakes + pieces in hand <= 8. With 4 or fewer pieces in hand the sum takes `pieces` lengths;
+        // with 5 or more there are at most 3 snakes, so at most 2 others to sum.
+        debug_assert!(ns + pieces as usize <= 8, "more snakes and pieces than a player has");
+        let mut start: BB = 0;
+        for j in 0..ns {
+            let mut top = [0i32; 4]; // the longest other snakes no longer than j, longest first
+            for i in 0..ns {
+                if i != j && len_of[i] <= len_of[j] {
+                    let mut v = len_of[i];
+                    for k in 0..4 {
+                        if v > top[k] {
+                            std::mem::swap(&mut v, &mut top[k]);
+                        }
+                    }
+                }
+            }
+            let mut others = 0;
+            for k in 0..(pieces as usize).min(4) {
+                others += top[k];
+            }
+            if len_of[j] + rem + others >= target {
+                start |= pos.snakes[player][j];
+            }
+        }
+        return start != 0 && reach_from(t, pos, player, target, start, ALL, work);
+    }
     if pieces > 2 || !FROM_LONGEST.load(std::sync::atomic::Ordering::Relaxed) {
         return if target > rem {
             pos.cells[player] != 0 && reach_from(t, pos, player, target, pos.cells[player], ALL, work)
@@ -488,6 +530,34 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
     })
 }
 
+/// The number of cells in the pieces `left`.
+#[inline]
+pub fn hand_cells(left: u8) -> i32 {
+    let mut rem = 0i32;
+    for p in 0..NPIECES {
+        if left >> p & 1 == 1 {
+            rem += PIECE_SIZE[p] as i32;
+        }
+    }
+    rem
+}
+
+/// The cells at most `rem` steps from the cells `own`. When a player holding `rem` cells in hand
+/// asks for a snake longer than `rem`, only these cells matter: the final snake holds an old snake,
+/// and each of its new cells is joined to an old one by a path of at most `rem` new cells. Whether
+/// the player can reach a target above `rem` therefore depends on its own cells, its pieces and
+/// which of these cells are occupied, and more occupied cells can only make it harder (a placement
+/// legal with more cells occupied is legal with fewer: emptiness is all a placement needs from the
+/// other cells). `verify` checks this against every sequence of placements.
+#[inline]
+pub fn near_cells(own: BB, rem: i32) -> BB {
+    let mut n = own;
+    for _ in 0..rem {
+        n |= neighbours(n);
+    }
+    n
+}
+
 /// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.
 fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good: BB, work: &mut u32) -> bool {
     if *work == 0 {
@@ -548,6 +618,37 @@ fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good
         let later = pieces - 1;
         if len + rem - p.n as i32 + extra[later.min(ns)] < target {
             return false;
+        }
+        if later == 1 {
+            // The last piece, on the position after p without building it (what reach_from on that
+            // position does, with the same work): it grows the snake p built (p and the snakes it
+            // joined, `len` cells), and adds the other snakes it touches.
+            if *work == 0 {
+                return true;
+            }
+            *work -= 1;
+            let mut joined: u32 = 0;
+            let mut joined_cells: BB = 0;
+            for j in 0..ns {
+                if pos.snakes[player][j] & p.border != 0 {
+                    joined |= 1 << j;
+                    joined_cells |= pos.snakes[player][j];
+                }
+            }
+            let built = p.cells | joined_cells;
+            let own2 = pos.cells[player] | p.cells;
+            let occ2 = pos.occupied() | p.cells;
+            let left2 = left & !(1u8 << p.piece);
+            return find_grow(t, own2, occ2, left2, built, |m2| {
+                let p2 = &t.placements[m2 as usize];
+                let mut len2 = p2.n as i32 + len;
+                for j in 0..ns {
+                    if joined >> j & 1 == 0 && pos.snakes[player][j] & p2.border != 0 {
+                        len2 += len_of[j];
+                    }
+                }
+                len2 >= target
+            });
         }
         let mut child = *pos;
         let joined = child.place_for(t, player, m);
@@ -615,4 +716,53 @@ pub fn upper_bound_reference(t: &Tables, pos: &Pos, player: usize) -> i32 {
         upper = upper.max(reach);
     }
     upper
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pieces::tables;
+    use crate::pos::Pos;
+    use std::sync::atomic::Ordering::Relaxed;
+
+    /// The reach test against every sequence of placements, for every target from one above the
+    /// longest snake to two above the optimum, with the three-piece test from the longest snake
+    /// (START3) off and on.
+    fn agrees_with_brute_force(text: &str, player: usize) -> i32 {
+        let t = tables();
+        let pos = Pos::from_text(text).expect("bad position text");
+        let opt = one_player_optimum(t, &pos, player);
+        for s3 in [false, true] {
+            START3.store(s3, Relaxed);
+            for target in pos.longest[player] as i32 + 1..=opt + 2 {
+                let mut work = u32::MAX;
+                assert_eq!(can_reach_touching(t, &pos, player, target, &mut work), target <= opt, "start3 {} target {} optimum {} at {}", s3, target, opt, text);
+            }
+        }
+        START3.store(true, Relaxed);
+        opt
+    }
+
+    /// The k term of START3: the final snake must take in S and three other old snakes with a hand
+    /// of three pieces (the verifier's position; red snakes of 4, 4, 4, 1 and a bar of 4, hand
+    /// 2 + 3 + 3). With k - 1 other snakes counted the test says "cannot" for 21.
+    #[test]
+    fn start3_counts_one_other_snake_per_piece() {
+        let t = tables();
+        let text = "000100000100200478800801002084e0_00000000000000000000000000000000_14_14_0_12_0";
+        let pos = Pos::from_text(text).unwrap();
+        for s3 in [false, true] {
+            START3.store(s3, Relaxed);
+            let mut work = u32::MAX;
+            assert!(can_reach_touching(t, &pos, 0, 21, &mut work), "start3 {}: red can reach 21", s3);
+        }
+        START3.store(true, Relaxed);
+        let opt = agrees_with_brute_force(text, 0);
+        assert!(opt >= 21, "optimum {}", opt);
+        // a neighbour: a fifth snake of 5 next to the bar (S is now longer than the snakes it
+        // must take in; the snakes of 4 tie with each other)
+        agrees_with_brute_force("0001000001002004f8800801002084e0_00000000000000000000000000000000_14_14_0_12_0", 0);
+        // a neighbour: a blue tile in the gap between the first two snakes of the ring
+        agrees_with_brute_force("000100000100200478800801002084e0_00000000000000000000000000000100_14_14_0_12_0", 0);
+    }
 }

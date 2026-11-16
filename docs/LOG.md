@@ -2301,3 +2301,321 @@ reach-threat gate is through, because a replay of 25 replies is about an hour of
 threads an arm and the lock is the bottleneck tonight. The replay is also the missing ruler
 for the proof itself: seconds a reply, in the proof's order, with everything the driver
 knows. Any frozen change should be read on it once.
+
+## 2026-11-16 E29, the verifier's verdict on round three: start3 and the new defaults cleared, with limits
+
+Agent's report (the independent verifier; branch `climb/verify-rt3`, commits `6480f52`,
+`ba13096`, `74df585`; run outputs in its worktree, `work/g1` to `work/g7`). Its numbers.
+It did not build the change and does not gate it.
+
+**Verdict: no wrong value and no wrong "cannot reach" answer found. Every check passed.**
+
+- **The argument, checked against the code.** The mover alone, opponent frozen, ends with a
+  snake F of at least the target. F holds old snakes; take S, a longest of them. F's new
+  pieces can be ordered outward from S so that each placement is legal now. Every piece is
+  an induced path, so it touches at most two components outside itself, one of them what is
+  built: each piece brings in at most one more old snake. So F is at most len(S) + the cells
+  in hand + the k longest other snakes no longer than S (k pieces in hand). Ties are
+  counted (`<=`), a piece joining two snakes is counted, a ring brings in none, an empty
+  start set answers "cannot". At the boundary (target = cells in hand + 1) start3 does nothing.
+- **Differential check inside every reach test** (shadow build at the new defaults; each
+  query in start3's domain asked in the other mode with the same work limit, in both modes
+  with unlimited work, and a sample against an independent brute force). Over ply 6 0-199,
+  ply 7 0-589, ply 8, `ply5_other_openings`, proof4 0-23 narrow, proof 0-2 full window and
+  three 8-thread runs:
+
+  | Hand | Queries | start3 "cannot", plain "can" | The other way | Unlimited: start3 differs | Brute-force checked |
+  | --- | --- | --- | --- | --- | --- |
+  | 3 | 9,303,444 | 0 | 0 | 0 | 1,163,623 |
+  | 4 | 366,073 | 163 | 0 | 0 | 45,812 |
+  | 5 | 97 | 0 | 0 | 0 | 0 |
+  | 6, 7 | 0 | | | | |
+
+  All 163 changed answers are "cannot" by the unlimited test in both modes. No brute-force
+  check disagreed.
+- **Shadow re-search at the new defaults**, same sets: 128.7 M moves pruned by a reach bound,
+  127.6 M of them (99.1%) solved exactly with the rule off; 3.86 M nodes where the rule
+  pruned solved exactly against the value returned and the bounds stored; all 6.58 M
+  "cannot reach" answers asked again with unlimited work, start3 off and on. **0
+  mismatches.** The shadow build's node counts equal the candidate's (proof 0-23:
+  26,095,441 in both).
+- **Values below the root:** 1,880 positions from inside the trees (levels 2-11), each
+  solved with the rule off and then in 4 settings x 3 windows on fresh tables: 22,560
+  solves, 0 mismatches.
+- `verify 100` passes. **Proof driver** (16 single-thread workers, depth 1): job a root -1
+  and all 675 root moves -1; job b root -1 and all 838 root moves -1.
+- **Planted faults.** No other-snakes term: caught (differential, re-search, `verify`).
+  Ties not counted: caught. **k-1 other snakes instead of k: caught by nothing**, not by
+  any in-tree check and not by `verify 100`; node counts identical to the unfaulted run. A
+  position built by hand shows it is a real fault
+  (`000100000100200478800801002084e0_00000000000000000000000000000000_14_14_0_12_0`,
+  target 21: plain start3 and the brute force say "can", the faulted builds "cannot"). The
+  final snake there needs S plus three other snakes with three pieces, which never arises
+  in these trees. So the term k is right by argument and by that one case only.
+- **What root labels cannot see:** with the first fault planted, proof 0-23 gave 0 wrong
+  labels and 19.8 M nodes instead of 26.1 M. A wrong reach "cannot" looks like a 0.76x
+  speed-up at the root. Only the in-tree checks see it.
+- **The node increase, explained:** it happens only in `f368e74`'s setting (tested at node
+  start at 4 left or fewer): 27,984,567 off, 28,463,674 on, reproduced. 39 queries (all
+  with 4 pieces in hand) turn from "ran out of its 2,000 work, said can" into a proved
+  "cannot", all correct; nothing changes the other way. Position 23 alone grows by 479,683
+  because the extra correct prunes change what feeds E30's cost history (with
+  `--no-cost-order` it is 1,396,848 against 1,405,619). With unlimited reach work start3 on
+  and off give identical node counts everywhere. At the new defaults start3 lowers the
+  nodes (26,238,711 to 26,095,441).
+- **Not covered:** proof4 24-47 and `proof4b`; four of the five ply-5 files; the full window
+  beyond 3 proof positions; driver jobs other than a and b; hands of 5 to 7 in start3's
+  domain (97 queries, all agreed); the `--rt-effort*`, `--rt-margin-*` and `--rt-refuter`
+  options were read, not run.
+- **Fragile points it names:** the k term needs a unit test on a constructed position; the
+  4-slot `top` array relies on snakes + pieces in hand being at most 8; a bench run carries
+  state across positions, so node counts compare only between runs over the same range
+  (position 13: 1,535,040 when the run starts at 12, 1,563,463 from 0).
+- **Its slips:** a mistyped `cd` queued a build in the ordering agent's worktree; it was
+  stopped while waiting for the lock, nothing compiled or written. An early smoke run
+  outside the lock was refused.
+
+**Decision.** `f24a2d2` goes to its one gate as it is. Two conditions on the freeze, neither
+changing the search: a unit test of the k term on the constructed position, and a guard on
+the `top` array, go in with the merge. What the verifier did not cover stays listed here.
+
+## 2026-11-16 The top of the proof, second report: the replay is built; "images first" costs more often than it pays
+
+Agent's report (the ordering agent's round six), branch `climb/replay` at `7068a18`
+(this branch's source, plus `--emulate` cherry-picked as `9c368c8`, plus the replay
+commit). Its numbers. The 25-reply replay was not run.
+
+- **`prove --replay`:** the roots of a file are proved as the replies of one proof. Kept
+  from root to root: the table (a new generation only at the first root), the winners that
+  feed the image bonus, the killers, the workers' solvers (their history). A root's line
+  also ends in the job seconds lost on stopped jobs. **`prove --deadline S`:** no new root
+  after S seconds, so a replay can be cut into pieces.
+- **Run:** `sh tools/replay.sh EXE FILE DIR` (`--threads 16 --job-threads 1 --depth 2 --tt 27
+  --upper-first`; each piece under the lock, no new root after 600 s; resumes from
+  `DIR/results.txt`); `tools/replay_sum.py` gives one line a root and the totals and checks
+  every root as `tools/certificate.py` does. Files: `tests/replay/tune25.txt` (the 25 tune
+  replies in the paused proof's order), `tests/replay/smoke3.txt` (replies 12, 9, 3).
+  Nothing touches `work/long/`.
+- **What the replay is not:** in the real proof idle workers take other replies' tries;
+  here they start more red tries of the same reply, lost when a try wins (1,860-1,950 of the
+  smoke test's 7,169-7,502 job-seconds). The 49 gate replies in between are missing (their
+  winners, table entries, history). A resumed piece starts without the earlier pieces'
+  table and history. The resume path was not exercised.
+- **Identity with `--replay` off:** proof 0-23 narrow 56,301,796; ply07 6,404,487; ply06
+  5,846,840.
+- **Smoke test, base against base, two runs:**
+
+  | Reply | Tries (failed) | Run A: wall s | Run B: wall s | Winning move (both) |
+  | --- | --- | --- | --- | --- |
+  | 20,30,39,40 | 1 (0) | 78.3 | 76.7 | 4B:17,28,38,49 |
+  | 18,28,37,38 | 3 (2) | 360.4 | 339.4 | 4B:70,79,80,89 |
+  | 10,20,29,30 | 1 (0) | 30.2 | 32.0 | 4B:70,79,80,89 |
+  | Total | 5 (2) | 468.9 | 448.1 | certificate checks ok |
+
+  The runs differ by 4.5% in total, 1-6% a reply; tries and winners identical.
+- **The image bonus both ways, inside these three replies:** reply 18,28,37,38 is 3.8x
+  slower than proved cold (91 s, 1 try): the bonus put two images of the previous reply's
+  winner first and both failed. Reply 10,20,29,30 gained (30 s against 58 s cold): won with
+  an image of the previous winner.
+- **From the recorded data:** reply 81,91,100,101's winner (an image of five earlier
+  winners, the paused run's first try, 94 s) is not among the first 17 tries of today's
+  cold order. On the four replies where the cold order wins at try 1, 1, 2 and 4, the
+  paused run never tried the cold winner: all 3, 4 and 5 tries, and 13 of 19, were images
+  of earlier winners (of up to 18 replies each). None of those four cold winners is an
+  image of an earlier winner.
+- **The agent's reading:** "images first" puts every image of every earlier winner ahead of
+  the model's order, and the set grows with every reply proved. It wins when a reply
+  resembles an earlier one and costs whenever the winner is a new idea.
+
+**Decision.** Orders of red's tries that bound the loss both ways are built behind options
+now (compiles only): the two orders taken in turn, a cap on the images, images of recent
+winners only. No long run before the gate of `f24a2d2` is through. The first long replay
+is `tune25.txt` with the base frozen then. It serves twice: as the ruler's baseline, and as
+today's estimate of what the 98 replies left of the centre-opening proof would cost.
+That estimate goes to the owner; resuming is the owner's call.
+
+## 2026-11-16 E29, fifth report: the test of the k term is written; no cut inside the dear reach test yet
+
+Agent's report (the reach agent's round five). Its numbers. The candidate is still exactly
+`f24a2d2`.
+
+- **The test commit, `64d2bf4`, branch `climb/threats-tests`, on top of `f24a2d2`** (the
+  verifier's condition for the freeze):
+  - `bounds::tests::start3_counts_one_other_snake_per_piece`: the verifier's position, red,
+    target 21 must be "can" with start3 off and on; the same position against the brute
+    force (one-player optimum 24) for every target from the longest snake + 1 to 26; two
+    neighbours of it (a fifth red snake of 5, so S is longer than four snakes that tie; a
+    blue tile in the ring's gap), checked the same way. No hand-of-four case: the brute
+    force is too slow there.
+  - With k changed to k-1 locally the test fails ("start3 true: red can reach 21"); restored,
+    it passes.
+  - `debug_assert!(ns + pieces <= 8)` before the 4-slot `top` array, with the reason.
+  - `cargo test` passes; a plain build gives proof 0-23 narrow 26,095,441 and ply07 0-589
+    4,174,807, as `f24a2d2`.
+- **Inside the three-piece reach tests** (study build, proof 0-23): the bound of the child
+  after the first piece is 14.5 G cycles over 16.0 M calls (906 each), about 39% of the dear
+  tests and 10% of the run; the last piece 7.0 G; copies 1.4 G. "Cannot" at 6 left is
+  806,506 tests and 28.0 G, spread over many middling proofs (most visit 8 to 255
+  positions); "can" answers are cheap (72% visit one position at 5 left).
+- **The same question rarely comes back:** an exact repeat of a "cannot" 2,878 times in 4.12 M
+  tests; a monotone cache would answer 6,151 (0.15%). Dropped.
+- **`--reach-ub-upto` (`df82bf5`, off):** the prune after a piece uses the early-stopping
+  flood. Same nodes everywhere (26,095,441; 36,202,062; ply06 3,669,218; ply07 4,174,807;
+  ply08 4,223,127). Plain builds, three rounds: 0.96-0.97x on medians, 0.99-1.01x on
+  minima, and the arm that ran first was faster in every round. Within the order effect;
+  not a candidate.
+- **Ruled out with a number or an argument:** one search for both targets (ceiling 4%, the
+  second test runs only after a "can"); a "cannot" kept from the parent (the mover differs,
+  and our cells change in between); first-piece order (a "cannot" must try every branch).
+- **`snek verify GAMES SEED HAND3 THREAT3` (`ba347dc`):** how often three-piece hands are
+  checked; the defaults (40, 20) give the old sequence; `verify 100 1 8 8` passes (4,108
+  reach checks against 3,271).
+- **What is left, its words:** the child's bound computed from the parent's instead of from
+  scratch. Mechanical if exact, but needs care.
+
+## 2026-11-16 The top of the proof, third report: three orders of red's tries are built, none run
+
+Agent's report (the ordering agent's round seven), `climb/replay` at `2149110`, all options
+off by default. No replay was run (the lock was kept for the reach-threat gate).
+
+- **`--win-turns`:** where the image bonus applies, the model's order (no bonus) and the
+  image order take turns, the model's first. **`--win-cap N`:** only the N images that most
+  winners map onto keep the bonus. **`--win-recent K`:** only the K most recent winners count.
+- **Identity, options off:** proof 0-23 narrow 56,301,796; ply07 0-589 6,404,487. That the
+  smoke replay's tries are unchanged is argued (same image set, same list), not run.
+- **The replay's tools:** `--deadline` now stops a piece only after one root that needed
+  work; the resume path was run on three tiny roots with `--deadline 0` (three pieces, one
+  new root each, certificate checks ok); `tools/replay_sum.py --pairs CAND_DIR BASE_DIR`
+  writes one pair a root for `tools/hc.py report --ratio`. Smoke run A against B through
+  it: -0.8% [-7.2%, +6.1%], sd 0.059 a root.
+- **Simulation on the paused run's recorded tries** (25 tune replies, 8,145 recorded seconds;
+  a variant is ranked only where its winner was tried, so the cap is flattered):
+
+  | Variant | Replies ranked | Cost against recorded | Unranked replies (recorded s) |
+  | --- | --- | --- | --- |
+  | Images by count | 25 | 0.954x | 0 |
+  | Oracle | 25 | 0.788x | 0 |
+  | recent 1 / 2 / 3 / 5 / 10 | 13 / 19 / 20 / 22 / 24 | 0.930 / 0.982 / 0.975 / 0.993 / 1.000x | 12 / 6 / 5 / 3 / 1 |
+  | cap 1 / 2 / 4 / 8 | 16 / 20 / 24 / 24 | 0.968 / 0.915 / 0.896 / 0.896x | 9 / 5 / 1 / 1 |
+  | turns | cannot be ranked | | the model's own first tries were never recorded |
+
+- **Its choice: `--win-turns` first.** On the five replies where both orders are known the
+  cold winners would come at tries 1, 1, 3 and 7 (3, 4, 5 and 19 in the paused run) and the
+  image winner at try 2 instead of 1: about 14 tries against 32. Second: `--win-cap 4`.
+- **Its doubt:** turns re-scores a node's moves as ranks, so after a failed try the moves
+  lifted by the answer rule jump the whole list, where today the bonus band keeps images
+  above them. Untested.
+
+**Decision.** Nothing here is gated or run yet. After the reach-threat gate: one replay of
+`tune25.txt` with the base of that moment (the baseline and the estimate for the owner),
+then `--win-turns` on the same file as a screen. The 49 other replies stay unused for a gate.
+
+## 2026-11-16 E29 round three: my checks, the screen, and the gate's hypothesis and cap
+
+Written before the first gate unit. Candidate: `f24a2d2` (`climb/threats`), built by me:
+plain `b630a2fab0bf`, profiled `440dfbb757aa` (`work/e29r3/`, record in
+`work/e29r3/checks.txt`). Base: `frozen/climb-base.exe` `03e5963b7ba5`.
+
+- **Identity, the rule off** (`--no-reach-threat`): proof 0-23 narrow 56,301,796; ply07
+  0-589 6,404,487; ply06 0-199 5,846,840: the frozen base's counts. **The old setting**
+  (`--reach-threat-max 4 --reach-threat-start 4 --no-reach-start3`): 49,334,737 and
+  5,255,948: `6057bd7`'s counts. The profiled build: 6,404,487 with the rule off.
+- **Labels with the new defaults,** all values right, none unknown, every count equal to
+  the agent's: proof 0-23 narrow 26,095,441; 24-47 36,202,062; proof 0-11 full window
+  19,741,708; ply07 4,174,807; ply06 3,669,218; ply08 4,223,127; the five ply-5 files
+  6,839,041 / 6,914,528 / 8,005,501 / 4,585,644 / 26,853,486 (53,198,200 together; the
+  reference solver needs 59,709,026). `verify 100` passes. 16 threads on ply06: 9,624,368
+  nodes, all right.
+- **Screen `E29R3-S`** (proof4b tune units 50-79, profiled builds, `--window 0,1`): total
+  time 117.57 s against 107.55 s, **0.915x**; nodes 0.557x; per unit the log ratio is
+  +0.115 +/- 0.099, **sd 0.277 a unit**. 25 units faster (down to 0.57x), 5 slower. Two
+  outliers carry the spread: unit 75 at 1.47x with half the nodes (the tests cost more than
+  they save there), and unit 55 at 2.68x with 1.39x the NODES (8,993,217 to 12,512,261).
+  The extra prunes are exact, so the larger tree there is a worse order: what the verifier
+  found at proof position 23, where the prunes change what feeds E30's cost history. No
+  run from the analysis board without the lock fell in the screen's window.
+- **`hc.py plan`** on the screen: SPRT[0, 0.05] needs about 163 units if the truth is either
+  hypothesis and 266 halfway. 325 gate units of `proof4b` are unused (118-442).
+
+**Hypothesis.** Reach threats at every level, tested at node start too, with the
+three-piece reach test from the longest snake, cut the time of fresh proof positions (one
+thread, profiled builds, `--window 0,1`): at least 5% against no gain. Expected: about
+0.89x a unit (the screen), 0.83-0.92x in total (the agent's profiled pairs and the
+screen). **Test:** `E29R3`, one gate, SPRT[0, 0.05] on the per-unit log ratio of time,
+`proof4b` gate units from 118, **cap 266**. On a pass: the guards (ply 5 scaling on 10 tune
+units; driver jobs a-d), then the freeze with the test commit `64d2bf4`. On a fail or at
+the cap undecided: no freeze, no second gate; the cost of the reach test (round six) and
+the order effect seen at unit 55 are then the things to work on, and what comes back is a
+new change on new units.
+
+## 2026-11-16 E29 round three: the gate passes (0.856x); frozen as climb base 4
+
+- **Gate `E29R3`** (`proof4b` gate units 118-147, 60 fresh positions, profiled builds, one
+  thread, `--window 0,1`; base `03e5963b7ba5`, candidate `440dfbb757aa`): SPRT[0, 0.05]
+  accepted H1 at unit 30 of the cap's 266, LLR +5.91. Per unit the log ratio is +0.140 +/-
+  0.061 (sd 0.171 a unit); **total time 128.31 s against 109.83 s, 0.856x; nodes 0.533x.** A
+  size read where a sequential test stops leans high: quote 0.86x as the gate's, 0.915x as
+  the screen's, and expect between.
+- **Guards.** `E29R3-UP` (ply 5, full window, the set's 3 tune units): 0.774x time, nodes
+  0.470x. `E29R3-DRV` (whole proof jobs, 16 single-thread workers, depth 1, one run an arm):
+
+  | Job | Base, s | Candidate, s | Ratio |
+  | --- | --- | --- | --- |
+  | a | 24.9 | 21.2 | 0.849 |
+  | b | 42.3 | 36.8 | 0.868 |
+  | c | 42.7 | 35.4 | 0.829 |
+  | d | 59.1 | 49.4 | 0.836 |
+  | Total | 169.1 | 142.8 | **0.844** |
+
+  Log ratio 0.168 +/- 0.020 over the four jobs. The gain is in the prover at the size it has
+  on single positions (unlike E31). No run from the analysis board started solvers without
+  the lock after 23:58 the evening before (one at 00:05 was cancelled before any started).
+- **Freeze.** `climb/threats-tests` (`f24a2d2` + the unit test `64d2bf4`) merged into
+  `parallel-v9` as `6d08294`; the merge's source equals the test commit's; a plain build of
+  the merge (`ab6e9bb8f5d9`) gives 26,095,441 on proof 0-23 narrow and 4,174,807 on ply07
+  0-589; `cargo test` passes (the test of the k term). `frozen/climb-base.exe` is now the
+  gated executable `440dfbb757aa` (kept as `frozen/E29R3-440dfbb757aa.exe`);
+  `frozen/climb-base-plain.exe` is my plain build `b630a2fab0bf` of `f24a2d2`. Back:
+  `cp frozen/E30-03e5963b7ba5.exe frozen/climb-base.exe` and revert the merge `6d08294`.
+- **The new base's counts** (one thread): proof 0-23 narrow 26,095,441; 24-47 36,202,062;
+  proof 0-11 full window 19,741,708; ply07 0-589 4,174,807; ply06 0-199 3,669,218; ply08
+  4,223,127; the five ply-5 files 6,839,041 / 6,914,528 / 8,005,501 / 4,585,644 /
+  26,853,486. With `--no-reach-threat` it gives the previous base's counts; with
+  `--reach-threat-max 4 --reach-threat-start 4 --no-reach-start3` those of `6057bd7`.
+- **Gate units left:** `proof4b` 148-442 (295), `proof4` 164-220 (57).
+- **What the gate did not cover** stays as the verifier listed it: hands of 5 to 7 in start3's
+  domain, and the k term, which stands on its argument and the unit test.
+- **Known cost:** on some positions the extra prunes give a worse order (screen unit 55: 2.68x
+  time with 1.39x the nodes; proof position 23 in the verifier's analysis). The mean pays for
+  them; they are a pot of their own.
+
+## 2026-11-16 E29, sixth report: the child's bound from the parent's is exact and worth 1-2%; not a candidate
+
+Agent's report (the reach agent's round six), `climb/threats` at `9bf07c4`, off by default.
+
+- **`--reach-ub-inc`:** in the three-piece reach test the parent's clusters are recorded once
+  and the prune "is the child's bound below the target" is decided from them, cheapest part
+  first, flooding only the placed piece's own cluster. Only the decision is used.
+- **In-place check** (`--features ubcheck`, not in the release path): 35.7 M decisions and
+  values compared against the full bound (proof 0-23 16,028,321; 24-47 18,999,177; ply07
+  711,226; ply08 914,471; `verify 100 1 8 8` 2,105): 0 differences. Node counts identical
+  with the option on and off on all five label sets.
+- **Time, plain builds, three rounds:** 0.986x and 0.976x on medians, 1.004x and 1.019x on
+  minima. Below the 3% bar; no profiled pair. The child bound falls from 13.0 G to 9.2 G
+  cycles but recording the parent's clusters costs 2.1 G, and the piece's own cluster is
+  usually the big one.
+- **The rest of the three-piece test** (proof 0-23, 36.4 G inclusive over 2.95 M calls): child
+  bound 13.0 G; the two-piece level 16.5 G (its own setup and loop 10.3 G, the last piece
+  6.25 G); first-piece generation and setup 5.6 G; copies 1.24 G. The one cut left is
+  mechanical and worth 1-2%.
+- **Its hand-over note** (for whoever touches the reach test next): running out of work
+  answers "can", so any change in the positions visited can change node counts; labels
+  cannot see a wrong "cannot" (judge by the `ubcheck` pattern, `verify` against brute force
+  and `cargo test`); `verify 100 1 8 8` for three-piece hands; the global switches
+  (`START3`, `CAP3`, `UB_UPTO`, `UB_INC`) are toggled by tests, which must stay
+  single-threaded; a bench run carries state across positions.
+
+**Decision.** The mechanical cuts inside the reach test are spent: five options, none above
+3%. The reach agent's line of work ends here. The pots that remain are of another kind:
+fewer tests asked (a cheaper sufficient condition before the search), the order effect the
+prunes cause on some positions, the top of the proof, and what the field study finds.
