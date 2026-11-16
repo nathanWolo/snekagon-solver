@@ -3,6 +3,9 @@ name = "snek"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+shadow = []
+
 [dependencies]
 
 [profile.release]
