@@ -3147,3 +3147,39 @@ through its own script under `tools/locked.sh` because the check build needs a f
   board to the reply in work.
 - *Both processes (gate, tunnel) are background shells of the coordinator's session:* they end
   with it, and the tunnel's address changes when it is started again. Commit `4c34a0c`.
+
+## 2026-11-16 The tries of the reply in work, on the board (12:35)
+
+- Owner: "in follow mode, it would be cool to also see what the like follow up moves its
+  currently exploring are, or like how close to being refuted the currently followed one is".
+  Built by the Opus agent on `gui-prove` (`4b01220`, `25d9339`), merged as `0f1a55d`, live on
+  the board since 12:35.
+- *What it shows* when the reply in work is on the board (follow, or a click on its row): an
+  outline on each of red's tries in work, stronger the more of blue's replies to it are shown
+  lost; a list of those tries with a bar and done/total, then the failed tries with the reply
+  that refuted each; a bar on the reply's own row for its best try. A click on a try plays it.
+- *Where it comes from:* the results file gets a line for every finished job and every
+  decided try. The server builds a reply's tries from the file once when the driver takes the
+  reply up, then reads only new bytes, at most twice a second. `total` is the number of blue's
+  replies at the try, one a symmetry class: an upper bound of the jobs the try needs, so a bar
+  can end before it is full. A try can also sit at 1104 of 1105 for minutes on one hard reply.
+- *For the phone:* the tries are part of the state `/api/status` returns; the rows of the
+  replies list carry a version and are left out of a poll when the page has them: one poll of
+  the opening is about 850 bytes instead of 40,000.
+- *The agent's checks:* a stand-in driver (`tools/fake_prover.py`) that plays back two recorded
+  replies: states, counts and totals of the tries match an independent count; a file read in
+  two halves cut inside a line gives the same tries; cancel and Prove again rebuild them;
+  state events at least a second apart. The whole of `tools/gui_test.py` from a copy under a
+  191-character path: 47 ok, 0 failures. It also found that the folder-name fix of `0fe09ff`
+  had missed one lookup (a store other than the opening's could not be read without a run
+  after a restart) and fixed it.
+- *The coordinator's checks on the live board:* after the restart the proof went on at 77 of
+  172; with follow ticked the board showed the reply in work, its leading try outlined (730
+  of 1015) and three fainter ones, the list with bars, and the bar on the row; the same at
+  375 x 812 through the tunnel, with polls carrying the rows' version.
+- *The restart's cost:* done 58 s into a reply. The driver's jobs in flight, its table and its
+  history were lost; everything in the results file was kept.
+- *A leftover to know:* stopping the board's server while its run holds the lock leaves
+  `.git/run.lock` behind (a killed process cannot give it back); the next run waits for it
+  until it goes stale after 20 minutes. Removed by hand at 12:34 after checking that no
+  driver or solver process was alive.

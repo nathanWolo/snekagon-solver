@@ -40,7 +40,11 @@ Update this section in the same change that freezes a version.
 - **A run started from a page stops when that page goes away** (4 s without its event
   stream). A proof that has to outlive pages is started through the API with no owner:
   `POST /api/run {"mode": "prove", "position": P, "procs": 16, "lock": true, "client": ""}`.
-  The opening's proof runs that way since 2026-11-16 11:48.
+  The opening's proof runs that way since 2026-11-16 11:48 (again since 12:34, after a restart
+  of the board for the tries view). **Restarting the board's server while its run holds the
+  lock:** the proof does not come back by itself (start it again as above), and the killed
+  server leaves `.git/run.lock` behind: check that no `prove-replay.exe` or `climb-base.exe`
+  is alive, then remove it, or the next run waits 20 minutes for it to go stale.
 - **The board from outside the PC:** `python tools/gui_gate.py` (127.0.0.1:8781, token in
   `work/gui/gate.token`, watch only unless `--control`) behind a Cloudflare quick tunnel
   (`C:\Users\<user>\cloudflared\cloudflared.exe tunnel --no-autoupdate --url
