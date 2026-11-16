@@ -3121,3 +3121,29 @@ through its own script under `tools/locked.sh` because the check build needs a f
   reply in work arrive only once a minute.
 - *A lesson for tests of anything that writes files here:* run them once from the main
   checkout, whose path is 189 characters long, not only from a short scratch folder.
+
+## 2026-11-16 The board from the owner's phone; the opening's proof runs without a page (11:48-12:00)
+
+- Owner, away from the PC: "Could you make the gui accessible from my phone so I can watch on
+  the bus?" Earlier: a wish to see, in follow mode, red's tries in work and how close the reply
+  is to being refuted (an agent is building that on `gui-prove`; hypothesis-free display work).
+- *The proof had stopped.* The owner's run of the opening ended 31 s after its start at 11:40:
+  a run belongs to the page that started it and is cancelled 4 s after that page's event stream
+  goes away. Restarted at 11:48 through the board's API with no owning page (run 6), so it no
+  longer depends on any page; it holds the run lock, 16 processes.
+- *Access:* `tools/gui_gate.py` on 127.0.0.1:8781 in front of the board: a request passes only
+  with the token (`work/gui/gate.token`; first as `?k=`, then as a cookie), and the requests
+  that start or stop runs are refused ("watch only"). In front of the gate a Cloudflare quick
+  tunnel (`cloudflared tunnel --url http://127.0.0.1:8781`, the program was already installed;
+  the owner's own tunnel service was not touched). Checked: 403 without the token and with a
+  wrong one, the page and the API with it, `/api/run` and `/api/cancel` refused, both locally
+  and through the tunnel.
+- *The tunnel holds the event stream back* (a 2 s read through it gave nothing; locally the
+  pings arrive). The page now asks `/api/status` every 5 s while the stream is silent. One
+  answer is 40 KB with the opening's 172 rows.
+- *For a phone:* a page opened while a proof runs starts on the proof's position; under 900 px
+  the run's rows and the list sit directly under the board. Checked in the browser pane at
+  375 x 812 through the tunnel: the proof shows without typing anything, and follow moves the
+  board to the reply in work.
+- *Both processes (gate, tunnel) are background shells of the coordinator's session:* they end
+  with it, and the tunnel's address changes when it is started again. Commit `4c34a0c`.

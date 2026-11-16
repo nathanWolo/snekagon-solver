@@ -37,6 +37,16 @@ Update this section in the same change that freezes a version.
   it is** (`work/long/` stays as it was at the pause). While the board proves or solves, no
   timing counts (`work/gui/runs.log`). The 49 replies once kept for a top-of-proof gate are
   used up as the board proves them. LOG, "The board's Prove mode is live".
+- **A run started from a page stops when that page goes away** (4 s without its event
+  stream). A proof that has to outlive pages is started through the API with no owner:
+  `POST /api/run {"mode": "prove", "position": P, "procs": 16, "lock": true, "client": ""}`.
+  The opening's proof runs that way since 2026-11-16 11:48.
+- **The board from outside the PC:** `python tools/gui_gate.py` (127.0.0.1:8781, token in
+  `work/gui/gate.token`, watch only unless `--control`) behind a Cloudflare quick tunnel
+  (`C:\Users\<user>\cloudflared\cloudflared.exe tunnel --no-autoupdate --url
+  http://127.0.0.1:8781`). Never put the board's own port on a tunnel: it has no login and
+  starts solver processes for whoever asks. The owner asked for this on 2026-11-16; stop both
+  when the owner no longer needs them. LOG, "The board from the owner's phone".
 
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
