@@ -1548,22 +1548,24 @@ default; with both off the driver does what the base does.
   One solve of job a's position on one thread with one table tells how many nodes the same
   proof needs when everything is shared (the workers needed 642-685 M).
 
-## 2026-11-15 Pot sizing: separate workers lose nothing by not sharing a table
+## 2026-11-15 Pot sizing: the driver's jobs need no more nodes than one sequential search
 
-- **Run:** proof job a's position solved by one thread with one table (`frozen/climb-base.exe
-  bench work/e24/a.pos --tt 27 --window -1,0`): value -1, 721.6 M nodes, 600.3 s.
-- **Against the driver on the same position** (16 single-thread workers, depth 1, each job its
-  own table): 642 M to 685 M nodes in five runs, 834 thread-seconds, 50.8 to 57.9 s of
-  wall-clock.
-- **Reading:** the sequential search with everything shared needs no fewer nodes than 675
-  separate jobs (it needs a few more), so there is nothing to win from a table shared between
-  jobs. The driver turns one thread's 600 s into about 51 to 58 s on 8 cores (10 to 12 times),
-  and its 1.39x in thread-seconds is the price of two threads a core. At depth 1 the driver is
-  close to what this machine can give: the remaining gains are in the search (nodes, and the
-  cost of a node), not in scheduling.
-- **Closed:** a shared table for the workers; more scheduling work on single jobs. *Reopen* the
-  driver only for what a long proof with many roots shows (idle workers between roots, the
-  order of roots).
+- **Run:** proof job a's position solved by one thread (`frozen/climb-base.exe bench
+  work/e24/a.pos --tt 27 --window -1,0`): value -1, 721.6 M nodes, 600.3 s.
+- **Against the driver on the same position** (16 single-thread workers, depth 1): 642 M to
+  685 M nodes in five runs, 834 thread-seconds, 50.8 to 57.9 s of wall-clock.
+- **Corrected the same day.** This entry first said the workers each have their own table and
+  concluded that a shared table would win nothing. That premise was wrong: `prove` makes one
+  table and every worker's solver is built on it (`Solver::with_table`), and a job does not
+  clear it. So the workers already share a table, and nothing here says what an unshared
+  design would cost.
+- **What the run does show:** splitting the proof into 675 jobs on 16 threads costs no nodes
+  against the sequential search (it needs a few fewer). The driver turns one thread's 600 s
+  into about 51 to 58 s on 8 cores (10 to 12 times), and its 1.39x in thread-seconds is the
+  price of two threads a core. At depth 1 the driver is close to what this machine can give:
+  the remaining gains are in the search (nodes, and the cost of a node), not in scheduling.
+- **Closed:** more scheduling work on single jobs. *Reopen* the driver only for what a long
+  proof with many roots shows (idle workers between roots, the order of roots).
 
 ## 2026-11-15 The ordering study: a learned order is worth nothing here; the pot is the cost of the win chosen
 
@@ -1630,3 +1632,25 @@ base's.
   left outside the zone) predicts the answer before the test.
 - **A slip of the agent's:** one command ran in the main checkout (`git checkout src`, on a
   clean tree: no effect). Checked: the main checkout is clean and at the right commit.
+
+## 2026-11-15 Does halving the nodes save memory? (owner's question) No
+
+- **Owner:** "In the 0.56x nodes case, even if it's not saving on time, is it at least saving on
+  memory? Would it let us hold onto a larger tree".
+- **How memory is used:** the search is depth-first and holds no tree; what it keeps is the
+  table, of a size fixed by `--tt` (16 bytes an entry; 64 MB by default, 2 GB in proof runs,
+  one table for all workers). So memory does not follow the node count.
+- **Could fewer nodes let the table cover more of the tree?** Measured: proof positions 0-3,
+  `--window 0,1`, reach threats at every level against off (`rt5.exe`), nodes:
+
+  | `--tt` | Off | On | Ratio |
+  | --- | --- | --- | --- |
+  | 16 (1 MB) | 15,180,345 | 8,197,177 | 0.540 |
+  | 19 | 13,363,696 | 7,305,782 | 0.547 |
+  | 22 | 13,150,272 | 7,192,988 | 0.547 |
+  | 26 (1 GB) | 13,150,845 | 7,187,958 | 0.547 |
+
+  The ratio does not move with the table's size, and a table a thousand times smaller costs
+  15% more nodes. The table is not the scarce resource on these positions.
+- **Where it would count:** a written-out proof tree for an independent checker would be about
+  0.56x the size (a pruned move is justified by one reach test the checker can repeat).
