@@ -2378,3 +2378,58 @@ It did not build the change and does not gate it.
 **Decision.** `f24a2d2` goes to its one gate as it is. Two conditions on the freeze, neither
 changing the search: a unit test of the k term on the constructed position, and a guard on
 the `top` array, go in with the merge. What the verifier did not cover stays listed here.
+
+## 2026-11-16 The top of the proof, second report: the replay is built; "images first" costs more often than it pays
+
+Agent's report (the ordering agent's round six), branch `climb/replay` at `7068a18`
+(this branch's source, plus `--emulate` cherry-picked as `9c368c8`, plus the replay
+commit). Its numbers. The 25-reply replay was not run.
+
+- **`prove --replay`:** the roots of a file are proved as the replies of one proof. Kept
+  from root to root: the table (a new generation only at the first root), the winners that
+  feed the image bonus, the killers, the workers' solvers (their history). A root's line
+  also ends in the job seconds lost on stopped jobs. **`prove --deadline S`:** no new root
+  after S seconds, so a replay can be cut into pieces.
+- **Run:** `sh tools/replay.sh EXE FILE DIR` (`--threads 16 --job-threads 1 --depth 2 --tt 27
+  --upper-first`; each piece under the lock, no new root after 600 s; resumes from
+  `DIR/results.txt`); `tools/replay_sum.py` gives one line a root and the totals and checks
+  every root as `tools/certificate.py` does. Files: `tests/replay/tune25.txt` (the 25 tune
+  replies in the paused proof's order), `tests/replay/smoke3.txt` (replies 12, 9, 3).
+  Nothing touches `work/long/`.
+- **What the replay is not:** in the real proof idle workers take other replies' tries;
+  here they start more red tries of the same reply, lost when a try wins (1,860-1,950 of the
+  smoke test's 7,169-7,502 job-seconds). The 49 gate replies in between are missing (their
+  winners, table entries, history). A resumed piece starts without the earlier pieces'
+  table and history. The resume path was not exercised.
+- **Identity with `--replay` off:** proof 0-23 narrow 56,301,796; ply07 6,404,487; ply06
+  5,846,840.
+- **Smoke test, base against base, two runs:**
+
+  | Reply | Tries (failed) | Run A: wall s | Run B: wall s | Winning move (both) |
+  | --- | --- | --- | --- | --- |
+  | 20,30,39,40 | 1 (0) | 78.3 | 76.7 | 4B:17,28,38,49 |
+  | 18,28,37,38 | 3 (2) | 360.4 | 339.4 | 4B:70,79,80,89 |
+  | 10,20,29,30 | 1 (0) | 30.2 | 32.0 | 4B:70,79,80,89 |
+  | Total | 5 (2) | 468.9 | 448.1 | certificate checks ok |
+
+  The runs differ by 4.5% in total, 1-6% a reply; tries and winners identical.
+- **The image bonus both ways, inside these three replies:** reply 18,28,37,38 is 3.8x
+  slower than proved cold (91 s, 1 try): the bonus put two images of the previous reply's
+  winner first and both failed. Reply 10,20,29,30 gained (30 s against 58 s cold): won with
+  an image of the previous winner.
+- **From the recorded data:** reply 81,91,100,101's winner (an image of five earlier
+  winners, the paused run's first try, 94 s) is not among the first 17 tries of today's
+  cold order. On the four replies where the cold order wins at try 1, 1, 2 and 4, the
+  paused run never tried the cold winner: all 3, 4 and 5 tries, and 13 of 19, were images
+  of earlier winners (of up to 18 replies each). None of those four cold winners is an
+  image of an earlier winner.
+- **The agent's reading:** "images first" puts every image of every earlier winner ahead of
+  the model's order, and the set grows with every reply proved. It wins when a reply
+  resembles an earlier one and costs whenever the winner is a new idea.
+
+**Decision.** Orders of red's tries that bound the loss both ways are built behind options
+now (compiles only): the two orders taken in turn, a cap on the images, images of recent
+winners only. No long run before the gate of `f24a2d2` is through. The first long replay
+is `tune25.txt` with the base frozen then. It serves twice: as the ruler's baseline, and as
+today's estimate of what the 98 replies left of the centre-opening proof would cost.
+That estimate goes to the owner; resuming is the owner's call.
