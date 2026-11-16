@@ -2195,3 +2195,16 @@ on this PC for a same-machine comparison?", the owner answered "Yes, run it".
   call (the distribution had stopped in between), so the first comparison script timed only
   ours and was stopped. Rebuilt in `/opt/snekref`. Also new: `RUN_LOCK_FIRST=1` in
   `tools/lockfair.sh` puts a caller ahead of the queue, for what the owner is waiting on.
+
+## 2026-11-16 E31 (held): the checks that ran, and the screen that did not
+
+- **My checks of `climb/xk` `381560f`** (plain build `b6fadcbe7879`, `work/e31/checks.txt`): with
+  `--xk 0` the frozen base's counts (proof 0-23 56,301,796, ply 7 6,404,487, ply 6 5,846,840);
+  with `--no-cost-order` v9's (proof 0-3 13,150,272, ply 7 8,076,471); with the defaults
+  every label right on proof 0-23 (53,909,813 nodes) and 24-47 (58,520,632), ply 7
+  (5,990,249), ply 6 (5,336,972), ply 8 (5,699,363), the five ply-5 files (13,239,959,
+  12,960,170, 12,884,337, 8,974,161, 49,994,059) and `verify 100`. These are the agent's counts.
+- **Not run:** the 16-thread label check, the profiled build and the screen `E31-S`. I stopped
+  the script while it waited in the queue: the candidate is held, the screen would only have
+  given the cold-solve time, and nine runs were waiting for the lock, the verifier of the
+  reach test among them. The earlier entry said the screen would be recorded; it was not.
