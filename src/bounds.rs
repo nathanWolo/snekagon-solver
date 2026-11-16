@@ -488,6 +488,34 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
     })
 }
 
+/// The number of cells in the pieces `left`.
+#[inline]
+pub fn hand_cells(left: u8) -> i32 {
+    let mut rem = 0i32;
+    for p in 0..NPIECES {
+        if left >> p & 1 == 1 {
+            rem += PIECE_SIZE[p] as i32;
+        }
+    }
+    rem
+}
+
+/// The cells at most `rem` steps from the cells `own`. When a player holding `rem` cells in hand
+/// asks for a snake longer than `rem`, only these cells matter: the final snake holds an old snake,
+/// and each of its new cells is joined to an old one by a path of at most `rem` new cells. Whether
+/// the player can reach a target above `rem` therefore depends on its own cells, its pieces and
+/// which of these cells are occupied, and more occupied cells can only make it harder (a placement
+/// legal with more cells occupied is legal with fewer: emptiness is all a placement needs from the
+/// other cells). `verify` checks this against every sequence of placements.
+#[inline]
+pub fn near_cells(own: BB, rem: i32) -> BB {
+    let mut n = own;
+    for _ in 0..rem {
+        n |= neighbours(n);
+    }
+    n
+}
+
 /// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.
 fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good: BB, work: &mut u32) -> bool {
     if *work == 0 {
@@ -548,6 +576,37 @@ fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good
         let later = pieces - 1;
         if len + rem - p.n as i32 + extra[later.min(ns)] < target {
             return false;
+        }
+        if later == 1 {
+            // The last piece, on the position after p without building it (what reach_from on that
+            // position does, with the same work): it grows the snake p built (p and the snakes it
+            // joined, `len` cells), and adds the other snakes it touches.
+            if *work == 0 {
+                return true;
+            }
+            *work -= 1;
+            let mut joined: u32 = 0;
+            let mut joined_cells: BB = 0;
+            for j in 0..ns {
+                if pos.snakes[player][j] & p.border != 0 {
+                    joined |= 1 << j;
+                    joined_cells |= pos.snakes[player][j];
+                }
+            }
+            let built = p.cells | joined_cells;
+            let own2 = pos.cells[player] | p.cells;
+            let occ2 = pos.occupied() | p.cells;
+            let left2 = left & !(1u8 << p.piece);
+            return find_grow(t, own2, occ2, left2, built, |m2| {
+                let p2 = &t.placements[m2 as usize];
+                let mut len2 = p2.n as i32 + len;
+                for j in 0..ns {
+                    if joined >> j & 1 == 0 && pos.snakes[player][j] & p2.border != 0 {
+                        len2 += len_of[j];
+                    }
+                }
+                len2 >= target
+            });
         }
         let mut child = *pos;
         let joined = child.place_for(t, player, m);
