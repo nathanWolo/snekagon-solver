@@ -17,6 +17,7 @@ restart; a killed server takes its driver with it. A few minutes under the run l
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -31,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gui  # noqa: E402
 
 BASE = ""
+PROCS = 16
 FAILS = []
 
 
@@ -86,12 +88,20 @@ def from_main(rel, solver):
     return p if p.exists() else Path(solver.path).resolve().parent.parent / rel
 
 
-def start_server(a, solver, prover, proofs):
+def start_server(a, solver, prover, proofs, env=None):
     srv = subprocess.Popen([sys.executable, "-u", str(Path(__file__).resolve().parent / "gui.py"), "--port", str(a.port),
                             "--solver", solver.path, "--prover", str(prover), "--proofs", str(proofs)],
-                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
     srv.stdout.readline()
     return srv
+
+
+def test_dir(prefix):
+    """A fresh folder for test stores beside the real ones (work/gui/), so that the paths the server writes are as
+    long as in a real run (Windows stops at 260 characters)."""
+    base = gui.ROOT / "work" / "gui"
+    base.mkdir(parents=True, exist_ok=True)
+    return tempfile.mkdtemp(prefix=prefix, dir=str(base))
 
 
 def proof(position):
@@ -100,7 +110,7 @@ def proof(position):
 
 def prove(position, lock, cancel_when=None, timeout=3600):
     """A prove run through the server; cancel_when(state) cancels it. Returns (last run snapshot, pids seen)."""
-    code, j = call("/api/run", {"mode": "prove", "position": position, "procs": 16, "lock": lock})
+    code, j = call("/api/run", {"mode": "prove", "position": position, "procs": PROCS, "lock": lock})
     if code != 200:
         return {"status": "refused", "message": j.get("error"), "prove": None}, set()
     t0, seen, cancelled = time.time(), set(), False
@@ -131,7 +141,7 @@ def prove_tests(a, solver):
     base4 = from_main(Path("work") / "replay" / "base4" / "results.txt", solver)
     known, _ = gui.read_results(base4)
     check(known.get(WIN3, [0, 0])[1] == -1 and known.get(FAIL3, [0, 0])[0] == 0, "the test positions are in %s" % base4)
-    proofs = Path(tempfile.mkdtemp(prefix="gui-proofs-"))
+    proofs = Path(test_dir("proofs-"))
     try:
         info = call("/api/info")[1]
         SRV.terminate()
@@ -197,7 +207,7 @@ def prove_tests(a, solver):
         s = proof(FAIL3)
         check(s and len(s["held"]) == 1, "after a server restart: the failed try still holds at %s" % (s and s["held"]))
         shutil.rmtree(proofs / gui.store_key(WIN3))
-        code, j = call("/api/run", {"mode": "prove", "position": WIN3, "procs": 16, "lock": False})
+        code, j = call("/api/run", {"mode": "prove", "position": WIN3, "procs": PROCS, "lock": False})
         t0, pids = time.time(), set()
         while time.time() - t0 < 30 and not pids:
             pids = set(call("/api/status")[1]["solver_pids"])
@@ -212,6 +222,156 @@ def prove_tests(a, solver):
         shutil.rmtree(proofs, ignore_errors=True)
 
 
+# Two replies of the opening that the replay proved (roots of work/replay/base4/results.txt): the first with a
+# failed try and a winning one, the second with one try.
+FAKE_ROOTS = ["00000000000000001000000000000000_000000000000000000000000300a0000_254_126_0_2_0",
+              "00000000000000001000000000000000_00000000000000000000000060100400_254_222_0_2_0"]
+
+
+def expected_tries(record, root, solver):
+    """The tries of a root as an independent count from a results file: try cells -> [state, reply, lost replies]
+    (a job counts when its position is a child of the try, by the solver's own move list)."""
+    r = gui.parse_text(root)
+    tries = {int(c.split("_")[0], 16): c for mv, c in solver.children([root])[0]}
+    ro, rm = r["cells"][0], r["cells"][1]
+    out, jobs = {}, {}
+    for l in open(record):
+        f = l.split()
+        t = f[0].split("_")
+        a, b, ply = int(t[0], 16), int(t[1], 16), int(t[5])
+        if a & ro != ro or a == ro:
+            continue
+        if ply == 3 and b == rm:
+            e = out.setdefault(a, ["work", None, 0])
+            if int(f[2]) <= -1:
+                e[0] = "won"
+            elif int(f[1]) >= 0:
+                e[0], e[1] = "failed", f[5]
+        elif ply == 4 and b & rm == rm and b != rm:
+            out.setdefault(a, ["work", None, 0])
+            jobs.setdefault(f[0], [a, False])
+            if int(f[1]) >= 1:
+                jobs[f[0]][1] = True
+    keys = sorted(out)
+    kids = dict(zip(keys, ({c for mv, c in k} for k in solver.children([tries[a] for a in keys]))))
+    for j, (a, lost) in jobs.items():
+        out[a][2] += lost and j in kids[a]
+    return out
+
+
+def fake_tests(a, solver):
+    """The tries of the reply in work, with a stand-in driver (tools/fake_prover.py) that plays back the replay's
+    records of two replies of the opening."""
+    global SRV
+    record = from_main(Path("work") / "replay" / "base4" / "results.txt", solver)
+    proofs = Path(test_dir("fake-"))
+    try:
+        # the tries of a root read from a whole file, against an independent count
+        path = proofs / "record.txt"
+        shutil.copy(record, path)
+        want = expected_tries(path, FAKE_ROOTS[0], solver)
+        tr = gui.Tries(solver, FAKE_ROOTS[0], path)
+        tr.summary()
+        red = gui.parse_text(FAKE_ROOTS[0])["cells"][0]
+        got = {red | sum(1 << c for c in t["cells"]): t for t in tr.tries.values()}
+        ok = set(got) == set(want) and all(got[k]["state"] == w[0] and got[k]["reply"] == w[1] and got[k]["done"] == w[2]
+                                           and got[k]["total"] and got[k]["total"] >= w[2] for k, w in want.items())
+        check(ok, "tries of a root from its records: %s" % "; ".join("%s %s %d/%s %s" % (t["move"], t["state"], t["done"], t["total"], t["reply"] or "")
+                                                                   for t in tr.tries.values()))
+        # read on from a byte offset: the same file written in two halves, the cut inside a line
+        half = proofs / "half.txt"
+        data = path.read_bytes()
+        half.write_bytes(data[: len(data) // 2])
+        tr2 = gui.Tries(solver, FAKE_ROOTS[0], half)
+        with open(half, "ab") as f:
+            f.write(data[len(data) // 2:])
+        tr2.read()
+        check(tr2.summary() == tr.summary(), "read on from an offset gives the same tries")
+
+        # a store of the two replies; the server's driver is the stand-in
+        store = proofs / "stores" / gui.store_key(gui.OPENING)
+        store.mkdir(parents=True)
+        p = gui.parse_text(gui.OPENING)
+        roots = [[gui.move_between(p, gui.parse_text(c)), c] for c in FAKE_ROOTS]
+        (store / "roots.txt").write_text("".join("? %s\n" % c for m, c in roots))
+        (store / "results.txt").write_text("")
+        (store / "meta.json").write_text(json.dumps({"position": gui.OPENING, "roots": roots, "seeded": None, "created": "-",
+                                                     "seconds": [0.0, 0.0], "finished": [], "runs": 0}))
+        SRV.terminate()
+        SRV.wait()
+        env = dict(os.environ, FAKE_RECORD=str(record), FAKE_DELAY="0.004")
+        SRV = start_server(a, solver, Path(__file__).resolve().parent / "fake_prover.py", proofs / "stores", env)
+
+        states = []
+        stop = threading.Event()
+
+        def listen():
+            try:
+                with urllib.request.urlopen(BASE + "/api/events?client=fake", timeout=60) as s:
+                    ev = None
+                    while not stop.is_set():
+                        line = s.readline().decode()
+                        if line.startswith("event: "):
+                            ev = line[7:].strip()
+                        elif line.startswith("data: ") and ev == "state":
+                            states.append((time.time(), json.loads(line[6:])))
+            except OSError:
+                pass
+
+        th = threading.Thread(target=listen, daemon=True)
+        th.start()
+        time.sleep(0.5)
+        code, j = call("/api/run", {"mode": "prove", "position": gui.OPENING, "procs": 2, "lock": False, "client": "fake"})
+        seen = []
+        t0 = time.time()
+        while time.time() - t0 < 60:
+            r = call("/api/status")[1]["run"]
+            t = r["prove"].get("tries")
+            if t:
+                seen.append(t)
+            if t and sum(x["d"] for x in t["list"]) >= 150:
+                break
+            time.sleep(0.2)
+        call("/api/cancel", {})
+        mid = seen[-1] if seen else None
+        r = wait_run(30)
+        check(r["status"] == "cancelled" and mid and mid["root"] == 0 and mid["work"] >= 1 and mid["best"] is not None
+              and all(x["t"] and x["t"] >= x["d"] for x in mid["list"]),
+              "tries while the first reply is in work: %s" % (mid and "; ".join("%s %s %d/%s" % (x["m"], x["s"], x["d"], x["t"]) for x in mid["list"])))
+        grew = [sum(x["d"] for x in s["list"]) for s in seen]
+        check(grew == sorted(grew) and len(set(grew)) > 1, "the counts grow: %s" % grew[:12])
+
+        # prove again: the tries are built from the file first
+        code, j = call("/api/run", {"mode": "prove", "position": gui.OPENING, "procs": 2, "lock": False, "client": "fake"})
+        first = None
+        t0 = time.time()
+        while time.time() - t0 < 30 and first is None:
+            t = call("/api/status")[1]["run"]["prove"].get("tries")
+            if t and t["root"] == 0:
+                first = t
+            time.sleep(0.1)
+        done_mid = sum(x["d"] for x in mid["list"]) if mid else 0
+        check(first and sum(x["d"] for x in first["list"]) >= done_mid,
+              "proved again: the first tries come from the file (%s lost replies, %s before the cancel)" % (
+                  first and sum(x["d"] for x in first["list"]), done_mid))
+        r = wait_run(60)
+        p = r["prove"]
+        check(r["status"] == "done" and p["refuted"] == 2 and r["value"] == -1, "both replies refuted: %s, %s of %s" % (r["status"], p["refuted"], p["n"]))
+        full = call("/api/status")[1]["run"]["prove"]
+        again = call("/api/status?rows=" + full["rows_v"])[1]["run"]["prove"]
+        check(full["rows"] and again["rows"] is None and again["rows_v"] == full["rows_v"],
+              "a poll that has the rows' version gets no rows (%s)" % full["rows_v"])
+        time.sleep(1.5)
+        stop.set()
+        gaps = [b[0] - a_[0] for a_, b in zip(states, states[1:])]
+        check(len(states) >= 3 and min(gaps) >= 0.9, "state events at most once a second: %d events, smallest gap %.2f s" % (len(states), min(gaps) if gaps else -1))
+        with_tries = [s for _, s in states if s.get("prove") and s["prove"].get("tries")]
+        check(with_tries and {s["prove"]["tries"]["root"] for s in with_tries} == {0, 1},
+              "the events carry the tries of each reply in work (%d events with tries)" % len(with_tries))
+    finally:
+        shutil.rmtree(proofs, ignore_errors=True)
+
+
 def main():
     global BASE, SRV
     ap = argparse.ArgumentParser()
@@ -221,16 +381,26 @@ def main():
     ap.add_argument("--no-lock-tests", action="store_true")
     ap.add_argument("--no-prove-tests", action="store_true")
     ap.add_argument("--only-prove", action="store_true", help="only the prove tests")
+    ap.add_argument("--only-fake", action="store_true", help="only the tests with the stand-in driver")
+    ap.add_argument("--procs", type=int, default=16, help="processes of the prove tests' driver")
     a = ap.parse_args()
+    global PROCS
+    PROCS = a.procs
     a.lock = not a.no_lock_tests
     sp = Path(a.solver)
     solver = gui.Solver(sp if sp.is_absolute() else gui.ROOT / sp)
     BASE = "http://127.0.0.1:%d" % a.port
     log_before = gui.LOG_PATH.read_text().count("\n") if gui.LOG_PATH.exists() else 0
-    SRV = start_server(a, solver, from_main(a.prover, solver), Path(tempfile.mkdtemp(prefix="gui-proofs-")))
+    first_store = Path(test_dir("proofs-"))
+    SRV = start_server(a, solver, from_main(a.prover, solver), first_store)
     try:
-        if a.only_prove:
-            prove_tests(a, solver)
+        if a.only_prove or a.only_fake:
+            fake_tests(a, solver)
+            if a.only_prove:
+                prove_tests(a, solver)
+            SRV.terminate()
+            SRV.wait()
+            shutil.rmtree(first_store, ignore_errors=True)
             return finish()
 
         info = call("/api/info")[1]
@@ -333,6 +503,7 @@ def main():
                 check(" -1 " in " " + v.split("value")[1][:4] + " ", "the winning move's child is a loss for the opponent: %s" % v.strip())
 
         if not a.no_prove_tests:
+            fake_tests(a, solver)
             prove_tests(a, solver)
 
         lines = gui.LOG_PATH.read_text().splitlines()[log_before:]
@@ -344,6 +515,7 @@ def main():
     finally:
         SRV.terminate()
         SRV.wait()
+        shutil.rmtree(first_store, ignore_errors=True)
     finish()
 
 

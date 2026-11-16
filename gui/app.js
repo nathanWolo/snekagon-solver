@@ -67,6 +67,7 @@
   // ---------------------------------------------------------------- board
   const board = $("board");
   let cellEls = [];
+  let HEX = "";
   function buildBoard() {
     const xs = SN.CELLS.map(cx), ys = SN.CELLS.map(cy);
     const pad = 1.1;
@@ -77,6 +78,7 @@
       const a = Math.PI / 180 * (60 * k - 30);
       hex.push((0.97 * Math.cos(a)).toFixed(3) + "," + (0.97 * Math.sin(a)).toFixed(3));
     }
+    HEX = hex.join(" ");
     const cells = document.createElementNS(svgNS, "g");
     cellEls = [];
     for (const c of SN.CELLS) {
@@ -157,6 +159,18 @@
         for (const c of pl.cells) if (!bestAt.has(c) || rank[k] > rank[bestAt.get(c)]) bestAt.set(c, k);
       }
       for (const [c, k] of bestAt) parts.push(`<circle class="mark ${k}" cx="${cx(c)}" cy="${cy(c) + 0.5}" r="0.13"/>`);
+    }
+    // the tries in work at the reply in work: the more complete, the stronger the outline
+    const tw = triesHere();
+    if (tw && st.cur === tw.ctx.k + 1 && !drag) {
+      const at = new Map();
+      for (const t of tw.tries.list) {
+        if (t.s !== "w") continue;
+        const fr = t.t ? t.d / t.t : 0;
+        for (const c of tryCells(t)) if (!at.has(c) || fr > at.get(c)) at.set(c, fr);
+      }
+      for (const [c, fr] of at)
+        parts.push(`<polygon class="trymark" transform="translate(${cx(c).toFixed(3)},${cy(c).toFixed(3)}) scale(0.86)" points="${HEX}" style="stroke-opacity:${(0.25 + 0.75 * fr).toFixed(2)}"/>`);
     }
     over.innerHTML = parts.join("");
   }
@@ -340,13 +354,16 @@
   }
   const PSTATE = { refuted: ["refuted", "v-win"], work: ["in work", "v-run"], open: ["open", "v-unk"], held: ["holds", "v-held"] };
   function proveLive(text) { return run && run.mode === "prove" && run.position === text && run.status === "running"; }
+  // seconds that went by since the last state event (they come at most once a second, a beat every 5 s)
+  const since = () => (run && run._at ? (Date.now() - run._at) / 1000 : 0);
+  function curSeconds(ctx) { return proveLive(ctx.text) && ctx.pr.cur_seconds != null ? ctx.pr.cur_seconds + since() : null; }
   function renderProveHead(ctx) {
     const pr = ctx.pr, live = proveLive(ctx.text);
     const bits = [`refuted ${pr.refuted} of ${pr.n}`];
-    if (live) bits.push(fmtT(run.elapsed));
+    if (live) bits.push(fmtT(run.elapsed + since()));
     if (pr.rate && pr.open) {
       bits.push(fmtT(pr.rate) + " a reply");
-      const cur = live && pr.cur_seconds ? pr.cur_seconds : 0;
+      const cur = curSeconds(ctx) || 0;
       bits.push(fmtT(Math.max(pr.rate * (pr.open - 1), pr.rate * pr.open - cur)) + " left");
     }
     let html = esc(bits.join(" · "));
@@ -361,18 +378,87 @@
     const rows = pr.rows.slice().sort((a, b) => rank(a) - rank(b) ||
       (rank(a) === 1 ? (b.seq ?? -1) - (a.seq ?? -1) : a.i - b.i));
     const shown = st.cur > ctx.k ? SN.text(st.positions[ctx.k + 1]) : null;
-    setHtml(ol, rows.map(r => {
+    const best = pr.tries && pr.tries.root === pr.cur ? pr.tries.best : null;
+    // the first row in view keeps its place when the list is rebuilt (a reply that finishes moves rows down)
+    let anchor = null;
+    if (ol.scrollTop > 0) {
+      for (const li of ol.children) if (li.offsetTop + li.offsetHeight > ol.scrollTop) { anchor = [li.dataset.i, li.offsetTop - ol.scrollTop]; break; }
+    }
+    const changed = setHtml(ol, rows.map(r => {
       const [label, vc] = PSTATE[r.state] || [r.state, "v-unk"];
       const cls = ["pr", r.state === "work" ? "work" : "", r.child === shown ? "here" : ""].join(" ");
+      const bar = r.state === "work" && best != null ? `<span class="bar"><i style="width:${(100 * best).toFixed(1)}%"></i></span>` : "";
       return `<li class="${cls}" data-i="${r.i}" data-mv="${esc(r.move)}"><span class="v ${vc}">${label}</span>` +
         `<span class="mv">${esc(r.move)}</span><span class="ans">${esc(r.answer || "")}</span>` +
         `<span class="n">${r.tries || r.state !== "open" ? r.tries + "/" + r.failed : ""}</span>` +
-        `<span class="t">${r.seconds ? fmtT(r.seconds) : ""}</span></li>`;
+        `<span class="t">${r.seconds ? fmtT(r.seconds) : ""}</span>${bar}</li>`;
     }).join(""));
-    // the reply in work: its seconds tick in place, so that the list is not rebuilt (and a click lost) twice a second
-    const w = ol.querySelector("li.work .t");
-    if (w && proveLive(ctx.text) && pr.cur_seconds) w.textContent = fmtT(pr.cur_seconds);
+    if (changed && anchor) {
+      const li = ol.querySelector(`li[data-i="${anchor[0]}"]`);
+      if (li) ol.scrollTop = li.offsetTop - anchor[1];
+    }
+    // the reply in work: its seconds tick in place, so that the list is not rebuilt (and a click lost) each second
+    const w = ol.querySelector("li.work .t"), cs = curSeconds(ctx);
+    if (w && cs) w.textContent = fmtT(cs);
+    renderTries(ctx);
   }
+  // the tries of the reply in work, when that reply is on the board
+  function triesHere() {
+    const ctx = proveView();
+    if (!ctx || !ctx.pr.tries || ctx.pr.cur == null || ctx.pr.tries.root !== ctx.pr.cur || st.cur < ctx.k + 1) return null;
+    const row = ctx.pr.rows[ctx.pr.cur];
+    if (!row || SN.text(st.positions[ctx.k + 1]) !== row.child) return null;
+    return { ctx, row, tries: ctx.pr.tries };
+  }
+  const CAP = 12;
+  // a try as the server sends it: m move, s state (w in work, f failed, x won), d replies shown lost, t replies, r refuting reply
+  function tryCells(t) { const pl = SN.BY_KEY.get(t.m); return pl ? pl.cells : []; }
+  function renderTries() {
+    const el = $("tries"), tw = triesHere();
+    if (!tw) { el.hidden = true; setHtml(el, ""); return; }
+    const fr = t => (t.t ? t.d / t.t : 0);
+    const work = tw.tries.list.filter(t => t.s === "w").sort((a, b) => fr(b) - fr(a) || b.d - a.d);
+    const failed = tw.tries.list.filter(t => t.s === "f").reverse();
+    const won = tw.tries.list.filter(t => t.s === "x");
+    const all = won.concat(work, failed);
+    const lines = all.slice(0, CAP).map(t => {
+      if (t.s === "f")
+        return `<li class="failed" data-m="${esc(t.m)}"><span class="mv">${esc(t.m)}</span><span class="rep">${esc(t.r || "")}</span></li>`;
+      return `<li class="${t.s === "x" ? "won" : "work"}" data-m="${esc(t.m)}"><span class="mv">${esc(t.m)}</span>` +
+        `<span class="bar"><i style="width:${(100 * fr(t)).toFixed(1)}%"></i></span><span class="n">${t.d}/${t.t ?? "?"}</span></li>`;
+    });
+    const total = tw.tries.work + tw.tries.failed + tw.tries.won;
+    if (total > CAP) lines.push(`<li class="more">+${total - CAP}</li>`);
+    el.hidden = false;
+    setHtml(el, lines.join(""));
+  }
+  function tryAt(li) {
+    const tw = triesHere();
+    return tw && li && li.dataset.m ? { tw, t: tw.tries.list.find(t => t.m === li.dataset.m) } : null;
+  }
+  $("tries").addEventListener("mouseover", e => {
+    const x = tryAt(e.target.closest("li"));
+    const cells = x && x.t ? tryCells(x.t) : null;
+    if (String(cells) !== String(hint)) { hint = cells; renderBoard(); }
+  });
+  $("tries").addEventListener("mouseleave", () => { hint = null; renderBoard(); });
+  // a try: the reply and the try as moves (a failed one also with the reply that refuted it)
+  $("tries").addEventListener("click", e => {
+    const x = tryAt(e.target.closest("li"));
+    if (!x || !x.t) return;
+    const get = m => (m === "pass" ? null : SN.BY_KEY.get(m));
+    const moves = [x.tw.row.move, x.t.m].concat(x.t.s === "f" && x.t.r ? [x.t.r] : []).map(get);
+    if (moves.some(m => m === undefined)) return;
+    setLine(st.base, st.baseText, st.line.slice(0, x.tw.ctx.k).concat(moves));
+  });
+  setInterval(() => {
+    const ctx = proveView();
+    if (ctx && proveLive(ctx.text)) {
+      renderProveHead(ctx);
+      const w = $("results").querySelector("li.work .t"), cs = curSeconds(ctx);
+      if (w && cs) w.textContent = fmtT(cs);
+    }
+  }, 1000);
   // the reply on the board (after P), with its answer as the next move when it is known
   function showReply(ctx, r, withAnswer) {
     const pl = r.move === "pass" ? null : SN.BY_KEY.get(r.move);
@@ -403,6 +489,7 @@
     const ctx = proveView();
     $("provehead").hidden = !ctx;
     if (ctx) { renderProveHead(ctx); renderProve(ctx); return; }
+    renderTries();
     const here = resultsHere();
     const ol = $("results");
     if (!here) { setHtml(ol, ""); return; }
@@ -445,7 +532,7 @@
     $("typical").textContent = SN.isOver(p) ? "" : bits.join(" · ");
   }
   // replaces an element's content only when it changed, so a click in progress is not lost
-  function setHtml(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; } }
+  function setHtml(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; return true; } return false; }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
   function render() {
@@ -526,7 +613,14 @@
   }
   let jumped = false;
   function onState(r) {
+      // a state without its rows: they have not changed since the ones the page has (rows_v)
+      if (r.prove && r.prove.rows == null) {
+        const old = proofs.get(r.position);
+        if (old && old.rows) r.prove.rows = old.rows;
+        else { r.prove = null; } // no rows to keep: the next poll or event brings them
+      }
       run = r;
+      run._at = Date.now();
       if (run.mode === "prove") {
         if (run.prove && run.prove.n) proofs.set(run.position, Object.assign({ exists: true }, run.prove));
         // a page opened while a proof runs starts on the proof's position
@@ -537,6 +631,7 @@
         if (run.message && run.status === "error") say(run.message);
         follow();
         renderRun();
+        renderBoard();
         return;
       }
       const c = entryFor(run.id, run.position, run.mode, run.seconds);
@@ -563,7 +658,8 @@
     setInterval(async () => {
       if (document.hidden || Date.now() - lastStream < 10000) return;
       try {
-        const j = await (await fetch("/api/status")).json();
+        const pr = run && run.mode === "prove" ? proofs.get(run.position) : null;
+        const j = await (await fetch("/api/status" + (pr && pr.rows_v ? "?rows=" + pr.rows_v : ""))).json();
         if (!j.run || (run && run.id === j.run.id && JSON.stringify(run) === JSON.stringify(j.run))) return;
         for (const r of j.run.results || []) onResult(Object.assign({ run: j.run.id, position: j.run.position }, r));
         onState(j.run);
