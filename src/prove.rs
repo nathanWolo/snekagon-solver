@@ -723,10 +723,14 @@ impl Prover {
         let (mut lo, mut hi) = (-1, 1);
         let mut best = PASS;
         std::thread::scope(|scope| {
-            for _ in 0..c.threads {
+            // --emulate W: one worker thread, W solvers taking the jobs in turn (exact node counts)
+            let emulate = c.cfg.drv_emulate as usize;
+            for _ in 0..(if emulate > 0 { 1 } else { c.threads }) {
                 let queue = queue.clone();
                 let tx = tx.clone();
-                let mut solvers: Vec<Solver> = (0..c.job_threads.max(1)).map(|_| Solver::with_table(c.cfg, table.clone())).collect();
+                let nsolvers = if emulate > 0 { emulate } else { c.job_threads.max(1) };
+                let mut solvers: Vec<Solver> = (0..nsolvers).map(|_| Solver::with_table(c.cfg, table.clone())).collect();
+                let mut turn = 0usize;
                 scope.spawn(move || loop {
                     let job = {
                         let mut g = queue.jobs.lock().unwrap();
@@ -744,8 +748,10 @@ impl Prover {
                     let t0 = Instant::now();
                     let (value, best, nodes) = if job.stop.load(Relaxed) {
                         (UNKNOWN, PASS, 0)
-                    } else if solvers.len() == 1 {
-                        let solver = &mut solvers[0];
+                    } else if solvers.len() == 1 || emulate > 0 {
+                        turn += 1;
+                        let k = (turn - 1) % solvers.len();
+                        let solver = &mut solvers[k];
                         solver.stop = Some(job.stop.clone());
                         let (v, m) = solver.solve_job(&job.pos, job.alpha, job.beta, &mut job.killers);
                         (v, m, solver.nodes)
