@@ -20,14 +20,13 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 
 Update this section in the same change that freezes a version.
 
-- **Paused on 2026-11-16 at 10:03 for a restart of the PC (owner's request); nothing was
-  running.** Three lines stopped mid-work, each with a `HANDOVER.md` on its branch
-  (`git show BRANCH:HANDOVER.md`): `climb/failtry` (E34, `284dd01`), `climb/tightq` (E33,
-  `895536e`), `climb/evalorder` (E32, `07c92bd`). Go on with one fresh Opus agent a line,
-  started from that file. The worktrees and scratch executables were in the session's
-  temporary folder: if they are gone, `git worktree prune`, then `git worktree add DIR BRANCH`;
-  copies of the candidate executables are in `work/exes/`. Delete `work/failtry/hold10/STOP`
-  before that replay goes on. LOG, "Paused for a restart of the PC".
+- **Resumed on 2026-11-16 at 10:25 after a restart of the PC** (paused at 10:03 at the
+  owner's request; the restart lost nothing). The three lines in work each keep a `HANDOVER.md`
+  on their branch (`git show BRANCH:HANDOVER.md`), kept current so that a stop loses nothing:
+  `climb/failtry` (E34), `climb/tightq` (E33), `climb/evalorder` (E32). Copies of the candidate
+  executables are in `work/exes/`. The owner uses the analysis board (port 8770): its solves
+  queue on the run lock, so keep lock holds short. LOG, "Paused for a restart of the PC" and
+  "Resumed after the restart".
 
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first

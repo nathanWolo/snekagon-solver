@@ -2965,3 +2965,32 @@ and not yet checked by the coordinator.
   candidate yet (base only: job a 152,253,809 nodes, job b 326,125,056 under `--emulate 16`).
 - The compiler seen outside the lock at 04:46 was `cargo check` (a type check, no link, a few
   seconds), run several times by this agent. Builds went through `tools/build.sh`.
+
+## 2026-11-16 Resumed after the restart (10:25)
+
+- Owner: "pc is back, can you start the gui for me". The analysis board runs again on port
+  8770; checked by loading the first position of `tests/set1/ply08.txt` and solving it (blue
+  wins, its label).
+- The restart lost nothing: the worktrees, the scratch executables and the repository are as
+  they were at 10:03; no process of ours was running and the lock was free.
+- Three fresh Opus agents go on from the hand-over notes. Their aims:
+  - **E34 (`climb/failtry`):** finish the screen of `--hold 10` (roots 6-9 of `tune25`), then
+    `--hold 30` on roots 0-9, both against the recorded base arm. If neither reads beyond the
+    10% band and the job logs point at one sharper rule, one variant behind its own option,
+    with its hypothesis written down first.
+  - **E33 (`climb/tightq`):** correctness before speed: identity with the option off on the
+    current source, `cargo test`, the check build, `verify 100 1 8 8`, the unexplained node
+    count at margin 3, and the argument why the rule is exact written out for a verifier. Then
+    the wider screen of the one setting that paid (asked at exactly 6 left).
+  - **E32 (`climb/evalorder`):** first a size-the-pot study at the top of the proof, then the
+    logistic weights out of sample.
+- *Hypothesis for the E32 study (before it runs):* the base replay made 170 red tries for 25
+  replies (145 failed) where the paused run made 67, and failed tries are about 70% of the
+  wall-clock. An evaluation that ranks red's winning try earlier than the model order does
+  would cut the failed tries directly, which no test set of red-win jobs can show. *Test:*
+  offline, on the 25 tune replies only: every red try in the recorded arms (`work/replay/base4`,
+  `work/replay/turns`, and the paused run's lines for the same replies) is labelled won or
+  failed; for each order (the model, the port as a yardstick, our fitted weights) the place of
+  the first known winner among red's moves and the number of known failures ranked before it.
+  *Against it:* 25 replies are few; untried moves have no label; the 49 other refuted replies
+  stay unused for a gate. If no order ranks the winners earlier than today's, the line stops.
