@@ -87,6 +87,9 @@ Roots done with hold 10 against the recorded base arm (wall s; one run each, tun
 
 ## Next steps
 
+Taken over 2026-11-16 by a new agent. **Running now:** step 1 (STOP deleted, the resume command
+below started; its output in `$W/hold10.run2.txt`). If stopped, run the same command again: it resumes.
+
 1. Finish the hold 10 screen: `rm $W/hold10/STOP; sh tools/replay.sh $W/hold-1.exe $W/tune10.txt $W/hold10 --hold 10 --job-log $W/hold10/jobs.txt`
    (about 30-40 min of locked time; it ends with `summary.txt`, check "all ok").
 2. Second setting, S=30 (better targeted, see step 2): `mkdir -p $W/hold30; sh tools/replay.sh $W/hold-1.exe $W/tune10.txt $W/hold30 --hold 30 --job-log $W/hold30/jobs.txt`.
