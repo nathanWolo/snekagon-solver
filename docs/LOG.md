@@ -1547,3 +1547,20 @@ default; with both off the driver does what the base does.
 - **What the driver may be losing, being sized now:** separate workers do not share a table.
   One solve of job a's position on one thread with one table tells how many nodes the same
   proof needs when everything is shared (the workers needed 642-685 M).
+
+## 2026-11-15 Pot sizing: separate workers lose nothing by not sharing a table
+
+- **Run:** proof job a's position solved by one thread with one table (`frozen/climb-base.exe
+  bench work/e24/a.pos --tt 27 --window -1,0`): value -1, 721.6 M nodes, 600.3 s.
+- **Against the driver on the same position** (16 single-thread workers, depth 1, each job its
+  own table): 642 M to 685 M nodes in five runs, 834 thread-seconds, 50.8 to 57.9 s of
+  wall-clock.
+- **Reading:** the sequential search with everything shared needs no fewer nodes than 675
+  separate jobs (it needs a few more), so there is nothing to win from a table shared between
+  jobs. The driver turns one thread's 600 s into about 51 to 58 s on 8 cores (10 to 12 times),
+  and its 1.39x in thread-seconds is the price of two threads a core. At depth 1 the driver is
+  close to what this machine can give: the remaining gains are in the search (nodes, and the
+  cost of a node), not in scheduling.
+- **Closed:** a shared table for the workers; more scheduling work on single jobs. *Reopen* the
+  driver only for what a long proof with many roots shows (idle workers between roots, the
+  order of roots).
