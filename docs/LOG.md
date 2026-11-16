@@ -2054,3 +2054,54 @@ counts with them off equal a build of `381560f`: proof 0-3 12,078,999, ply 6 5,3
   driver read (emulated, exact nodes, the tune jobs) *before* its gate, not as a guard
   after; changes that prune or that speed up a node are not affected in the same way, but
   get the same read once.
+
+## 2026-11-15 Ordering, round four (report): the order is used up inside the driver
+
+Agent's report. Its numbers.
+
+- **`--emulate W` on a branch of its own:** `climb/emulate`, commit `ab3bf7e`, parent `8f6adce`
+  (the frozen base's source); 18 lines in three files. Off: the base's counts (proof 0-23
+  56,301,796, ply 7 6,404,487, ply 6 5,846,840). On: job a with 16 solvers 339,620,578 nodes
+  twice, every job identical, root -1 and every recorded child 1.
+- **Where the driver's nodes go** (job a, emulated, the base's defaults, the agent's cost
+  counters; "cold" is every fourth child of job a, 169 positions, through `bench`):
+
+  | Left | First try wins, driver / cold | Nodes under failed moves, driver / cold | Driver's win nodes from handed-down killers |
+  | --- | --- | --- | --- |
+  | 11 (the job's root) | 96.3% / 92.9% | 7.9% / 13.6% | 88% |
+  | 9 | 99.5% / 98.5% | 4.5% / 7.2% | 64% |
+  | 7 | 99.7% / 99.5% | 3.0% / 3.6% | 1% |
+  | 5 | 98.5% / 98.1% | 1.4% / 1.7% | 0% |
+
+  A driver job costs 0.74x of the same position solved cold (108.4M against 146.9M nodes on
+  those 169).
+- **Why the extra killer slots gain cold and not in the driver:** at 9 and 11 left a job
+  starts from killers its siblings proved. `--xk 2` orders all killers by the history's key
+  and then by recorded cost; a handed-down killer has no recorded cost and sorts after the
+  extra slots. With the slots on, the handed-down share of win nodes at 9 left falls from
+  64% to 53% and the nodes under failed moves rise from 4.5% to 5.5%. Cold there is nothing
+  handed down to displace. (A fix to E31, not built: handed-down killers ahead of extras of
+  unknown cost.)
+- **What is left for the order in the driver:** failed first tries hold at most 7.9% of the
+  nodes at the job's root, 4.5% at 9 left, 3.0% at 7, 1.4% at 5 (nested; the union is below
+  their sum). The largest piece is 25 of 675 jobs whose first try fails. Which win is taken
+  remains (the cheaper killer in fact 0.74x), and nothing measured predicts it. The agent's
+  answer: used up for rules of this kind; move to another line.
+- **Not counted:** job b; the coordinator's order of jobs; times (the emulation gives nodes).
+
+**A fault in `tools/build.sh`, found by the agent and fixed.** The script checked only that
+`snek.exe` exists in the build directory, and a pipeline hid cargo's exit status. After a
+compile error the exe of an earlier build was copied out and its hash printed as if the build
+had worked. No gated build was affected as far as the records show: every candidate's counts
+were checked with its new option on, which an older exe would not have. Now cargo's exit
+status decides (it passes through the lock script; checked). The test of the fix (a good
+build, then a compile error with the earlier exe still in place) is queued behind the lock
+as this is written; its result gets its own line below when it is in.
+
+**Next line for this agent: the top of the proof.** In the paused run (old build) the 74
+refuted replies took 29,491 s. 35 needed one red try (mean 249 s); the other 39 needed 232
+failed tries on top, so about 11,000 s, 37% of the time, went to red moves at ply 2 that did
+not win, and four replies hold 133 of those 232 tries. That is a pot at the top of the real
+proof that no test position sees: red's choice of move against a reply, and what a failed
+try costs. First a profile with today's base on replies already refuted (fresh output files;
+the paused proof itself is not touched), then the pot by simulation on the recorded tries.

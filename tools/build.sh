@@ -7,8 +7,8 @@
 #
 # The profile is always collected the same way: the instrumented build on proof positions 0-23 with
 # --window 0,1 and on ply 7 positions 0-99 (tune positions; the ply-7 file is read from the main
-# checkout, a worktree does not have it). The profile run goes through the run lock; compiling
-# does not.
+# checkout, a worktree does not have it). The profile run and the compile go through the run lock
+# (do not wrap this script in locked.sh).
 #
 # The linker fails when the target directory's path is long (this repo's folder is), so everything is
 # built in a short directory: $SNEK_BUILD_DIR, or one under the temporary directory named after this
@@ -26,8 +26,12 @@ mkdir -p "$B"
 build() { # build TARGET-SUBDIR RUSTFLAGS
   # the compile takes the machine's run lock too: a build beside a timed run costs that run a
   # percent or two (2026-11-15, a compile overlapped a gate chunk)
-  RUSTFLAGS="$2" sh "$MAIN/tools/locked.sh" cargo +$TC build --release --target-dir "$B/$1" 2>&1 | grep -E "^error|LNK|Finished" | cut -c1-300
-  [ -f "$B/$1/release/snek.exe" ] || { echo "the build failed" >&2; exit 1; }
+  # cargo's own exit status decides: an exe left in the build directory by an earlier build is
+  # not a result (2026-11-15: after a compile error the old exe was copied out and its hash
+  # printed, because only the file's existence was checked)
+  if RUSTFLAGS="$2" sh "$MAIN/tools/locked.sh" cargo +$TC build --release --target-dir "$B/$1" > "$B/$1.log" 2>&1; then OK=1; else OK=0; fi
+  grep -E "^error|LNK|Finished" "$B/$1.log" | cut -c1-300 || true
+  [ $OK = 1 ] && [ -f "$B/$1/release/snek.exe" ] || { echo "the build failed (log: $B/$1.log)" >&2; exit 1; }
 }
 if [ $PGO = 0 ]; then
   build plain "-Ctarget-cpu=native"
