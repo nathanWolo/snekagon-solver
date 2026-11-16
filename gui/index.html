@@ -27,6 +27,7 @@
     <div class="row solver">
       <button id="bSolve" class="primary">Solve</button>
       <button id="bAll" class="primary">All moves</button>
+      <button id="bProve" class="primary">Prove</button>
       <label title="time limit per position; 0 = no limit">limit <input id="iSec" type="number" min="0" step="1" value="30"> s</label>
       <label title="solver processes at once">&times;<input id="iProcs" type="number" min="1" max="64" step="1" value="16"></label>
       <label title="wait for the machine's run lock"><input id="iLock" type="checkbox" checked> lock</label>
@@ -34,6 +35,7 @@
     <div class="row" id="typical"></div>
     <div class="row" id="runstate" hidden><span id="runtext"></span><button id="bNow">Run now</button><button id="bCancel">Cancel</button></div>
     <div id="verdict"></div>
+    <div class="row" id="provehead" hidden><span id="provetext"></span><label><input id="iFollow" type="checkbox"> follow</label></div>
     <ol id="results"></ol>
     <div class="row io">
       <textarea id="io" rows="2" spellcheck="false" placeholder="position text or moves"></textarea>
