@@ -106,6 +106,11 @@ pub struct Config {
     /// reply's length (at most `reach_threat_max` pieces left / above it; 99 = no limit).
     pub rt_margin_lo: i32,
     pub rt_margin_hi: i32,
+    /// After a failed move, which reply is taken as the one that refuted it: 0 the first killer one
+    /// ply down (as before; with the cost order it need not be the reply that just cut), 1 the move
+    /// that cut the child (the killer when the child did not cut by a move) for the reach-threat
+    /// test, 2 that also for the answer bonus.
+    pub rt_refuter: u8,
 }
 
 /// A "cannot reach" answer: the player with the cells `own` and the pieces `left` cannot build
@@ -170,7 +175,7 @@ pub fn outside_bucket(n: u32) -> usize {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0 }
     }
 }
 
@@ -399,6 +404,8 @@ pub struct Solver {
     pub rts: Box<RtStudy>,
     /// The nodes the current node has spent when it asks for a threat test.
     rt_effort_now: u64,
+    /// The move that cut the node at each ply (PASS until one does).
+    refuter: [u16; MAX_PLY],
     no_reach: Vec<NoReach>,
     node_limit: u64,
     aborted: bool,
@@ -477,6 +484,7 @@ impl Solver {
             rt_stats: [0; 3],
             rts: Box::new(RtStudy::new()),
             rt_effort_now: 0,
+            refuter: [PASS; MAX_PLY],
             no_reach: vec![NoReach { own: 0, opp: 0, left: 0, need: 0 }; 1 << NO_REACH_BITS],
             node_limit: u64::MAX,
             aborted: false,
@@ -1087,6 +1095,7 @@ impl Solver {
     /// node's whole subtree `total`. Keeps the killers (as before, or by cost) and the counters.
     #[inline]
     fn cut_by(&mut self, pos: &Pos, ply: usize, level: usize, m: u16, tt_move: u16, tried: u64, win: u64, total: u64) {
+        self.refuter[ply] = m;
         let k = self.killers[ply];
         let c = self.kcost[ply];
         if self.cfg.cost_stats {
@@ -1173,6 +1182,7 @@ impl Solver {
             return 0;
         }
         let ply = (pos.ply as usize).min(MAX_PLY - 2);
+        self.refuter[ply] = PASS;
         let (alpha_in, beta_in) = (alpha, beta);
         if PAR {
             // a parallel solve: remember the path, and now and then look whether another thread has
@@ -1723,8 +1733,9 @@ impl Solver {
                 }
                 // The reply that refuted this move (the first killer one ply down) will meet most
                 // moves that leave it alone: the moves that cover one of its cells go first.
+                let refuted_by = if self.cfg.rt_refuter > 0 && self.refuter[ply + 1] != PASS { self.refuter[ply + 1] } else { self.killers[ply + 1][0] };
                 if self.cfg.answer_bonus > 0 && first_pass && i + 1 < n {
-                    let k = self.killers[ply + 1][0];
+                    let k = if self.cfg.rt_refuter >= 2 { refuted_by } else { self.killers[ply + 1][0] };
                     if k != PASS && k != answered {
                         answered = k;
                         let reply = t.placements[k as usize].cells;
@@ -1744,7 +1755,7 @@ impl Solver {
                 // look for all of the opponent's threats.
                 if threats_on && first_pass && i + 1 < n {
                     if self.cfg.rt_study {
-                        let k = self.killers[ply + 1][0];
+                        let k = refuted_by;
                         if k != PASS {
                             let r = &t.placements[k as usize];
                             let z = r.cells | r.border;
@@ -1753,7 +1764,7 @@ impl Solver {
                     }
                     self.rt_effort_now = self.nodes - nodes_at_start;
                     let tests_before = self.rt_stats[0];
-                    self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, self.cfg.reach_threat && searched >= self.cfg.reach_threat_after, &mut th);
+                    self.try_threat(pos, ply, refuted_by, alpha, self.cfg.reach_threat && searched >= self.cfg.reach_threat_after, &mut th);
                     if self.cfg.rt_study && first_eb == usize::MAX && self.rt_stats[0] > tests_before {
                         first_eb = effort_bucket(self.nodes - nodes_at_start);
                     }

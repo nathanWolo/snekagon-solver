@@ -275,6 +275,7 @@ fn parse_opts(args: &[String]) -> Opts {
             }
             "--rt-margin-lo" => o.cfg.rt_margin_lo = val().parse().unwrap(),
             "--rt-margin-hi" => o.cfg.rt_margin_hi = val().parse().unwrap(),
+            "--rt-refuter" => o.cfg.rt_refuter = val().parse().unwrap(),
             "--reach-threat-cache" => o.cfg.reach_threat_cache = true,
             "--no-reach-threat-cache" => o.cfg.reach_threat_cache = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
