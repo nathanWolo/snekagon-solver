@@ -218,6 +218,8 @@ struct Opts {
     win_recent: usize,
     /// `prove --deadline S`: no new root is started after S seconds (the replay's pieces).
     deadline: f64,
+    /// `prove --job-log FILE` (see `prove::ProveCfg::job_log`).
+    job_log: Option<String>,
     no_symmetry: bool,
     /// `bench`: the window every position is searched with (one thread).
     window: (i32, i32),
@@ -227,7 +229,7 @@ struct Opts {
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, replay: false, win_turns: false, win_cap: 0, win_recent: 0, deadline: f64::INFINITY, no_symmetry: false, window: (-1, 1), only: None, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, replay: false, win_turns: false, win_cap: 0, win_recent: 0, deadline: f64::INFINITY, job_log: None, no_symmetry: false, window: (-1, 1), only: None, rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -317,6 +319,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--win-cap" => o.win_cap = val().parse().unwrap(),
             "--win-recent" => o.win_recent = val().parse().unwrap(),
             "--deadline" => o.deadline = val().parse().unwrap(),
+            "--job-log" => o.job_log = Some(val()),
             "--no-symmetry" => o.no_symmetry = true,
             "--window" => {
                 let v = val();
@@ -356,7 +359,7 @@ fn parse_opts(args: &[String]) -> Opts {
 fn prove_cmd(t: &Tables, o: &Opts) {
     let path = &o.rest[0];
     let text = std::fs::read_to_string(path).expect("cannot read the position file");
-    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first, wide: o.wide, no_symmetry: o.no_symmetry, replay: o.replay, win_turns: o.win_turns, win_cap: o.win_cap, win_recent: o.win_recent });
+    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first, wide: o.wide, no_symmetry: o.no_symmetry, replay: o.replay, win_turns: o.win_turns, win_cap: o.win_cap, win_recent: o.win_recent, job_log: o.job_log.clone() });
     let (mut total_nodes, mut total_us, mut wrong, mut n) = (0u64, 0u128, 0u32, 0u32);
     let (mut jobs, mut stopped, mut thread_s) = (0u64, 0u64, 0f64);
     let began = Instant::now();
@@ -373,6 +376,7 @@ fn prove_cmd(t: &Tables, o: &Opts) {
             println!("# deadline: stopped before root {}", i);
             break;
         }
+        prover.root_index = i;
         let r = prover.prove(&pos);
         worked |= r.jobs > 0 || r.stopped > 0;
         let us = (r.seconds * 1e6) as u128;

@@ -65,6 +65,10 @@ pub struct ProveCfg {
     pub win_turns: bool,
     pub win_cap: usize,
     pub win_recent: usize,
+    /// `--job-log FILE` (E34, a measurement, no effect on the search): one line a job and one a
+    /// coordinator node that is decided, with the path from the root (each move with its place in
+    /// its node's order), start and end seconds, the result and whether it was stopped.
+    pub job_log: Option<String>,
 }
 
 pub struct ProveResult {
@@ -98,6 +102,9 @@ pub struct Prover {
     root_killers: Killers,
     workers: Vec<Vec<Solver>>,
     started: bool,
+    jlog: Option<std::fs::File>,
+    /// The index of the root being proved (for the job log).
+    pub root_index: usize,
 }
 
 const NONE: usize = usize::MAX;
@@ -145,6 +152,8 @@ struct Node {
     running: bool,
     /// Decided when it was made (the game is over, or the result was known): nothing to record.
     given: bool,
+    /// The move's place in its parent's order (the job log).
+    place: u32,
     done: bool,
     dead: bool,
     stop: Option<Arc<AtomicBool>>,
@@ -195,6 +204,12 @@ struct Driver<'a> {
     /// Jobs out and not yet back.
     busy: usize,
     res: ProveResult,
+    /// The job log (see `ProveCfg::job_log`): the file, the root's index, the pass, and for each job
+    /// under way its path and start.
+    jlog: &'a mut Option<std::fs::File>,
+    root_index: usize,
+    pass_window: (i32, i32),
+    jmeta: HashMap<usize, (String, f64)>,
 }
 
 /// The cells of `bb` after symmetry `s` of the board.
@@ -232,6 +247,22 @@ impl<'a> Driver<'a> {
     }
 
 
+    /// The moves from the root to node `n`, each as move@place (the job log).
+    fn path_of(&self, mut n: usize) -> String {
+        let mut parts = Vec::new();
+        while n != ROOT && n != NONE {
+            let node = &self.nodes[n];
+            parts.push(format!("{}@{}", move_to_string(self.t, node.via), node.place));
+            n = node.parent;
+        }
+        parts.reverse();
+        if parts.is_empty() {
+            "-".to_string()
+        } else {
+            parts.join("/")
+        }
+    }
+
     /// A new node for `pos`. One that is decided at once comes back marked done.
     fn new_node(&mut self, pos: Pos, parent: usize, via: u16, alpha: i32, beta: i32) -> usize {
         let mut n = Node {
@@ -262,6 +293,7 @@ impl<'a> Driver<'a> {
             started: false,
             running: false,
             given: false,
+            place: 0,
             done: false,
             dead: false,
             stop: None,
@@ -503,6 +535,7 @@ impl<'a> Driver<'a> {
             let mut child = self.nodes[n].pos;
             child.play(self.t, m);
             let c = self.new_node(child, n, m, -beta, -alpha);
+            self.nodes[c].place = (self.nodes[n].next - 1) as u32;
             self.nodes[n].kids.push(c);
             if self.nodes[c].done {
                 let (v, mv) = (self.nodes[c].best, self.nodes[c].best_move);
@@ -551,6 +584,10 @@ impl<'a> Driver<'a> {
         if !self.nodes[n].leaf && !self.nodes[n].given {
             let (pos, window) = (self.nodes[n].pos, self.nodes[n].window);
             self.remember(&pos, window, v, reply, 0, 0);
+        }
+        if self.jlog.is_some() && !self.nodes[n].leaf {
+            let line = format!("N {} {},{} {:.3} {} {} {} {}", self.root_index, self.pass_window.0, self.pass_window.1, self.start.elapsed().as_secs_f64(), self.path_of(n), v, self.nodes[n].finished, self.nodes[n].given as u8);
+            writeln!(self.jlog.as_mut().unwrap(), "{}", line).expect("cannot write the job log");
         }
         self.release(n);
         let p = self.nodes[n].parent;
@@ -644,6 +681,13 @@ impl<'a> Driver<'a> {
     /// A job has come back.
     fn take(&mut self, done: Done) {
         self.busy -= 1;
+        if self.jlog.is_some() {
+            let (path, t0) = self.jmeta.remove(&done.id).unwrap_or_else(|| ("?".to_string(), -1.0));
+            let n = &self.nodes[done.id];
+            let res = if done.value == UNKNOWN { "S".to_string() } else { done.value.to_string() };
+            let line = format!("J {} {},{} {:.3} {:.3} {} {},{} {} {:.3} {} {}", self.root_index, self.pass_window.0, self.pass_window.1, t0, self.start.elapsed().as_secs_f64(), path, n.alpha, n.beta, res, done.micros as f64 / 1e6, done.nodes, n.dead as u8);
+            writeln!(self.jlog.as_mut().unwrap(), "{}", line).expect("cannot write the job log");
+        }
         self.res.nodes += done.nodes;
         self.res.thread_seconds += done.micros as f64 / 1e6;
         let id = done.id;
@@ -678,6 +722,7 @@ impl<'a> Driver<'a> {
         self.nodes.clear();
         self.free.clear();
         self.freed.clear();
+        self.pass_window = (alpha, beta);
         let root_id = self.new_node(*root, NONE, PASS, alpha, beta);
         assert!(root_id == ROOT);
         self.settle(ROOT);
@@ -693,6 +738,10 @@ impl<'a> Driver<'a> {
                 n.stop = Some(stop.clone());
                 n.running = true;
                 let job = Job { id: j, pos: n.pos, alpha: n.alpha, beta: n.beta, killers: n.killers, stop };
+                if self.jlog.is_some() {
+                    let path = self.path_of(j);
+                    self.jmeta.insert(j, (path, self.start.elapsed().as_secs_f64()));
+                }
                 if let Some(k) = self.known.get(&job.pos.hash).copied() {
                     // a bound from an earlier run that does not decide this window still helps
                     self.top.seed(job.pos.hash, k.lo as i32, k.hi as i32, k.mv);
@@ -771,7 +820,12 @@ impl Prover {
         }
         let log = c.out.as_deref().map(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).expect("cannot open the results file"));
         let table = Arc::new(Table::new(c.cfg.tt_bits));
-        Prover { c, table, known, log, winners: vec![Vec::new(); MAX_PLY], root_killers: [[PASS; 2]; MAX_PLY], workers: Vec::new(), started: false }
+        let mut jlog = c.job_log.as_deref().map(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).expect("cannot open the job log"));
+        if let Some(f) = jlog.as_mut() {
+            // a new process: its times start again from zero
+            writeln!(f, "P").expect("cannot write the job log");
+        }
+        Prover { c, table, known, log, winners: vec![Vec::new(); MAX_PLY], root_killers: [[PASS; 2]; MAX_PLY], workers: Vec::new(), started: false, jlog, root_index: 0 }
     }
 
     /// The exact value of `root` for the side to move. Two questions, each a search with a window of
@@ -805,6 +859,10 @@ impl Prover {
             start,
             busy: 0,
             res: ProveResult { value: UNKNOWN, best: PASS, jobs: 0, stopped: 0, reused: 0, nodes: 0, thread_seconds: 0.0, seconds: 0.0, stopped_seconds: 0.0 },
+            jlog: &mut self.jlog,
+            root_index: self.root_index,
+            pass_window: (0, 0),
+            jmeta: HashMap::new(),
         };
         let table = &self.table;
         let (mut lo, mut hi) = (-1, 1);
