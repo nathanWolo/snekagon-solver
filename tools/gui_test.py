@@ -329,16 +329,16 @@ def fake_tests(a, solver):
             t = r["prove"].get("tries")
             if t:
                 seen.append(t)
-            if t and sum(x["done"] for x in t["list"]) >= 150:
+            if t and sum(x["d"] for x in t["list"]) >= 150:
                 break
             time.sleep(0.2)
         call("/api/cancel", {})
         mid = seen[-1] if seen else None
         r = wait_run(30)
         check(r["status"] == "cancelled" and mid and mid["root"] == 0 and mid["work"] >= 1 and mid["best"] is not None
-              and all(x["total"] and x["total"] >= x["done"] for x in mid["list"]),
-              "tries while the first reply is in work: %s" % (mid and "; ".join("%s %s %d/%s" % (x["move"], x["state"], x["done"], x["total"]) for x in mid["list"])))
-        grew = [sum(x["done"] for x in s["list"]) for s in seen]
+              and all(x["t"] and x["t"] >= x["d"] for x in mid["list"]),
+              "tries while the first reply is in work: %s" % (mid and "; ".join("%s %s %d/%s" % (x["m"], x["s"], x["d"], x["t"]) for x in mid["list"])))
+        grew = [sum(x["d"] for x in s["list"]) for s in seen]
         check(grew == sorted(grew) and len(set(grew)) > 1, "the counts grow: %s" % grew[:12])
 
         # prove again: the tries are built from the file first
@@ -350,13 +350,17 @@ def fake_tests(a, solver):
             if t and t["root"] == 0:
                 first = t
             time.sleep(0.1)
-        done_mid = sum(x["done"] for x in mid["list"]) if mid else 0
-        check(first and sum(x["done"] for x in first["list"]) >= done_mid,
+        done_mid = sum(x["d"] for x in mid["list"]) if mid else 0
+        check(first and sum(x["d"] for x in first["list"]) >= done_mid,
               "proved again: the first tries come from the file (%s lost replies, %s before the cancel)" % (
-                  first and sum(x["done"] for x in first["list"]), done_mid))
+                  first and sum(x["d"] for x in first["list"]), done_mid))
         r = wait_run(60)
         p = r["prove"]
         check(r["status"] == "done" and p["refuted"] == 2 and r["value"] == -1, "both replies refuted: %s, %s of %s" % (r["status"], p["refuted"], p["n"]))
+        full = call("/api/status")[1]["run"]["prove"]
+        again = call("/api/status?rows=" + full["rows_v"])[1]["run"]["prove"]
+        check(full["rows"] and again["rows"] is None and again["rows_v"] == full["rows_v"],
+              "a poll that has the rows' version gets no rows (%s)" % full["rows_v"])
         time.sleep(1.5)
         stop.set()
         gaps = [b[0] - a_[0] for a_, b in zip(states, states[1:])]

@@ -33,6 +33,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
+import zlib
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -956,11 +957,20 @@ class Tries:
             t["done"] = len(t["lost"] & t["kids"]) if t["kids"] is not None else 0
         work = [t for t in ts if t["state"] == "work"]
         frac = [t["done"] / t["total"] for t in work if t["total"]]
-        return {"list": [{k: v for k, v in t.items() if k not in ("text", "kids", "lost")} for t in ts],
+        # compact, for a phone that polls: m move, s state (w in work, f failed, x won), d done, t total, r the reply
+        # that refuted a failed try; every try in work and won (at most TRY_CAP), the last TRY_CAP failed ones
+        key = lambda t: -(t["done"] / t["total"] if t["total"] else 0)
+        failed = [t for t in ts if t["state"] == "failed"]
+        shown = sorted([t for t in ts if t["state"] != "failed"], key=key)[:TRY_CAP] + failed[-TRY_CAP:]
+        code = {"work": "w", "failed": "f", "won": "x"}
+        return {"list": [dict({"m": t["move"], "s": code[t["state"]], "d": t["done"], "t": t["total"]}, **({"r": t["reply"]} if t["reply"] else {}))
+                         for t in shown],
                 "work": len(work), "failed": sum(t["state"] == "failed" for t in ts), "won": sum(t["state"] == "won" for t in ts),
                 "best": round(max(frac), 3) if frac else None,
                 "jobs": sum(1 for j, a in self.jobs.items() if self.tries[a]["kids"] is not None and j in self.tries[a]["kids"])}
 
+
+TRY_CAP = 40  # tries sent to the page, of each kind
 
 RE_ROOT = re.compile(r"^(\d+) (\d+) (\S+) (-?\d+) (\d+) (\d+) (\S+) (\d+) (\d+) (\d+) ([0-9.]+) (\S+)")
 RE_TRY = re.compile(r"root move (\d+) of (\d+)\s+(\S+)\s+value (-?\d+)")
@@ -1005,14 +1015,17 @@ class ProveRun:
             return self.drv
         return None
 
-    def snapshot(self, with_results=False):
+    def snapshot(self, with_results=False, rows_since=None):
+        """rows_since: the version of the rows the asker has; when it is the current one the rows are left out."""
         with self.cv:
             s = proof_summary(self.rows)
             now = time.time()
             c = self.cur()
             rate = round(self.worked_secs / self.worked, 1) if self.worked else s["avg"]
             tries = self.tries_pub if c is not None and self.tries_pub and self.tries_pub["root"] == c else None
-            s.update({"rows": [dict(r) for r in self.rows], "cur": c, "rate": rate, "tries": tries,
+            rows = [dict(r) for r in self.rows]
+            rv = "%08x" % zlib.crc32(json.dumps(rows).encode())
+            s.update({"rows": None if rows_since == rv else rows, "rows_v": rv, "cur": c, "rate": rate, "tries": tries,
                       "cur_seconds": round(self.piece_secs[c] + now - self.cur_t0, 1) if c is not None and self.cur_t0 else None})
             return {"id": self.id, "mode": "prove", "position": self.pos_text, "status": self.status, "message": self.message,
                     "total": s["n"], "done": s["refuted"], "running": 1 if self.proc is not None else 0, "nodes": self.nodes,
@@ -1440,7 +1453,8 @@ def make_handler(app):
                                 "lock": RunLock().available()})
             elif u.path == "/api/status":
                 r = app.run
-                self.send_json({"run": r.snapshot(True) if r else None,
+                since = urllib.parse.parse_qs(u.query).get("rows", [None])[0]
+                self.send_json({"run": (r.snapshot(True, since) if r.mode == "prove" else r.snapshot(True)) if r else None,
                                 "solver_pids": sorted(p.pid for p in list(LIVE))})
             elif u.path == "/api/proof":
                 text = urllib.parse.parse_qs(u.query).get("position", [""])[0]
@@ -1461,7 +1475,7 @@ def make_handler(app):
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            sent_run, sent_n, last_state, last_beat, last_sent = None, 0, None, 0.0, 0.0
+            sent_run, sent_n, last_state, last_beat, last_sent, sent_rows = None, 0, None, 0.0, 0.0, None
             try:
                 while True:
                     if client:
@@ -1470,13 +1484,13 @@ def make_handler(app):
                     chunks = []
                     if r is not None and r.owner == client:
                         if r is not sent_run:
-                            sent_run, sent_n, last_state = r, 0, None
+                            sent_run, sent_n, last_state, sent_rows = r, 0, None, None
                         with r.cv:
                             new = r.events[sent_n:]
                             sent_n += len(new)
                         for e in new:
                             chunks.append("event: result\ndata: %s\n\n" % json.dumps(dict(e, run=r.id, position=r.pos_text)))
-                        st = r.snapshot()
+                        st = r.snapshot(rows_since=sent_rows) if r.mode == "prove" else r.snapshot()
                         kv = {k: v for k, v in st.items() if k not in ("elapsed", "waited")}
                         if "prove" in kv:
                             kv["prove"] = {k: v for k, v in kv["prove"].items() if k != "cur_seconds"}
@@ -1486,6 +1500,8 @@ def make_handler(app):
                             chunks.append("event: state\ndata: %s\n\n" % json.dumps(st))
                             last_state = key
                             last_beat = last_sent = time.time()
+                            if r.mode == "prove":
+                                sent_rows = st["prove"]["rows_v"]
                     if not chunks and time.time() - last_beat > 1:
                         chunks.append(": ping\n\n")
                         last_beat = time.time()
