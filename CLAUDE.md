@@ -32,13 +32,24 @@ Update this section in the same change that freezes a version.
   on proof positions. Build it and every candidate with `sh tools/build.sh [--pgo] OUT.exe`
   (the compile takes the run lock); a deciding read compares two `--pgo` builds.
   `frozen/climb-base-plain.exe` is the same source without the profile, for screens.
-- **In work (sub-agents, Opus):** reach threats (E29, branch `climb/threats`: an exact rule,
-  cleared by an independent verifier on `climb/verify-rt`, about 0.96x at 4 pieces left or
-  fewer; merged with E30 on `climb/both`, to be gated next); round two of the cost-aware
-  order (`climb/cost`: what pot is left, a budget race between candidates, more killer
-  slots). Kept apart: the driver's `--split` and `--hint` (`climb/driver`), the ordering
-  study (`climb/order`). Shadow builds that re-search what a rule pruned: `climb/verify`,
+- **In work (sub-agents, Opus):**
+  - Reach threats at every level (E29, branch `climb/threats`, `f24a2d2`): nodes 0.46-0.57x,
+    time 0.81-0.92x in the agent's reads, through a cheaper three-piece reach test
+    (`--reach-start3`). **Not gated until the independent verifier clears start3** (branch
+    `climb/verify-rt3`; the first check on `climb/verify-rt` covered the older code). Its agent
+    is on the cost per node (same nodes, less time).
+  - Extra killer slots (E31, branch `climb/xk`, `381560f`): 0.845x nodes on cold single
+    positions, 1.003x inside the driver. **Held, not gated** (LOG, "Ordering, round three").
+  - The ordering agent (`climb/cost`): what is left for move order inside the driver, and
+    `--emulate W` on a branch of its own (`climb/emulate`): a driver run with exact node counts.
+  - The analysis board (branch `gui`: `tools/gui.py`, `gui/`), no change to `src/`.
+  Kept apart: the driver's `--split` and `--hint` (`climb/driver`), the ordering study
+  (`climb/order`). Shadow builds that re-search what a rule pruned: `climb/verify`,
   `climb/verify-rt` (`--features shadow`).
+- **An ordering change needs a driver read before its gate.** `tests/proof4` positions are
+  the driver's jobs solved cold (no killers handed down, no history from sibling jobs, an
+  empty table). E30 gained on both; E31 only cold. Read it with `prove --emulate 16` (exact
+  nodes) on the tune jobs `work/e24/a.pos` to `f.pos`; jobs g to r are for driver gates.
 - **Gate units:** `tests/proof4` has 57 unused gate units (164-220); `tests/proof4b` (1,184
   positions, none shared) has 325 (118-442). A learned order is gated only on positions whose
   parents were kept out of its training.

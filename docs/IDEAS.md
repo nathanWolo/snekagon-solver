@@ -21,10 +21,15 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    red's moves (hours); a wide window there, and a better guess of the first red move, are the
    next things to build.
 
-0a. **Reach threats (E29, verified exact, gate pending on the base with E30).** At 4 pieces
-   left or fewer with the test at node start: about 0.96x on profiled builds. At 5-6 left the
-   tests that find a threat cost 23-40 thousand cycles; the cluster bound's margin predicts
-   the answer and is the filter to try. Found by the study agent on 2026-11-15: the reply that
+0a. **Reach threats (E29).** *Round three (2026-11-15):* at every level, tested at node start
+   too, with a cheaper three-piece reach test (`--reach-start3`): nodes 0.46-0.57x, time
+   0.81-0.92x (agent's reads, `f24a2d2`). start3 is a new pruning inside the reach test and
+   waits for the independent verifier; no gate before that. Time per node is up 1.8x, so the
+   next pot is the cost of the tests (round four). *Before:* at 4 pieces
+   left or fewer with the test at node start: about 0.96x on profiled builds (screen `E29-S`
+   0.966x; gate put off). At 5-6 left the
+   tests that find a threat cost 23-40 thousand cycles; the margin filter and an effort
+   trigger were tried in round three and do not help. Found by the study agent on 2026-11-15: the reply that
    refuted a move is a threat when the mover can no longer reach its length even alone; exact;
    nodes 0.51-0.57x on proof positions, 0.64-0.67x at plies 6-7; no time gain until the
    three-piece reach test behind it is cheaper. Branch `climb/threats`. LOG, "The study
@@ -39,11 +44,16 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    model is at the limit of its eight features (a refit on five times the data gave the same
    weights), and re-ranking by look-ahead features gave nothing. It needs information of another
    kind.
-2b. **Cheapest win first, from what the search has seen (E30: passed, 0.796x; round two in
-   work).** Left in the pot after round one (the agent's oracle): choosing between the two
-   killers by record gets 0.78-0.96x where the cheaper in fact costs 0.55-0.60x. Round two:
-   a budget race between candidates, more killer slots with costs, the history over every
-   candidate, the history's life in the driver. The ordering study
+2b. **Cheapest win first, from what the search has seen (E30: passed, 0.796x).** *Round two:*
+   the pot between the two killers is spent (by record 0.96-1.16x; a budget race never beats
+   0.99x in simulation, not built). Two more killer slots (E31, `--xk 2`, `climb/xk`): 0.845x
+   nodes on cold positions, **1.003x inside the driver** (exact, emulated, three jobs), so
+   held and not gated. *Reopen E31:* a driver read over six or more jobs that shows a gain,
+   or cold single solves become a target. *Round three:* carrying the killers' costs over a
+   worker's jobs 0.978x with the jobs disagreeing in sign; sharing the history between
+   workers 1.09x on one job. *Round four, in work:* what is left for the order inside the
+   driver, counted. Round one's pot (the agent's oracle): choosing between the two
+   killers by record gets 0.78-0.96x where the cheaper in fact costs 0.55-0.60x. The ordering study
    (LOG, 2026-11-15): a learned order pays 0.97-1.00x on held-out parents; the pot is the cost
    of the win that is taken (today pays 5.9x the cheapest win at 7 left, by standalone costs),
    and no feature of the position predicts it. Cost-aware killers and history use what
