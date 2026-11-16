@@ -31,8 +31,9 @@ pub const NFEAT: usize = 8;
 pub const NAMES: [&str; NFEAT] = ["est", "ub", "long", "terr", "hand", "ends", "short", "fresh"];
 
 /// The fitted weights, in the order of `NAMES`, then the weight of the model's score (`MODEL`, the
-/// order below these levels; 64 with every other weight 0 is today's order).
-pub const WEIGHTS: [i32; NFEAT + 1] = [0, 0, 0, 0, 0, 0, 0, 0, 64];
+/// order below these levels; 64 with every other weight 0 is today's order), then the weight of the
+/// static score (piece size and contact, divided by 64).
+pub const WEIGHTS: [i32; NFEAT + 2] = [0, 0, 0, 0, 0, 0, 0, 0, 64, 0];
 
 fn largest_group(mut b: BB) -> i32 {
     let mut best = 0;
@@ -118,7 +119,7 @@ pub fn features(t: &Tables, child: &Pos) -> [i32; NFEAT] {
 
 /// The order score of a move: higher first.
 #[inline]
-pub fn score(t: &Tables, child: &Pos, w: &[i32; NFEAT + 1]) -> i32 {
+pub fn score(t: &Tables, child: &Pos, w: &[i32; NFEAT + 2]) -> i32 {
     let f = features(t, child);
     let mut s = 0;
     for i in 0..NFEAT {

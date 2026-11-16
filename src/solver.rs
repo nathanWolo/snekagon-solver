@@ -115,7 +115,7 @@ pub struct Config {
     /// evaluation of the position after each (`evalorder.rs`) instead of the model (99 = never).
     pub eval_level: u32,
     /// E32: the weights of that evaluation.
-    pub eval_w: [i32; crate::evalorder::NFEAT + 1],
+    pub eval_w: [i32; crate::evalorder::NFEAT + 2],
     /// E32: the answer bonus at those nodes (added to the score of each move that covers the reply
     /// that refuted the move before; the scores of the evaluation lie below 1 << 21).
     pub eval_bonus: u64,
@@ -1567,6 +1567,7 @@ impl Solver {
                 } else if p.border & theirs != 0 {
                     score += 32;
                 }
+                let static_s = score as i32;
                 let mut model_s = 0i32;
                 if use_model {
                     let mut joined = p.n as i32;
@@ -1601,10 +1602,10 @@ impl Solver {
                     model_s = s;
                 }
                 if use_eval {
-                    // E32: the evaluation of the position after the move, with the model's score as one term
+                    // E32: the evaluation of the position after the move, with the model's and the static score as terms
                     let mut child = *pos;
                     child.play(t, m);
-                    let v = if child.is_over() { -game_result(&child) << 19 } else { crate::evalorder::score(t, &child, &ew) + ew[crate::evalorder::NFEAT] * model_s };
+                    let v = if child.is_over() { -game_result(&child) << 19 } else { crate::evalorder::score(t, &child, &ew) + ew[crate::evalorder::NFEAT] * model_s + ew[crate::evalorder::NFEAT + 1] * static_s / 64 };
                     score = (v + (1 << 20)).clamp(0, (1 << 21) - 1) as u64;
                 }
                 if m == tt_move {
