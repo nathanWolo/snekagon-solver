@@ -1600,3 +1600,33 @@ all training and test positions are children that are not in `tests/proof4`.
   information of another kind than a feature of the position. Expected: unknown; earlier
   order ideas from the search's own knowledge gave 0.77x once (E14) and nothing five times
   (E15-E17, E20, E21). Screened in the tree on node counts, which are exact.
+
+## 2026-11-15 E29, first report: reach threats ported and exact; nodes 0.56x, time unchanged
+
+Branch `climb/threats` (Opus sub-agent), commits `f59006f` to `efa65ec`, on top of the search
+bundle. The option is `--reach-threat`, off by default; with it off the node counts are the
+base's.
+
+- **Nodes** (proof positions 0-23, `--window 0,1`): 75,382,224 off; 44.66 M with the study's rule
+  using the witness cache; 42.38 M with a refined zone (when R grows a snake, a move that
+  touches R without covering it is also pruned if it grows a snake of the mover; the argument
+  is in the commit, and `verify` checks it against brute force).
+- **Time** (plain MSVC builds, arms interleaved, seconds): off 59.5 / 60.6 (min / median of 5);
+  on 59.2 / 60.4 (3 reads). No gain: the tests cost what the nodes save.
+- **By level, one read each:** testing only at 5 pieces left or more is the slowest arm (62.6 s
+  for 50.8 M nodes): most of the nodes saved there are cheap table cuts. Testing only at 4 or
+  fewer keeps a fifth of the node saving (66.6 M) at no cost (59.8, 60.0 s), and with the
+  replies also tested at node start there: 65.0 M nodes, 57.2 s (one read, 0.94x). This is the
+  reverse of the study's guess that the gain lives at 5-6 left.
+- **Witnesses** answer 11% of the threat tests; the last piece of a three-piece test without
+  copying the position changed nothing in time.
+- **Correct:** every label on ply 6 (0-199), ply 7 (0-589), ply 8 (all), one bench file, proof
+  positions 0-23 in every variant; `verify 100` with the new checks.
+- **Not done:** profiled builds, positions 24-47, repeats.
+- **Sent back with two steps:** secure the setting at 4 or fewer (three rounds on both halves,
+  then a profiled pair with the rule on by default, since the profile run uses the defaults);
+  then the 5-6 level with counters first: what a test costs by answer, what a found threat
+  saves, and whether a cheap signal (the cluster bound's margin over R's length, the moves
+  left outside the zone) predicts the answer before the test.
+- **A slip of the agent's:** one command ran in the main checkout (`git checkout src`, on a
+  clean tree: no effect). Checked: the main checkout is clean and at the right commit.
