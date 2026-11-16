@@ -1512,3 +1512,38 @@ that branch). Four pots, ranked:
   - The independent verifier found the argument that makes the riskiest change safe in a
     sentence (a witness can only say yes, and only a no prunes). Asking a second agent to
     break a change cost 35 minutes and is now a tool (`--features shadow`).
+
+## 2026-11-15 The driver agent's report: two exact options, no gain that can be told from noise
+
+Branch `climb/driver` (Opus sub-agent), commits `8f36221` and `ce2d0af`. Both options are off by
+default; with both off the driver does what the base does.
+
+- **`--split S`:** when a worker would be idle, the job whose root move has been under way
+  longest (at least S seconds) is stopped and its position becomes a coordinator node, its
+  moves going out as jobs. On job d it removed the idle tail (87.7 s of wall-clock for 1403
+  thread-seconds), but the base ran 88.8 s that hour without a late giant job; on job b no gain
+  (70.0 s against 60.8 and 67.2).
+- **`--hint`:** before a job goes out the coordinator works out the move it would search first
+  there and gives it to the job as its first killer; a move that wins a job is recorded as a
+  winner at its ply (before, at depth 1, that list stayed empty). Job c: 976 and 1064
+  thread-seconds against 1098 and 1204 (0.89x); elsewhere inside the noise. Limited to jobs at
+  most two plies below the root after it made the coordinator the bottleneck at depth 3 (127 s
+  against 15 s on a bench file).
+- **Correct:** the five bench files at depths 1-3 with both options on, splitting as hard as
+  possible: all values right; a cut results file is picked up and finished.
+- **The agent's reading, which I share:** one run cannot tell settings apart unless they differ
+  by 15-30%; depth 1 and depth 2 trade places from job to job. Its study of the morning's
+  results files: runs at depth 1 and depth 2 found different red refutations for 30-95% of
+  blue's moves; at depth 2 the coordinator sometimes tries hundreds of red moves (110 and 347
+  tries, 50 s and 150 s) where one job did it in 9 s and 47 s, because a failing first move is
+  cheap inside the solver (threat zones) and dear at the coordinator.
+- **Decision:** not gated. The effect the screens suggest (0 to 10%) is below what twelve jobs
+  resolve (7% with one run an arm, 5% with two), and a read of that size costs an hour of the
+  machine. The branch is kept apart, unmerged. *Reopen* when the driver's noise is lower or
+  the jobs are more (62 proved positions are left in the paused proof's results), or if a
+  long proof shows idle workers.
+- **Recommended setting for a long proof, as it stands:** `--threads 16 --job-threads 1 --depth 1`
+  (no work thrown away, the coordinator stays out of red's choices).
+- **What the driver may be losing, being sized now:** separate workers do not share a table.
+  One solve of job a's position on one thread with one table tells how many nodes the same
+  proof needs when everything is shared (the workers needed 642-685 M).

@@ -97,6 +97,9 @@ The sizes to quote are the ladder's (LOG, "Confirmation"), not the gates'.
 
 - **E8 parallel solve**: see Open 3.
 - **E18 proof driver** (`src/prove.rs` on `parallel-v9`): exact, restartable, not a speed gain yet.
+- **Driver options `--split` and `--hint`** (branch `climb/driver`, not merged): exact; no gain
+  that can be told from the driver's own run-to-run noise (sd 0.115 a job). *Reopen* with a
+  quieter ruler or more jobs.
   See Open 3 and 3a.
 
 ## Dropped (the graveyard)
