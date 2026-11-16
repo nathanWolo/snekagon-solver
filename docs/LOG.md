@@ -2301,3 +2301,80 @@ reach-threat gate is through, because a replay of 25 replies is about an hour of
 threads an arm and the lock is the bottleneck tonight. The replay is also the missing ruler
 for the proof itself: seconds a reply, in the proof's order, with everything the driver
 knows. Any frozen change should be read on it once.
+
+## 2026-11-16 E29, the verifier's verdict on round three: start3 and the new defaults cleared, with limits
+
+Agent's report (the independent verifier; branch `climb/verify-rt3`, commits `6480f52`,
+`ba13096`, `74df585`; run outputs in its worktree, `work/g1` to `work/g7`). Its numbers.
+It did not build the change and does not gate it.
+
+**Verdict: no wrong value and no wrong "cannot reach" answer found. Every check passed.**
+
+- **The argument, checked against the code.** The mover alone, opponent frozen, ends with a
+  snake F of at least the target. F holds old snakes; take S, a longest of them. F's new
+  pieces can be ordered outward from S so that each placement is legal now. Every piece is
+  an induced path, so it touches at most two components outside itself, one of them what is
+  built: each piece brings in at most one more old snake. So F is at most len(S) + the cells
+  in hand + the k longest other snakes no longer than S (k pieces in hand). Ties are
+  counted (`<=`), a piece joining two snakes is counted, a ring brings in none, an empty
+  start set answers "cannot". At the boundary (target = cells in hand + 1) start3 does nothing.
+- **Differential check inside every reach test** (shadow build at the new defaults; each
+  query in start3's domain asked in the other mode with the same work limit, in both modes
+  with unlimited work, and a sample against an independent brute force). Over ply 6 0-199,
+  ply 7 0-589, ply 8, `ply5_other_openings`, proof4 0-23 narrow, proof 0-2 full window and
+  three 8-thread runs:
+
+  | Hand | Queries | start3 "cannot", plain "can" | The other way | Unlimited: start3 differs | Brute-force checked |
+  | --- | --- | --- | --- | --- | --- |
+  | 3 | 9,303,444 | 0 | 0 | 0 | 1,163,623 |
+  | 4 | 366,073 | 163 | 0 | 0 | 45,812 |
+  | 5 | 97 | 0 | 0 | 0 | 0 |
+  | 6, 7 | 0 | | | | |
+
+  All 163 changed answers are "cannot" by the unlimited test in both modes. No brute-force
+  check disagreed.
+- **Shadow re-search at the new defaults**, same sets: 128.7 M moves pruned by a reach bound,
+  127.6 M of them (99.1%) solved exactly with the rule off; 3.86 M nodes where the rule
+  pruned solved exactly against the value returned and the bounds stored; all 6.58 M
+  "cannot reach" answers asked again with unlimited work, start3 off and on. **0
+  mismatches.** The shadow build's node counts equal the candidate's (proof 0-23:
+  26,095,441 in both).
+- **Values below the root:** 1,880 positions from inside the trees (levels 2-11), each
+  solved with the rule off and then in 4 settings x 3 windows on fresh tables: 22,560
+  solves, 0 mismatches.
+- `verify 100` passes. **Proof driver** (16 single-thread workers, depth 1): job a root -1
+  and all 675 root moves -1; job b root -1 and all 838 root moves -1.
+- **Planted faults.** No other-snakes term: caught (differential, re-search, `verify`).
+  Ties not counted: caught. **k-1 other snakes instead of k: caught by nothing**, not by
+  any in-tree check and not by `verify 100`; node counts identical to the unfaulted run. A
+  position built by hand shows it is a real fault
+  (`000100000100200478800801002084e0_00000000000000000000000000000000_14_14_0_12_0`,
+  target 21: plain start3 and the brute force say "can", the faulted builds "cannot"). The
+  final snake there needs S plus three other snakes with three pieces, which never arises
+  in these trees. So the term k is right by argument and by that one case only.
+- **What root labels cannot see:** with the first fault planted, proof 0-23 gave 0 wrong
+  labels and 19.8 M nodes instead of 26.1 M. A wrong reach "cannot" looks like a 0.76x
+  speed-up at the root. Only the in-tree checks see it.
+- **The node increase, explained:** it happens only in `f368e74`'s setting (tested at node
+  start at 4 left or fewer): 27,984,567 off, 28,463,674 on, reproduced. 39 queries (all
+  with 4 pieces in hand) turn from "ran out of its 2,000 work, said can" into a proved
+  "cannot", all correct; nothing changes the other way. Position 23 alone grows by 479,683
+  because the extra correct prunes change what feeds E30's cost history (with
+  `--no-cost-order` it is 1,396,848 against 1,405,619). With unlimited reach work start3 on
+  and off give identical node counts everywhere. At the new defaults start3 lowers the
+  nodes (26,238,711 to 26,095,441).
+- **Not covered:** proof4 24-47 and `proof4b`; four of the five ply-5 files; the full window
+  beyond 3 proof positions; driver jobs other than a and b; hands of 5 to 7 in start3's
+  domain (97 queries, all agreed); the `--rt-effort*`, `--rt-margin-*` and `--rt-refuter`
+  options were read, not run.
+- **Fragile points it names:** the k term needs a unit test on a constructed position; the
+  4-slot `top` array relies on snakes + pieces in hand being at most 8; a bench run carries
+  state across positions, so node counts compare only between runs over the same range
+  (position 13: 1,535,040 when the run starts at 12, 1,563,463 from 0).
+- **Its slips:** a mistyped `cd` queued a build in the ordering agent's worktree; it was
+  stopped while waiting for the lock, nothing compiled or written. An early smoke run
+  outside the lock was refused.
+
+**Decision.** `f24a2d2` goes to its one gate as it is. Two conditions on the freeze, neither
+changing the search: a unit test of the k term on the constructed position, and a guard on
+the `top` array, go in with the merge. What the verifier did not cover stays listed here.
