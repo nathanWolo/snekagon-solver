@@ -120,7 +120,7 @@ pub fn eval_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
     let text = std::fs::read_to_string(path).expect("cannot read the position file");
     let mut solver = Solver::new(cfg);
     let names: Vec<String> = crate::evalorder::NAMES.iter().map(|s| s.to_string()).collect();
-    println!("pos,move,{},static,win,nodes", names.join(","));
+    println!("pos,move,{},model,static,win,nodes", names.join(","));
     let mut list = Vec::new();
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
         if i < from || i >= to {
@@ -145,6 +145,23 @@ pub fn eval_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
             } else if p.border & theirs != 0 {
                 score += 32;
             }
+            // the model's score, as the search computes it at these levels
+            let w = cfg.model;
+            let empty = pos.empty();
+            let their_shape = shape_of(theirs);
+            let their_free = neighbours(their_shape.ends) & empty & !neighbours(their_shape.body);
+            let mut joined = p.n as i32;
+            for j in 0..pos.nsnakes[me] as usize {
+                if pos.snakes[me][j] & p.border != 0 {
+                    joined += count(pos.snakes[me][j]) as i32;
+                }
+            }
+            let after = joined.max(pos.longest[me] as i32);
+            let mine = shape_of(own | p.cells);
+            let my_ends = count(neighbours(mine.ends) & empty & !p.cells & !neighbours(mine.body)) as i32;
+            let their_ends = count(their_free & !p.cells) as i32;
+            let model = w[0] * (after - pos.longest[opp] as i32) + w[1] * p.n as i32 + w[2] * (p.border & own != 0) as i32 + w[3] * joined
+                + w[4] * (p.cells & front != 0) as i32 + w[5] * (p.border & theirs != 0) as i32 + w[6] * my_ends + w[7] * their_ends;
             let mut child = pos;
             child.play(t, m);
             let f = crate::evalorder::features(t, &child);
@@ -156,7 +173,7 @@ pub fn eval_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
                 let v = solver.solve(&child, -1, 0, cap);
                 (if v == UNKNOWN { "?" } else if v <= -1 { "1" } else { "0" }, solver.nodes)
             };
-            println!("{},{},{},{},{},{}", i, m, fs.join(","), score, win, nodes);
+            println!("{},{},{},{},{},{},{}", i, m, fs.join(","), model, score, win, nodes);
         }
     }
 }
