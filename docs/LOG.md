@@ -1814,3 +1814,23 @@ counterexample and gives an argument for every variant.
   cache reads `need >= e.need` and is never cleared (sound because entries are facts);
   `try_threat` now serves two paths behind two flags.
 - **Verdict:** cleared for its speed gate, which waits for E30 (the base will change).
+
+## 2026-11-15 E30: the gate passes (0.796x total time on fresh proof positions)
+
+- **Gate `E30`** (`proof4b` gate units 88-117, 60 positions, profiled builds, `--window 0,1`):
+  **pass** at the minimum of 30 units, LLR +15.1 against a bound of 2.94. Total time 178.3 s
+  against 224.0 s (**0.796x**), nodes 0.735x; log ratio 0.276 +/- 0.057 (a geometric mean of
+  0.76x a unit), sd 0.158 a unit; 2 of 30 units slower. Every value right.
+- **The screen predicted it:** 0.765x on 20 tune units, 0.794x in the agent's three rounds on
+  plain builds. The gate's spread (sd 0.158) is under half the screen's (0.356), so the cap of
+  120 was generous.
+- **A fault of the coordinator's during the gate:** a 17-second compile (the trial merge of
+  the two branches) ran while chunk 1 (units 98-107) was being timed. One core beside a
+  one-thread run, but it should not have happened. Sensitivity: chunk 1 read 0.813x, the
+  least favourable of the three (0.779x, 0.813x, 0.780x); without it the 20 remaining units
+  read 0.780x with the same mean log ratio (0.277 +/- 0.051). The verdict does not hang on it.
+  Rule from now: nothing is compiled while a gate of mine is being timed.
+- **The size:** an SPRT's estimate leans toward the bound it crossed, less so when it stops at
+  its minimum as here. Three reads agree on 0.77x to 0.80x.
+- **Next:** guards `E30-UP` (ply 5) and `E30-DRV` (whole proof jobs, 16 workers), then merge
+  and freeze.
