@@ -1999,3 +1999,58 @@ against without on queries from real searches, the shadow re-search of what the 
 pruned, a planted fault), and explains the node increase. A wrong "cannot reach" is a wrong
 value somewhere. Then: merge onto the base of that time (E31 is at its gate first), my own
 identity and label checks, a profiled pair, a tune screen, the cap, the one gate.
+
+## 2026-11-15 Ordering, round three (report): the driver gets nothing from the extra slots; E31 is held
+
+Agent's report, branch `climb/cost`, commit `1b2a3b6` (on `climb/xk` `381560f`; new options off,
+counts with them off equal a build of `381560f`: proof 0-3 12,078,999, ply 6 5,336,972, ply 7
+5,990,249). Its numbers.
+
+- **A driver read with exact node counts: `--emulate W`.** One thread holds W solvers that take
+  the jobs in turn; the coordinator still keeps W jobs out, so killers are handed down as with
+  W workers and the table is shared. Deterministic: job a, base against base, 344,011,725
+  nodes twice, every job identical. A whole job is 5 minutes (a) to 14 (d) on one thread, two
+  at a time (a `--tt 27` table is 2 GB). What is left is the spread from job to job: an order
+  change moves the total by 0.85x to 1.07x between jobs (sd of the log about 0.08), so six
+  tune jobs resolve about 6-8%, and 3% would need about 30 jobs. The approximation: solvers
+  take jobs strictly in turn, real workers as they come free.
+- **`--xk 2` inside the driver, exact:** a 1.013x, b 1.067x, c 0.924x; total 1,595.5M nodes
+  against 1,591.2M, **1.003x**. The real driver in round two read 0.996x on the same jobs. On
+  cold single positions the same option reads 0.845x (88 tune positions).
+- **Why, as far as known:** not the clearing of the costs and slots for every job (bench
+  clears them for every position and still gains). A driver job starts from the killers its
+  siblings proved, handed down by the coordinator; a bench position starts with none. Not
+  counted directly.
+- **Candidates in the driver** (exact, emulated, nodes against the defaults):
+  - `--drv-carry` (a job keeps the costs and extra slots its solver had for the handed
+    killers that are the same moves): a 0.937, b 0.852, c 1.055, d 1.040; total 0.978x. The
+    jobs disagree in sign.
+  - `--drv-share` (the history merged between workers at job boundaries): job a 1.091x; with
+    carry 0.971x. A worker's own recent history is better than everyone's.
+- **Recommendation:** no driver gate; nothing here can be shown.
+- **Breaches, by the agent's account:** one pair of runs held the lock for 13-14 minutes; a
+  launch of five 2 GB provers at once was stopped while it still waited for the lock; it
+  could not stop its own loop shell (refused by the permission check) and shortened the
+  loop's script instead.
+
+**Decision: E31 is not gated now.**
+
+- The goal is the prover (owner, 2026-11-15: "keep hill climbing the performance of the
+  prover"). The three jobs put the extra slots' effect in the driver at 1.00x with a
+  standard error of about 4-5% on the log: a few percent either way is open, the bench's
+  0.845x is not (3.6 standard errors away).
+- A gate on cold single positions would pass on a gain the prover does not get, and would
+  move the base under the reach-threat candidate for nothing. The candidate stays on
+  `climb/xk` (`381560f`); my checks of it are right so far (flags off: the base's counts;
+  `--no-cost-order`: v9's; proof 0-23 53,909,813 and 24-47 58,520,632 with every label right).
+  The screen `E31-S` was already queued and is recorded as the cold-solve number.
+- **Reopen:** a driver read over six or more jobs that shows a gain; or cold single solves
+  become a target of their own (the analysis board solves that way).
+- **What this says about the ruler.** `tests/proof4` positions are the driver's jobs solved
+  cold: no killers handed down, no history from sibling jobs, an empty table. E30 gained on
+  both (0.796x cold, 0.665x in the driver). E31 gains only cold. A change that works by
+  remembering more about sibling nodes is exactly what the driver's hand-down already does,
+  so for this class the cold ruler overstates. From here on an ordering change needs a
+  driver read (emulated, exact nodes, the tune jobs) *before* its gate, not as a guard
+  after; changes that prune or that speed up a node are not affected in the same way, but
+  get the same read once.
