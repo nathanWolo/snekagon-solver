@@ -542,6 +542,227 @@ pub fn hand_cells(left: u8) -> i32 {
     rem
 }
 
+/// E33: the most extensions `sure_next_length` keeps (the longest; dropping some only lowers G).
+pub const MAX_EXT: usize = 48;
+
+/// E33, the opponent's sure next length G: the side to move is `me`, the opponent `opp`. G is the
+/// largest length L such that after every legal move of `me` the opponent still has a legal
+/// placement that makes its longest snake at least L. Returns G when G >= `floor`; otherwise some
+/// number below `floor` (the opponent's longest snake now, or more if `floor` is above it).
+///
+/// Why G is a lower bound on the opponent's final longest snake. Let m be the move `me` makes.
+///  - If `me` has a legal placement it must place one (a player passes only without one). m adds
+///    cells of `me` and nothing else: the opponent's cells, snakes and pieces stay. An opponent
+///    placement e that grows one of its snakes is legal exactly when its cells are empty and the
+///    opponent's own cells allow it, so it stays legal unless m covers a cell of e. A placement
+///    that starts a new snake also needs its border free of every tile, so it stays legal unless m
+///    covers a cell of e or of its border. That set is e's `block` here.
+///  - After m (a placement) the passes are 0 and the opponent holds a piece (e uses one), so the
+///    game goes on and the opponent may play e. Its snakes are those of now, so the snake e makes
+///    has the length `longest_after` gives now; snakes never shrink, so its final longest is at
+///    least that. Taking the best e that m leaves legal, and the worst m for the opponent, gives G.
+///  - If `me` has no legal placement it passes. With passes = 0 now the game goes on (one pass)
+///    and every e stays legal: G is the longest extension. With a pass already made the game ends
+///    at our pass: G is the opponent's longest snake now. (A player without pieces has no legal
+///    placement; that case is the same.)
+///  - A placement joins at most two snakes (only a piece's two ends can touch own cells, and the
+///    1-cell piece has at most two own neighbours), so no extension is longer than the largest
+///    piece in hand plus the two longest snakes: when that is below `floor` nothing is generated.
+///  - Only extensions of at least `floor` cells are collected, at most `MAX_EXT` of them, the
+///    longest kept. Leaving extensions out can only make "every move blocks them all" easier to
+///    meet, so the length found is never above the true G (and is exact when nothing is left out).
+///
+/// `cand` is scratch space (the moves of `me` that block every extension seen so far).
+pub fn sure_next_length(t: &Tables, pos: &Pos, floor: i32, cand: &mut Vec<BB>) -> i32 {
+    let me = pos.stm as usize;
+    let opp = me ^ 1;
+    let now = pos.longest[opp] as i32;
+    let floor = floor.max(now + 1);
+    let left = pos.left[opp];
+    if left == 0 {
+        return now;
+    }
+    let ns = pos.nsnakes[opp] as usize;
+    let mut len_of = [0i32; MAX_SNAKES];
+    let (mut l1, mut l2) = (0i32, 0i32);
+    for j in 0..ns {
+        let l = count(pos.snakes[opp][j]) as i32;
+        len_of[j] = l;
+        if l > l1 {
+            l2 = l1;
+            l1 = l;
+        } else if l > l2 {
+            l2 = l;
+        }
+    }
+    let mut maxn = 0i32;
+    for p in 0..NPIECES {
+        if left >> p & 1 == 1 {
+            maxn = maxn.max(PIECE_SIZE[p] as i32);
+        }
+    }
+    if maxn + l1 + l2 < floor {
+        return now;
+    }
+    // the extensions of at least `floor` cells, longest first: (length, block)
+    let mut ext = [(0i32, 0 as BB); MAX_EXT];
+    let mut ne = 0usize;
+    let mut push = |len: i32, block: BB| {
+        let mut i = if ne < MAX_EXT {
+            ne += 1;
+            ne - 1
+        } else if len > ext[MAX_EXT - 1].0 {
+            MAX_EXT - 1
+        } else {
+            return;
+        };
+        while i > 0 && ext[i - 1].0 < len {
+            ext[i] = ext[i - 1];
+            i -= 1;
+        }
+        ext[i] = (len, block);
+    };
+    let own = pos.cells[opp];
+    if floor > maxn {
+        // a new snake is at most `maxn` long: only placements that grow a snake can reach `floor`,
+        // and only by touching a snake j with n + len(j) + (the longest snake) >= floor
+        let g = gen_grow(own, pos.occupied());
+        for piece in 0..NPIECES {
+            if left >> piece & 1 == 0 {
+                continue;
+            }
+            let n = PIECE_SIZE[piece] as i32;
+            let mut a: BB = 0;
+            for j in 0..ns {
+                if n + len_of[j] + l1 >= floor {
+                    a |= pos.snakes[opp][j];
+                }
+            }
+            if a == 0 {
+                continue;
+            }
+            let g2 = Gen { free_new: 0, allowed: g.allowed, next_own: g.next_own & neighbours(a), own: g.own, own_with_nb: g.own_with_nb };
+            if g2.next_own == 0 {
+                continue;
+            }
+            for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
+                let mut anchors = grow_anchors(o, &g2);
+                while anchors != 0 {
+                    let p = &t.placements[o.placement_at[first(anchors)] as usize];
+                    anchors &= anchors - 1;
+                    let len = pos.longest_after(opp, p) as i32;
+                    if len >= floor {
+                        push(len, p.cells);
+                    }
+                }
+            }
+        }
+    } else {
+        pos.for_each_move(t, opp, left, |m| {
+            let p = &t.placements[m as usize];
+            let len = pos.longest_after(opp, p) as i32;
+            if len >= floor {
+                push(len, if p.border & own != 0 { p.cells } else { p.cells | p.border });
+            }
+        });
+    }
+    if ne == 0 {
+        return now;
+    }
+    // the longest length: the moves of ours that block all its extensions, found among the moves
+    // that block the one with the fewest cells to cover
+    let top = ext[0].0;
+    let mut e = 1;
+    while e < ne && ext[e].0 == top {
+        e += 1;
+    }
+    let mut star = 0;
+    for i in 1..e {
+        if count(ext[i].1) < count(ext[star].1) {
+            star = i;
+        }
+    }
+    let b = ext[star].1;
+    let pieces = pos.pieces_now();
+    cand.clear();
+    if pieces != 0 {
+        let g = pos.gen_ctx(me);
+        for piece in 0..NPIECES {
+            if pieces >> piece & 1 == 0 {
+                continue;
+            }
+            for o in &t.orientations[t.first_orientation[piece]..t.first_orientation[piece + 1]] {
+                // the anchors at which some cell of the orientation lies in b (cell k sits at
+                // anchor + shift[k]); a superset, checked exactly below
+                let mut hit = b;
+                for k in 1..o.size as usize {
+                    hit |= b >> o.shift[k];
+                }
+                let mut anchors = legal_anchors(o, &g) & hit;
+                while anchors != 0 {
+                    let c = t.placements[o.placement_at[first(anchors)] as usize].cells;
+                    anchors &= anchors - 1;
+                    if c & b != 0 && ext[..e].iter().all(|x| c & x.1 != 0) {
+                        cand.push(c);
+                    }
+                }
+            }
+        }
+    }
+    if cand.is_empty() {
+        // no legal move of ours blocks them all (or we have none and pass)
+        if pos.passes > 0 && !pos.has_move(t, me, pieces) {
+            return now; // our pass ends the game
+        }
+        return top;
+    }
+    // each shorter length in turn: the moves that also block all of its extensions
+    let mut s = e;
+    while s < ne {
+        let len = ext[s].0;
+        let mut e2 = s + 1;
+        while e2 < ne && ext[e2].0 == len {
+            e2 += 1;
+        }
+        cand.retain(|&c| ext[s..e2].iter().all(|x| c & x.1 != 0));
+        if cand.is_empty() {
+            return len; // every move of ours leaves one of length len or more (we have one)
+        }
+        s = e2;
+    }
+    now
+}
+
+/// G by brute force (tests and the check build): the minimum over the legal moves of the side to
+/// move of the opponent's longest snake after its best next placement, or after its pass; with no
+/// legal move of ours, after our pass.
+pub fn sure_next_length_brute(t: &Tables, pos: &Pos) -> i32 {
+    let me = pos.stm as usize;
+    let opp = me ^ 1;
+    let best_after = |child: &Pos| -> i32 {
+        if child.is_over() {
+            return child.longest[opp] as i32;
+        }
+        let mut best = child.longest[opp] as i32;
+        child.for_each_move(t, opp, child.pieces_now(), |r| best = best.max(child.longest_after(opp, &t.placements[r as usize]) as i32));
+        best
+    };
+    let mut moves = Vec::new();
+    pos.moves(t, &mut moves);
+    if moves.is_empty() {
+        let mut child = *pos;
+        child.play(t, PASS);
+        return best_after(&child);
+    }
+    let mut g = i32::MAX;
+    for m in moves {
+        let mut child = *pos;
+        child.play(t, m);
+        g = g.min(best_after(&child));
+    }
+    g
+}
+
 /// The cells at most `rem` steps from the cells `own`. When a player holding `rem` cells in hand
 /// asks for a snake longer than `rem`, only these cells matter: the final snake holds an old snake,
 /// and each of its new cells is joined to an old one by a path of at most `rem` new cells. Whether

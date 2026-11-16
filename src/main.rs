@@ -8,6 +8,8 @@ mod pos;
 mod prove;
 mod solver;
 mod study;
+#[cfg(feature = "tqcheck")]
+mod tqcheck;
 
 use geom::*;
 use pieces::*;
@@ -55,7 +57,7 @@ fn perft(t: &Tables, pos: &Pos, depth: u32) -> u64 {
 /// Random games; at every position the fast code is compared with the naive rules.
 fn verify(t: &Tables, games: usize, seed: u64) {
     let mut rng = Rng(seed);
-    let (mut positions, mut placements_checked, mut threat_checks, mut reach_checks) = (0u64, 0u64, 0u64, 0u64);
+    let (mut positions, mut placements_checked, mut threat_checks, mut reach_checks, mut g_checks) = (0u64, 0u64, 0u64, 0u64, 0u64);
     let mut moves = Vec::new();
     for _ in 0..games {
         let mut pos = Pos::initial();
@@ -124,6 +126,27 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                     }
                 }
             }
+            // E33: the opponent's sure next length against the brute force (no random numbers drawn)
+            if pos.left[0].count_ones() + pos.left[1].count_ones() <= 8 {
+                let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
+                let _ = me;
+                let bf = bounds::sure_next_length_brute(t, &pos);
+                let mut cand = Vec::new();
+                let g = bounds::sure_next_length(t, &pos, i32::MIN, &mut cand);
+                let now = pos.longest[opp] as i32;
+                let mut ne = 0;
+                pos.for_each_move(t, opp, pos.left[opp], |m| {
+                    if pos.longest_after(opp, &t.placements[m as usize]) as i32 > now {
+                        ne += 1;
+                    }
+                });
+                if ne <= bounds::MAX_EXT {
+                    assert!(g == bf || (g <= now && bf <= now), "sure next length {} brute force {} at {}", g, bf, pos.to_text());
+                } else {
+                    assert!(g <= bf, "sure next length {} above the brute force {} at {}", g, bf, pos.to_text());
+                }
+                g_checks += 1;
+            }
             // what the threat zones rely on: if the opponent could play b now, our upper bound after b
             // is no lower than after any move of ours that leaves b playable, followed by b
             let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
@@ -190,7 +213,7 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             assert!(pos.longest[player] as i32 <= prev_upper[player], "final snake above the bound");
         }
     }
-    println!("verify ok: {} games, {} positions, {} placement checks, {} threat-bound checks, {} reach checks", games, positions, placements_checked, threat_checks, reach_checks);
+    println!("verify ok: {} games, {} positions, {} placement checks, {} threat-bound checks, {} reach checks, {} sure-length checks", games, positions, placements_checked, threat_checks, reach_checks, g_checks);
 }
 
 struct Opts {
@@ -293,6 +316,10 @@ fn parse_opts(args: &[String]) -> Opts {
                     o.cfg.model[i] = x.parse().unwrap();
                 }
             }
+            "--tight-q" => o.cfg.tight_q = val().parse().unwrap(),
+            "--tight-q-hand" => o.cfg.tight_q_hand = val().parse().unwrap(),
+            "--tight-q-work" => o.cfg.tight_q_work = val().parse().unwrap(),
+            "--tq-study" => o.cfg.tq_study = true,
             "--reach-hand" => o.cfg.reach_hand = val().parse().unwrap(),
             "--reach-work" => o.cfg.reach_work = val().parse().unwrap(),
             "--pn" => o.pn = true,
@@ -451,6 +478,19 @@ fn bench(t: &Tables, o: &Opts) {
         writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
         writeln!(out, "# reach-threat tests, answered by a witness, threats: {:?}", solver.rt_stats).unwrap();
     }
+    if o.cfg.tight_q > 0 {
+        writeln!(out, "# tight-q by pieces left: asked, G >= floor, decided by cluster bound, reach questions, decided by reach | cycles/asked in G, cycles/reach question, cycles/undecided asked").unwrap();
+        for l in 0..16 {
+            let q = &solver.tq_stats[l];
+            if q[0] == 0 {
+                continue;
+            }
+            let undec = q[0] - q[2] - q[4];
+            writeln!(out, "# TQ {:2}: {} {} {} {} {} | {} {} {}", l, q[0], q[1], q[2], q[3], q[4], q[5] / q[0], q[6] / q[3].max(1), q[7] / undec.max(1)).unwrap();
+        }
+    }
+    #[cfg(feature = "tqcheck")]
+    tqcheck::report();
     if o.cfg.rt_study {
         let r = &solver.rts;
         writeln!(out, "# rt-study by pieces left | none: tests positions cycles/test | threat: tests positions cycles/test | skipped moves, est nodes, nodes w/ skips, moves searched there, nodes under them").unwrap();

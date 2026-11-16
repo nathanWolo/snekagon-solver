@@ -111,6 +111,16 @@ pub struct Config {
     /// that cut the child (the killer when the child did not cut by a move) for the reach-threat
     /// test, 2 that also for the answer bonus.
     pub rt_refuter: u8,
+    /// E33 (`--tight-q N`): at nodes with at most N pieces left (both hands; 0 = off), ask whether the
+    /// mover alone can still beat the opponent's sure next length G (`sure_next_length`).
+    pub tight_q: u32,
+    /// E33: the reach question is asked for a mover with at most this many pieces in hand (above it
+    /// only the mover's cluster bound is compared with G, when it is known).
+    pub tight_q_hand: u32,
+    /// E33: the positions one such reach question may look at.
+    pub tight_q_work: u32,
+    /// E33 study counters with cycle counts (`--tq-study`).
+    pub tq_study: bool,
 }
 
 /// A "cannot reach" answer: the player with the cells `own` and the pieces `left` cannot build
@@ -175,7 +185,7 @@ pub fn outside_bucket(n: u32) -> usize {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0, tight_q: 0, tight_q_hand: 2, tight_q_work: 200, tq_study: false }
     }
 }
 
@@ -426,6 +436,11 @@ pub struct Solver {
     bufs: Vec<Vec<u64>>,
     defer_bufs: Vec<Vec<u16>>,
     replies: Vec<(u32, BB)>,
+    /// E33, by pieces left: [asked, G computed (G >= the floor), decided by the cluster bound, reach
+    /// questions, decided by a reach question, cycles in G (study), cycles in the reach questions
+    /// (study), cycles of asked nodes that the rule did not decide (study)].
+    pub tq_stats: [[u64; 8]; 16],
+    tq_cand: Vec<BB>,
 }
 
 /// E30: what the winning moves of cut nodes cost, measured in the tree.
@@ -499,6 +514,8 @@ impl Solver {
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
             defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
             replies: Vec::with_capacity(1024),
+            tq_stats: [[0; 8]; 16],
+            tq_cand: Vec::with_capacity(512),
         }
     }
 
@@ -1058,6 +1075,100 @@ impl Solver {
         can_reach_touching_w(self.t, pos, player, need, &mut work, &mut self.wit[ply][player])
     }
 
+    /// E33, the tight question. True when it proves that the node's value is at most `alpha` (then
+    /// the caller returns alpha, a fail-low, and stores alpha as an upper bound).
+    ///
+    /// The rule. Let G be the opponent's sure next length (`sure_next_length`: after any move of
+    /// ours it can still make a snake of G, so its final longest snake is at least G) and OPT the
+    /// mover's one-player optimum (the longest snake the mover could build if the opponent never
+    /// moved again; the opponent's moves only take the mover's placements away, so the mover's
+    /// final longest snake is at most OPT). The value is the sign of (ours - theirs) at the end, so
+    /// it is at most sign(OPT - G): OPT <= G gives at most 0 (a draw at best), OPT < G a loss.
+    /// "OPT < target" is proved by a reach test answering "cannot" (`can_reach_touching_w`, the
+    /// same test as step 2'; running out of work answers "can", which proves nothing and decides
+    /// nothing), or by the mover's cluster bound (an upper bound on OPT) being below the target.
+    ///
+    /// Asked only where it ends the node: alpha >= 0 needs value <= 0, target G + 1; alpha = -1
+    /// needs value = -1, target G. The window here is after the table and the cluster bounds, so
+    /// alpha >= the true lower bounds known. G is computed only when it can matter: when the mover
+    /// is already known to reach W cells (its snake now, or a witness of an earlier reach test that
+    /// still applies here), a target of W or less cannot fail, so G must be at least W - delta + 1
+    /// (the `floor`). The step 2' question is this one with G replaced by the opponent's snake now;
+    /// G is never below that, so this question is the same or stricter.
+    ///
+    /// Not covered by this argument: nothing about the opponent's later moves is assumed beyond
+    /// "it may play e next"; G is a lower bound however the rest of the game goes.
+    fn tight_question(&mut self, pos: &Pos, ply: usize, level: usize, alpha: i32, upper: Option<i32>) -> bool {
+        let t = self.t;
+        let me = pos.stm as usize;
+        let study = self.cfg.tq_study;
+        let c0 = if study { unsafe { core::arch::x86_64::_rdtsc() } } else { 0 };
+        self.tq_stats[level][0] += 1;
+        let delta = if alpha >= 0 { 1 } else { 0 };
+        // what the mover is known to reach
+        let mut known = pos.longest[me] as i32;
+        if self.cfg.witness {
+            let w = self.wit[ply][me];
+            if w.proves(pos, me, 1) {
+                known = known.max(w.len);
+            }
+            if ply > 0 {
+                let w = self.wit[ply - 1][me];
+                if w.proves(pos, me, 1) {
+                    known = known.max(w.len);
+                }
+            }
+        }
+        let floor = known - delta + 1;
+        let mut cand = std::mem::take(&mut self.tq_cand);
+        let g = sure_next_length(t, pos, floor, &mut cand);
+        self.tq_cand = cand;
+        let c1 = if study { unsafe { core::arch::x86_64::_rdtsc() } } else { 0 };
+        if study {
+            self.tq_stats[level][5] += c1 - c0;
+        }
+        #[cfg(feature = "tqcheck")]
+        crate::tqcheck::check_g(pos, floor, g);
+        if g < floor {
+            if study {
+                self.tq_stats[level][7] += c1 - c0;
+            }
+            return false;
+        }
+        self.tq_stats[level][1] += 1;
+        let target = g + delta;
+        if let Some(u) = upper {
+            if u < target {
+                self.tq_stats[level][2] += 1;
+                #[cfg(feature = "tqcheck")]
+                crate::tqcheck::check_decided(&self.cfg, pos, alpha, g, target, false);
+                return true;
+            }
+        }
+        if pos.left[me].count_ones() > self.cfg.tight_q_hand {
+            if study {
+                self.tq_stats[level][7] += c1 - c0;
+            }
+            return false;
+        }
+        self.tq_stats[level][3] += 1;
+        let mut work = self.cfg.tight_q_work;
+        let r = can_reach_touching_w(t, pos, me, target, &mut work, &mut self.wit[ply][me]);
+        if study {
+            let c2 = unsafe { core::arch::x86_64::_rdtsc() };
+            self.tq_stats[level][6] += c2 - c1;
+            if r {
+                self.tq_stats[level][7] += c2 - c0;
+            }
+        }
+        if !r {
+            self.tq_stats[level][4] += 1;
+            #[cfg(feature = "tqcheck")]
+            crate::tqcheck::check_decided(&self.cfg, pos, alpha, g, target, true);
+        }
+        !r
+    }
+
     /// True when the table now decides the node at `ply` of the current path for its window.
     #[inline]
     fn resolved(&self, ply: usize) -> bool {
@@ -1384,6 +1495,22 @@ impl Solver {
                     self.store_if(use_tt, pos.hash, beta, hi, PASS, 1);
                     return beta;
                 }
+            }
+        }
+        // 2c. E33 (`--tight-q N`): can the mover alone still beat the opponent's sure next length?
+        if self.cfg.tight_q > 0 && level as u32 <= self.cfg.tight_q && reach_on && pos.left[opp] != 0 {
+            let upper = if have_clusters && !my_clusters.overflow {
+                let mut u = pos.longest[me] as i32;
+                for i in 0..my_clusters.n {
+                    u = u.max(my_clusters.upper[i]);
+                }
+                Some(u)
+            } else {
+                None
+            };
+            if self.tight_question(pos, ply, level, alpha, upper) {
+                self.store_if(use_tt, pos.hash, lo, alpha, PASS, 1);
+                return alpha;
             }
         }
         let (alpha0, beta0) = (alpha, beta);
@@ -1824,5 +1951,125 @@ impl Solver {
         }
         self.store_if(use_tt, pos.hash, nlo, nhi, best_move, self.nodes - nodes_at_start + 1);
         best
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Rng;
+
+    /// Positions from random games, stopped at `max_left` or fewer pieces left (both hands) and then
+    /// played on for a random number of moves (passes included): (position, seed of the game).
+    fn random_positions(n: usize, max_left: u32, seed: u64) -> Vec<Pos> {
+        let t = tables();
+        let mut rng = Rng(seed);
+        let mut out = Vec::new();
+        let mut moves = Vec::new();
+        while out.len() < n {
+            let mut pos = Pos::initial();
+            let extra = rng.below(4);
+            let mut after = 0;
+            while !pos.is_over() {
+                let left = pos.left[0].count_ones() + pos.left[1].count_ones();
+                if left <= max_left {
+                    if after == extra {
+                        break;
+                    }
+                    after += 1;
+                }
+                pos.moves(t, &mut moves);
+                let m = if moves.is_empty() { PASS } else { moves[rng.below(moves.len())] };
+                pos.play(t, m);
+            }
+            if !pos.is_over() && pos.left[0].count_ones() + pos.left[1].count_ones() <= max_left {
+                out.push(pos);
+            }
+        }
+        out
+    }
+
+    /// The opponent's extensions of at least `floor` cells (to know when the kept list is complete).
+    fn extensions_at_least(pos: &Pos, floor: i32) -> usize {
+        let t = tables();
+        let opp = pos.stm as usize ^ 1;
+        let mut n = 0;
+        pos.for_each_move(t, opp, pos.left[opp], |m| {
+            if pos.longest_after(opp, &t.placements[m as usize]) as i32 >= floor {
+                n += 1;
+            }
+        });
+        n
+    }
+
+    /// G against the brute force: for every move of ours the opponent's best placement afterwards
+    /// is at least G, and some move leaves exactly G (exact when every extension is kept); with a
+    /// floor, G is returned when it is at least the floor and something below the floor otherwise.
+    #[test]
+    fn sure_next_length_matches_brute_force() {
+        let t = tables();
+        let mut cand = Vec::new();
+        let (mut exact, mut lower, mut checked) = (0, 0, 0);
+        for (k, max_left) in [3u32, 4, 5, 6, 7, 9].iter().enumerate() {
+            for pos in random_positions(250, *max_left, 11 + k as u64) {
+                let bf = sure_next_length_brute(t, &pos);
+                let now = pos.longest[pos.stm as usize ^ 1] as i32;
+                assert!(bf >= now);
+                for floor in [i32::MIN, now + 1, now + 2, now + 3, now + 5, bf, bf + 1] {
+                    let g = sure_next_length(t, &pos, floor, &mut cand);
+                    let f = floor.max(now + 1);
+                    checked += 1;
+                    if bf >= f && extensions_at_least(&pos, f) <= MAX_EXT {
+                        assert_eq!(g, bf, "G at {} floor {}", pos.to_text(), floor);
+                        exact += 1;
+                    } else if g >= f {
+                        assert!(g <= bf, "G {} above the brute force {} at {} floor {}", g, bf, pos.to_text(), floor);
+                        lower += 1;
+                    } else {
+                        assert!(g < f);
+                        if bf < f {
+                            exact += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(exact > 1000, "exact {} lower {} checked {}", exact, lower, checked);
+    }
+
+    /// The rule's verdicts (unlimited work, any hand) against exact solves, for both windows, and
+    /// whole solves with the rule at every node against solves without it.
+    #[test]
+    fn tight_question_verdicts_are_exact() {
+        let off = Config { tt_bits: 16, ..Config::default() };
+        let on = Config { tight_q: 15, tight_q_hand: 7, tight_q_work: u32::MAX, ..off };
+        let mut plain = Solver::new(off);
+        let mut rule = Solver::new(on);
+        let (mut decided, mut asked) = (0, 0);
+        for (k, max_left) in [3u32, 4, 5, 6].iter().enumerate() {
+            for pos in random_positions(150, *max_left, 101 + k as u64) {
+                plain.clear();
+                let exact = plain.solve(&pos, -1, 1, u64::MAX);
+                let ply = (pos.ply as usize).min(MAX_PLY - 2);
+                let level = (pos.left[0].count_ones() + pos.left[1].count_ones()) as usize;
+                for alpha in [-1, 0] {
+                    rule.clear();
+                    rule.wit = [[Witness::NONE; 2]; MAX_PLY];
+                    asked += 1;
+                    if pos.left[pos.stm as usize ^ 1] != 0 && rule.tight_question(&pos, ply, level, alpha, None) {
+                        decided += 1;
+                        let claim = if alpha >= 0 { 0 } else { -1 };
+                        assert!(exact <= claim, "the rule claims at most {} at {}, exact {}", claim, pos.to_text(), exact);
+                    }
+                }
+                for (a, b) in [(-1, 1), (-1, 0), (0, 1)] {
+                    rule.clear();
+                    let v = rule.solve(&pos, a, b, u64::MAX);
+                    let ok = if v <= a { exact <= v } else if v >= b { exact >= v } else { exact == v };
+                    assert!(ok, "window ({}, {}) returned {} at {}, exact {}", a, b, v, pos.to_text(), exact);
+                }
+            }
+        }
+        assert!(decided > 20, "decided {} of {}", decided, asked);
     }
 }
