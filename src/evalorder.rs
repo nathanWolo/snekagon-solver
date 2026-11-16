@@ -19,6 +19,7 @@
 //!   short cells in hand that the best snake has no room for
 //!   fresh room for a new snake: the largest group of cells that touch no tile and that the other
 //!         side does not reach first, at most the cells in hand
+//!   snakes the number of snakes
 //! The order score is the weighted sum of these terms and of the model's score of the move.
 //! The weights are fitted on our own solved positions (LOG, E32).
 
@@ -27,13 +28,13 @@ use crate::geom::*;
 use crate::pos::*;
 use crate::pieces::*;
 
-pub const NFEAT: usize = 8;
-pub const NAMES: [&str; NFEAT] = ["est", "ub", "long", "terr", "hand", "ends", "short", "fresh"];
+pub const NFEAT: usize = 9;
+pub const NAMES: [&str; NFEAT] = ["est", "ub", "long", "terr", "hand", "ends", "short", "fresh", "snakes"];
 
 /// The fitted weights, in the order of `NAMES`, then the weight of the model's score (`MODEL`, the
 /// order below these levels; 64 with every other weight 0 is today's order), then the weight of the
 /// static score (piece size and contact, divided by 64).
-pub const WEIGHTS: [i32; NFEAT + 2] = [0, 0, 0, 0, 0, 0, 0, 0, 64, 0];
+pub const WEIGHTS: [i32; NFEAT + 2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0];
 
 fn largest_group(mut b: BB) -> i32 {
     let mut best = 0;
@@ -114,6 +115,7 @@ pub fn features(t: &Tables, child: &Pos) -> [i32; NFEAT] {
         d(ends),
         d(short),
         d(fresh),
+        child.nsnakes[m] as i32 - child.nsnakes[s] as i32,
     ]
 }
 
