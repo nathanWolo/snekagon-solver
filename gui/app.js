@@ -337,8 +337,8 @@
     const p = pos();
     const a = t[p.ply], b = t[p.ply + 1];
     const bits = [];
-    if (a) bits.push(`typ. solve ${fmtT(a[0])}`);
-    if (b) bits.push(`${fmtT(b[0])} per move`);
+    if (a) bits.push(`solve here: ${a}`);
+    if (b) bits.push(`each move: ${b}`);
     $("typical").textContent = SN.isOver(p) ? "" : bits.join(" · ");
   }
   // replaces an element's content only when it changed, so a click in progress is not lost
@@ -440,16 +440,18 @@
     });
   }
 
+  $("iProcs").addEventListener("input", () => { $("iProcs").dataset.touched = "1"; });
   async function init() {
     buildBoard();
+    setLine(SN.initial(), null, [], 0);
+    connect();
     try {
       info = await (await fetch("/api/info")).json();
-      $("iProcs").value = info.cpus;
+      if (!$("iProcs").dataset.touched) $("iProcs").value = info.cpus;
       if (!info.solver_found) say("no solver at " + info.solver);
       if (!info.lock) $("iLock").checked = false;
     } catch (e) { say("no server"); }
-    setLine(SN.initial(), null, [], 0);
-    connect();
+    renderRun(); renderTypical();
   }
   init();
 })();

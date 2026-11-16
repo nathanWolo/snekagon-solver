@@ -33,9 +33,15 @@ LOG_PATH = ROOT / "work" / "gui" / "runs.log"
 YIELD_AFTER = 15 * 60  # seconds under the lock before giving it back to waiters
 OWNER_GONE = 4.0  # seconds without the page's event stream before its run is cancelled
 
-# Measured solve times on this PC (one `solve` process; see the commit that added this table):
-# ply of the position solved -> (median seconds, how many positions were measured).
-TYPICAL = {}
+# Measured on this PC, 2026-11-15, frozen/climb-base.exe: 16 positions per ply from random play, one
+# `solve` process each, 16 at once (as the page runs them), 90 s limit. Ply 2 and earlier: the project's
+# own runs (the position after two moves took hours on 16 threads; the start is unsolved).
+# Ply 3: 0 of 16 solved. Ply 4: 15 of 16, median 8.6 s, max 33 s. Ply 5: median 0.6 s, max 19 s.
+# Plies 6, 7, 8, 10, 12: medians 0.10 to 0.15 s, max 0.9 s.
+# ply of the position solved -> what the page shows.
+TYPICAL = {0: "unsolved", 1: "unsolved", 2: "hours on 16 threads", 3: "0 of 16 solved in 90 s",
+           4: "median 8.6 s, max 33 s", 5: "median 0.6 s, max 19 s"}
+TYPICAL.update({k: "under 1 s" for k in range(6, 40)})
 
 # ---------------------------------------------------------------- rules (for checks and move names)
 R, W, GRID = 5, 11, 121
@@ -370,7 +376,7 @@ def now_iso():
 def log_line(fields):
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(" ".join("%s=%s" % kv for kv in fields.items()) + "\n")
+        f.write(" ".join("%s=%s" % kv for kv in dict(fields, server=os.getpid()).items()) + "\n")
 
 
 class Run:
