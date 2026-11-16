@@ -3200,3 +3200,28 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - Not started: the board's proof has the machine (78 of 172 at 13:02). The plan when it ends
   or pauses: time one line first, then all 172 (and say what it costs before running them).
 
+## 2026-11-16 An explainer of the prover (owner's request, about 14:30); the table's key is 38 bits strong
+
+- Owner: "Can you make an artifact that fully explains how the current prover works? In the
+  style of like in depth documentatioj and exposition similar to the page from the nelhage
+  uttt solver". Written from the source (`climb/replay` at `a762d50` for the driver) and this
+  log; published as a private artifact, source kept as `docs/prover-explained.html` (page
+  content only; the artifact tool adds the document skeleton). Figures are drawn by the
+  page's script from the rules (board, images of a reply, dead cells), so they cannot drift
+  from the text. State at the time: 79 of 172 refuted, 0 held, 93 open.
+- The reply `4I:15,25,35,45` fell to `3I:57,67,77` after 2,707 s and 38 failed tries: the
+  only winner so far that is not a piece of four (of 81 winners at 14:40: 4B 60, 4C 19,
+  4I 1, 3I 1).
+- *Found while writing, not measured:* a table hit compares the full 64-bit key, and the
+  bucket index already fixes its low 26 bits (`--tt 27`: 2^26 buckets of two entries). So a
+  probe is told apart from another position in its bucket by 38 bits: about 2 / 2^38 =
+  7e-12 a probe for a false match. The whole opening proof is of the order of 6e11 to 8e11
+  nodes (3.4e9 to 4.6e9 a reply by the paused run and the replay), so the expected number of
+  false matches is about one to seven. Most would change nothing (the wrong entry has to
+  decide the window, and the error has to reach a job's answer), but the claim "every value
+  in the table is a proof" stands on the key. The driver's own map of results (a few hundred
+  thousand 64-bit keys) is not at risk.
+- *What would cover it:* the independent check of the certificate (the reference solver on
+  each of the 172 lines), or a second run with other Zobrist numbers, or a wider check in
+  the entry (a second hash word; costs table space). Not acted on: the climb is paused and
+  this is the owner's call. Written into `docs/LESSONS.md`, "Open questions for the owner".

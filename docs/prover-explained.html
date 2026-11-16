@@ -1,0 +1,810 @@
+<title>The Snekagon Prover</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column of about 68 characters beside a sticky contents rail; figures share the column, wide ones scroll inside themselves. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --ink: #18202b;
+  --muted: #586372;
+  --rule: #d7dce4;
+  --red: #c4382d;
+  --blue: #2a5fc0;
+  --accent: #0c6b67;
+  --accent-soft: #cfe8e5;
+  --red-soft: #f2d2ce;
+  --blue-soft: #cbd9f3;
+  --cell: #e8ecf1;
+  --cell-line: #bfc7d2;
+  --code-bg: #ebeef3;
+  --on-solid: #ffffff;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151b; --surface: #181e26; --ink: #e3e7ed; --muted: #97a2b0; --rule: #2a323d;
+    --red: #ec6b5f; --blue: #6d9ef2; --accent: #57c6bd; --accent-soft: #173f3c;
+    --red-soft: #55292a; --blue-soft: #25395e; --cell: #202832; --cell-line: #3a4553;
+    --code-bg: #1a212a; --on-solid: #10141a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151b; --surface: #181e26; --ink: #e3e7ed; --muted: #97a2b0; --rule: #2a323d;
+  --red: #ec6b5f; --blue: #6d9ef2; --accent: #57c6bd; --accent-soft: #173f3c;
+  --red-soft: #55292a; --blue-soft: #25395e; --cell: #202832; --cell-line: #3a4553;
+  --code-bg: #1a212a; --on-solid: #10141a;
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 44px 96px;
+}
+.top { max-width: 46rem; }
+.eyebrow { font: 500 0.78rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+h1 { font-size: clamp(2rem, 5vw, 2.7rem); line-height: 1.1; letter-spacing: -0.02em; font-weight: 600; margin: 0 0 18px; text-wrap: balance; }
+.lede { font-size: 1.14rem; line-height: 1.55; margin: 0 0 14px; }
+.facts { display: flex; flex-wrap: wrap; gap: 14px 36px; margin: 26px 0 0; padding: 16px 0; border-block: 1px solid var(--rule); }
+.facts div { min-width: 0; }
+.facts dt { font: 500 0.72rem var(--font-mono); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.facts dd { margin: 2px 0 0; font: 500 1.02rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 36px; }
+nav.toc { font-size: 0.93rem; }
+nav.toc .toc-title { font: 500 0.72rem var(--font-mono); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+nav.toc ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 24px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px solid transparent; }
+nav.toc a:hover { border-bottom-color: var(--accent); }
+@media (min-width: 1040px) {
+  .layout { grid-template-columns: 210px minmax(0, 46rem); gap: 60px; }
+  nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 28px); align-self: start; }
+  nav.toc ul { grid-template-columns: 1fr; gap: 8px; }
+  nav.toc a { color: var(--muted); }
+  nav.toc a:hover { color: var(--ink); }
+}
+main { min-width: 0; max-width: 46rem; }
+section { scroll-margin-top: 24px; }
+h2 { font-size: 1.62rem; line-height: 1.2; letter-spacing: -0.012em; font-weight: 600; margin: 72px 0 14px; text-wrap: balance; }
+section:first-child h2 { margin-top: 8px; }
+h3 { font-size: 1.14rem; line-height: 1.3; font-weight: 600; margin: 38px 0 8px; text-wrap: balance; }
+p { margin: 0 0 16px; }
+ul, ol { margin: 0 0 18px; padding-left: 1.35em; }
+li { margin: 0 0 7px; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); margin: 20px 0 22px; padding: 14px 16px; border-radius: 6px; overflow-x: auto; font: 400 0.8rem/1.55 var(--font-mono); }
+pre code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.note { margin: 20px 0 22px; padding: 12px 0 2px; border-top: 1px solid var(--rule); }
+.note .lab { display: block; font: 500 0.72rem var(--font-mono); letter-spacing: 0.07em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+.note p { margin-bottom: 12px; }
+figure { margin: 28px 0 30px; }
+figcaption { font-size: 0.88rem; line-height: 1.5; color: var(--muted); margin-top: 10px; max-width: 42rem; }
+figcaption b { color: var(--ink); font-weight: 600; }
+svg { display: block; max-width: 100%; height: auto; }
+.board { width: 100%; max-width: 430px; }
+.scroll { overflow-x: auto; }
+.scroll > svg { min-width: 640px; width: 100%; }
+.pair { display: flex; flex-wrap: wrap; gap: 20px 36px; align-items: flex-start; }
+.pair > * { min-width: 0; }
+.pieces { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: flex-end; max-width: 300px; }
+.piece { display: grid; justify-items: center; gap: 4px; font: 500 0.78rem var(--font-mono); color: var(--muted); }
+.panels { display: flex; flex-wrap: wrap; gap: 18px 30px; }
+.panel { flex: 0 1 190px; min-width: 0; }
+.panel svg { width: auto; }
+.panel p { font-size: 0.86rem; line-height: 1.45; color: var(--muted); margin: 8px 0 0; }
+.panel p b { color: var(--ink); font-weight: 600; }
+.key { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.84rem; color: var(--muted); margin-top: 10px; }
+.key span { display: inline-flex; align-items: center; gap: 7px; }
+.key i { width: 13px; height: 13px; border-radius: 2px; display: inline-block; border: 1.5px solid transparent; }
+.k-red { background: var(--red); } .k-blue { background: var(--blue); }
+.k-bs { background: var(--blue-soft); border-color: var(--blue) !important; }
+.k-zone { background: var(--accent-soft); border-color: var(--accent) !important; }
+.k-b { background: var(--accent-soft); border: 1.5px dashed var(--blue) !important; }
+.k-new { background: var(--red-soft); border: 1.5px dashed var(--red) !important; }
+.k-bar { background: var(--muted); } .k-barnew { background: var(--accent); }
+table { border-collapse: collapse; font-size: 0.9rem; line-height: 1.45; width: 100%; min-width: 540px; }
+th, td { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 500 0.72rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-family: var(--font-mono); font-size: 0.84rem; }
+td.m { font-family: var(--font-mono); font-size: 0.84rem; white-space: nowrap; }
+.foot { margin-top: 72px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 0.86rem; color: var(--muted); }
+/* drawings */
+.hx { fill: var(--cell); stroke: var(--cell-line); stroke-width: 1; }
+.hx.r { fill: var(--red); stroke: var(--red); }
+.hx.b { fill: var(--blue); stroke: var(--blue); }
+.hx.bs { fill: var(--blue-soft); stroke: var(--blue); stroke-opacity: 0.5; }
+.hx.rn { fill: var(--red-soft); stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 3 2; }
+.hx.zb { fill: var(--accent-soft); stroke: var(--blue); stroke-width: 1.7; stroke-dasharray: 3 2; }
+.hx.z { fill: var(--accent-soft); stroke: var(--accent); }
+.hdot { fill: var(--muted); }
+.hn { font: 500 8.5px var(--font-mono); fill: var(--muted); text-anchor: middle; }
+.hn.on { fill: var(--on-solid); }
+.hn.big { font-size: 12px; font-weight: 500; fill: var(--ink); }
+.hn.big.on { fill: var(--on-solid); }
+.sq { fill: var(--cell); stroke: var(--cell-line); }
+.sq.off { fill: none; stroke: var(--rule); stroke-dasharray: 2 3; }
+.sq.c { fill: var(--red); stroke: var(--red); }
+.sq.nb { fill: var(--accent-soft); stroke: var(--accent); }
+.sqn { font: 400 8.5px var(--font-mono); fill: var(--muted); text-anchor: middle; }
+.sqn.c { fill: var(--on-solid); font-weight: 500; }
+.sqo { font: 500 9.5px var(--font-mono); fill: var(--accent); text-anchor: middle; }
+.tl { font: 600 13px var(--font-body); fill: var(--ink); }
+.ts { font: 400 11.5px var(--font-body); fill: var(--muted); }
+.tm { font: 500 11.5px var(--font-mono); fill: var(--ink); }
+.tc { font: 500 12px var(--font-mono); fill: var(--ink); text-anchor: middle; }
+.bx { stroke-width: 1.2; }
+.bx.b { fill: var(--blue-soft); stroke: var(--blue); }
+.bx.b.on { fill: var(--blue); }
+.bx.r { fill: var(--red-soft); stroke: var(--red); }
+.bx.r.win { fill: var(--red); }
+.bx.r.faint, .bx.b.faint { fill: none; stroke: var(--cell-line); stroke-dasharray: 2 2; }
+.bx.n { fill: var(--surface); stroke: var(--cell-line); }
+.bx.n.free { fill: var(--accent-soft); stroke: var(--accent); }
+.x { stroke: var(--red); stroke-width: 1.3; }
+.fan { fill: var(--cell); opacity: 0.55; }
+.tri { fill: none; stroke: var(--muted); stroke-width: 1; }
+.dot1 { fill: var(--red); }
+.grid { stroke: var(--rule); stroke-width: 1; }
+.axis { font: 400 10.5px var(--font-mono); fill: var(--muted); }
+.bar { fill: var(--muted); }
+.bar.new { fill: var(--accent); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Solver notes · snapshot of 16 November 2026</p>
+    <h1>The Snekagon Prover</h1>
+    <p class="lede">Snekagon is a two-player placement game on a hexagonal board. This page describes a program that computes the exact value of Snekagon positions, and the machinery around it that is proving one large claim: the first player wins by opening in the centre.</p>
+    <p>The proof is not finished. The claim needs 172 blue replies refuted. At the time of writing 79 are refuted, none has held, and 93 are open. Everything below describes the code as it runs today: about 6,000 lines of Rust with no dependencies outside the standard library, on one desktop PC.</p>
+    <p>The shape of this write-up follows Nelson Elhage's notes on <a href="https://minimax.dev/docs/ultimate/">solving Ultimate Tic Tac Toe</a>, whose two-level search was also one of the inputs to the design of the proof driver here.</p>
+    <dl class="facts">
+      <div><dt>Replies refuted</dt><dd>79 of 172</dd></div>
+      <div><dt>Held by blue</dt><dd>0</dd></div>
+      <div><dt>Recorded time</dt><dd>9.9 h</dd></div>
+      <div><dt>Machine</dt><dd>8 cores, 16 threads, 16 GB</dd></div>
+    </dl>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <p class="toc-title">Contents</p>
+      <ul>
+        <li><a href="#game">The game</a></li>
+        <li><a href="#claim">What is being proved</a></li>
+        <li><a href="#bits">Bitboards and moves</a></li>
+        <li><a href="#search">One search</a></li>
+        <li><a href="#table">The transposition table</a></li>
+        <li><a href="#rules">Deciding a node without a search</a></li>
+        <li><a href="#order">Move order</a></li>
+        <li><a href="#driver">The proof driver</a></li>
+        <li><a href="#pns">Why not proof-number search</a></li>
+        <li><a href="#cost">What it has cost</a></li>
+        <li><a href="#trust">What to trust</a></li>
+        <li><a href="#open">Open ends</a></li>
+      </ul>
+    </nav>
+
+    <main>
+      <section id="game">
+        <h2>The game</h2>
+        <p>The board is a hexagon of 91 cells, six to a side. Red owns eight pieces of one to four cells, 25 cells in all. Blue owns the same set without the single cell, 24 cells. Pieces may be turned and flipped.</p>
+        <figure>
+          <div class="pair">
+            <svg id="fig-board" class="board" role="img" aria-label="The hexagonal board of 91 cells with each cell's number; cell 60, the centre, holds red's single cell."></svg>
+            <div id="fig-pieces" class="pieces" role="img" aria-label="The eight pieces: one cell, two cells, a straight three, a bent three, a straight four and three bent fours named 4A, 4B and 4C."></div>
+          </div>
+          <figcaption><b>Figure 1.</b> The board with the cell numbers used in move names, after the opening this page is about: red's single cell on the centre, cell 60. Beside it, the eight pieces. Blue has all of them except the single cell.</figcaption>
+        </figure>
+        <ul>
+          <li>Red starts by placing the single cell anywhere. After that the players alternate, blue first, one piece a turn.</li>
+          <li>A piece goes on empty cells. It either starts a <em>new snake</em>, and then it may touch no tile of either colour, or it <em>grows</em> one of the mover's snakes, and then it must touch at least one of the mover's own tiles. A growing piece may touch the opponent, may join two of the mover's snakes into one, and may close a ring.</li>
+          <li>After the move every cell of the mover has at most two neighbours of its own colour, and no three cells of one colour touch each other pairwise. So every group of one colour is a path or a ring: a snake.</li>
+          <li>A player with no legal placement passes. The game ends after two passes in a row, or when both hands are empty.</li>
+          <li>The player whose longest snake has more cells wins. Equal lengths are a draw.</li>
+        </ul>
+        <figure>
+          <div class="panels">
+            <div class="panel"><svg id="fig-rule1" role="img" aria-label="A red snake of three cells grown by a two-cell piece at its end into a path of five."></svg><p><b>Legal.</b> The piece touches one end and the result is a path.</p></div>
+            <div class="panel"><svg id="fig-rule2" role="img" aria-label="A two-cell piece placed against the middle cell of a red snake, which would give that cell three red neighbours."></svg><p><b>Illegal.</b> The middle cell would get a third red neighbour.</p></div>
+            <div class="panel"><svg id="fig-rule3" role="img" aria-label="A piece placed in the notch between two touching red cells, which would make three cells that all touch each other."></svg><p><b>Illegal.</b> Three cells would touch each other pairwise.</p></div>
+          </div>
+          <div class="key"><span><i class="k-red"></i>red's tiles</span><span><i class="k-new"></i>the piece being placed</span></div>
+          <figcaption><b>Figure 2.</b> The snake rule on a corner of the board.</figcaption>
+        </figure>
+        <p>A move is written as the piece and its cells, for example <code>4B:70,81,82,93</code>. There are 40 distinct orientations of the pieces and 2,602 ways to put one on the board. From the empty board there are 91 first moves, 194,388 sequences of two moves and 315,706,848 of three.</p>
+        <p>Three consequences of the rules carry most of what follows.</p>
+        <ol>
+          <li><strong>Cells next to a snake's body are dead for its owner.</strong> A body cell already has two neighbours of its colour and may never get a third. So a player can never again occupy a cell that touches the body of one of its own snakes.</li>
+          <li><strong>A move never gives the opponent a new move.</strong> A placement takes placements away from the opponent (the cells it covers, and new snakes that would now touch it). It never adds one.</li>
+          <li><strong>The game is short.</strong> There are at most fifteen placements. The number of pieces still in the two hands counts down from 15, and this page uses it as the measure of how deep a position is.</li>
+        </ol>
+        <p>The rules here are the rules as the public reference solver, <a href="https://github.com/BoltKey/snekagon-lab">snekagon-lab</a>, implements them. This project takes its labelled test positions from that repository. The piece shapes were read from its rules file, not from the printed game.</p>
+      </section>
+
+      <section id="claim">
+        <h2>What is being proved</h2>
+        <p>A position has a value for the player to move: +1 if that player wins when both sides play perfectly, 0 for a draw, −1 for a loss. The prover computes this value exactly. It has no evaluation function and no depth limit. An answer is a proof or it is absent.</p>
+        <p>The claim under proof is this: after red opens with the single cell in the centre (<code>1:60</code>), blue loses whatever it replies. If that holds, the start position is a win for red.</p>
+        <p>Blue has 1,932 legal replies. The position after <code>1:60</code> looks the same under the six rotations and six reflections of the board, so replies that are images of each other need one proof between them. That leaves 172 classes. The count was made twice: by the solver, and by a separate script that builds the replies from the piece shapes alone.</p>
+        <figure>
+          <svg id="fig-sym" class="board" role="img" aria-label="One blue reply of four cells near the top edge of the board, with its eleven images under rotation and reflection drawn faintly around the centre."></svg>
+          <div class="key"><span><i class="k-red"></i>red's opening</span><span><i class="k-blue"></i>one reply</span><span><i class="k-bs"></i>its eleven images</span></div>
+          <figcaption><b>Figure 3.</b> The reply <code>4B:16,27,28,39</code> and its images. All twelve lead to the same game, so one is proved. A reply that is its own mirror image has fewer than twelve, which is why 1,932 replies make 172 classes and not 161.</figcaption>
+        </figure>
+        <p>Refuting one reply means finding one red move after which every blue answer loses, and so on down. The levels alternate between "one move is enough" and "every move must be answered".</p>
+        <figure>
+          <div class="scroll"><svg id="fig-tree" role="img" aria-label="The top of the proof as five levels: red's opening; blue's 172 replies, all of which must lose; red's tries against one reply, one of which must win; blue's answers to that try, all of which must lose; and one search for each answer."></svg></div>
+          <figcaption><b>Figure 4.</b> The top of the proof. The coordinator holds the two middle levels for one reply at a time. Each square of the fourth level is a position four moves into the game and becomes one job for a worker thread.</figcaption>
+        </figure>
+        <p>In numbers: after a typical reply red has about 1,600 legal moves, and after a red move blue has 1,000 to 1,250 answers. A reply that falls to the first move red tries costs about 1,100 searches. Each search starts with eleven pieces still to place and takes a median of 1.2 seconds on one thread.</p>
+        <p>The output is a certificate: for each of the 172 replies, the red move that beats it. Each line is a statement that another program can check without trusting this one: in this position, blue to move loses.</p>
+      </section>
+
+      <section id="bits">
+        <h2>Bitboards and moves</h2>
+        <p>The board is stored in an 11 by 11 grid of bits. A cell with axial coordinates (q, r), where |q|, |r| and |q + r| are at most 5, has the index (r + 5) × 11 + (q + 5). Any set of cells then fits in one 128-bit integer, and the six neighbours of a cell sit at fixed offsets: +1, −1, +11, −11, −10 and +10.</p>
+        <figure>
+          <svg id="fig-bits" style="max-width: 400px; width: 100%;" role="img" aria-label="An 11 by 11 grid of bit indices. Two opposite corners are unused. Cell 60 in the middle is marked with its six neighbours at offsets plus and minus 1, plus and minus 11, minus 10 and plus 10."></svg>
+          <figcaption><b>Figure 5.</b> The same board as bits 0 to 120 of an integer. Thirty of the 121 bits are off the board. The neighbours of cell 60 show the six offsets.</figcaption>
+        </figure>
+        <p>The neighbours of a whole set of cells come from six shifts. Two masks stop a step east or west from wrapping into the next row of the grid, and a final mask drops what fell off the board:</p>
+<pre><code>pub fn neighbours(b: BB) -&gt; BB {
+    let e = b &amp; NOT_EAST;
+    let w = b &amp; NOT_WEST;
+    ((e &lt;&lt; 1) | (w &gt;&gt; 1) | (b &lt;&lt; 11) | (b &gt;&gt; 11) | (e &gt;&gt; 10) | (w &lt;&lt; 10)) &amp; ALL
+}</code></pre>
+        <p>A position is a small value that is copied when a move is played, never undone. It holds each player's cells as a bitboard, each player's snakes as separate bitboards (at most eight, since every snake was started by one of eight pieces), the pieces in hand as a bit mask, the longest snake of each player, the side to move, the ply, the number of passes and a 64-bit hash. Playing a move ORs the piece into the mover's cells, clears its bit in the hand, and merges it with every own snake that its border touches.</p>
+        <p>Every way to put a piece on the board is numbered once at start-up. A move is one of those 2,602 numbers. Each placement carries its cells, its border (the cells around it) and its piece.</p>
+        <h3>Generating moves for every cell at once</h3>
+        <p>Legal moves are found for all anchor cells in parallel. For one orientation of a piece, the anchors where it can start a new snake are the cells from which every cell of the piece lands on a cell that is empty and touches no tile:</p>
+<pre><code>pub fn new_anchors(o: &amp;Orientation, g: &amp;Gen) -&gt; BB {
+    let mut a = g.free_new;                  // empty cells that touch no tile
+    for k in 1..o.size as usize {
+        a &amp;= (g.free_new &amp; o.win[k]) &gt;&gt; o.shift[k];
+    }
+    a
+}</code></pre>
+        <p>Growing a snake needs the snake rule. One pass over the six directions counts, for every cell at once, whether it has at least one, two or three neighbours of the mover's colour, and whether two of those neighbours touch each other:</p>
+<pre><code>for d in 0..6 {
+    a3 |= a2 &amp; nd[d];                // nd[d]: the mover's cells shifted one step in direction d
+    a2 |= a1 &amp; nd[d];
+    a1 |= nd[d];
+    pair |= nd[d] &amp; nd[(d + 1) % 6]; // directions d and d+1 lead to cells that touch
+}</code></pre>
+        <p>From these come three masks of cells that a cell of the new piece may occupy, chosen by how many cells of its own piece it touches. A cell next to the body of an own snake is in none of them. Two more tests handle an own tile that would touch two cells of the new piece at once. The result, per orientation, is a bitboard of legal anchors.</p>
+        <p>When moves only have to be counted they are counted with a population count and never listed. That is why the 315 million sequences of three moves are counted in 0.13 seconds.</p>
+        <h3>Hashing</h3>
+        <p>The hash is a Zobrist key: one random 64-bit number for each player and cell, one for each player and piece still in hand, and one for the side to move, XORed together and updated as a move is played.</p>
+        <p>The key is of the position as it stands. Mirror images get different keys, and the search inside a job makes no use of symmetry. A count on the proof's own data showed there is little to gain: of 66,585 positions four moves in, 0.2% were a mirror image of another. Symmetry is used at the top of the proof, where it divides the replies by eleven.</p>
+      </section>
+
+      <section id="search">
+        <h2>One search</h2>
+        <p>Inside a job the search is negamax alpha-beta over the three values. With three values there are only three windows to ask with, and each is a question:</p>
+        <ul>
+          <li>(−1, 0): can the mover at least draw?</li>
+          <li>(0, 1): can the mover win?</li>
+          <li>(−1, 1): what is the value?</li>
+        </ul>
+        <p>The narrow questions are cheaper, and the weaker true statement is the cheaper proof. For positions the mover wins, "at least a draw" took 0.57 to 0.63 of the wide search's nodes and "a win" took 0.82 to 0.94. Asking the wrong question first costs both: 1.39 times the wide search on won positions seven moves in. A drawn position needs both questions and costs 1.15 to 1.39 times the wide search.</p>
+        <p>The proof driver asks every job one narrow question, "does red win here". On proof positions that alone is 28% fewer nodes than the wide window.</p>
+        <h3>What happens at a node</h3>
+        <ol>
+          <li><strong>Game over, or the last pieces.</strong> If the game has ended, return the result. If each player has at most one piece left, the value comes from a closed form with no search.</li>
+          <li><strong>The table.</strong> If the stored interval decides the question, return it. Otherwise keep its best move.</li>
+          <li><strong>Length bounds.</strong> Bound each player's final longest snake from below and above. Near the end of the game, ask the exact reach question instead. Either can decide the node or narrow the window.</li>
+          <li><strong>Threats from the neighbours.</strong> The two replies that refuted moves at sibling nodes are tested as threats here.</li>
+          <li><strong>The first move, before the move list.</strong> The table move, or else a killer, is searched before any move is generated. Three nodes in four cut on it.</li>
+          <li><strong>Generate and score.</strong> Moves that a threat rules out are dropped. The rest get a score.</li>
+          <li><strong>Search in order.</strong> After a move fails, the moves that cover a cell of the reply that refuted it are lifted to the front, and that reply is tested as a threat against the remaining moves. After the first failure, all of the opponent's deciding placements are looked for.</li>
+          <li><strong>Store</strong> the new interval and the best move.</li>
+        </ol>
+        <p>Nearly all nodes are near the end of the game. In an early profile 98% of them had five pieces left or fewer. Each ply nearer the start costs about ten times more: the first version took 0.5 ms for a position after nine moves, 6 ms after eight and 50 ms after seven. So the rules that decide nodes act near the end, and the order of moves matters most near the top.</p>
+        <p>The search runs at about 1.2 microseconds a node on one thread.</p>
+      </section>
+
+      <section id="table">
+        <h2>The transposition table</h2>
+        <p>The table maps a position's key to what is known about it: an interval [lo, hi] that contains the value, and the best move. An interval, instead of a score and a flag, lets a "cannot win" from one question and an "at least draws" from another meet in one entry and close it.</p>
+        <div class="scroll">
+          <table style="min-width: 420px;">
+            <thead><tr><th>Bits</th><th>Field</th></tr></thead>
+            <tbody>
+              <tr><td class="m">0–15</td><td>best move, as a placement number</td></tr>
+              <tr><td class="m">16–23</td><td>generation</td></tr>
+              <tr><td class="m">24–31</td><td>log<sub>2</sub> of the nodes searched below this position</td></tr>
+              <tr><td class="m">32–33</td><td>lo + 1</td></tr>
+              <tr><td class="m">34–35</td><td>hi + 1</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>An entry is two 64-bit words: the key XOR the data, and the data. Two entries make a bucket of 32 bytes, half a cache line. For the opening proof the table has 2<sup>27</sup> entries, which is 2 GB.</p>
+        <p><strong>No locks.</strong> All sixteen workers read and write the table freely. If two threads write one entry at the same moment a reader may get a word from each. The XOR makes that harmless: such a pair fails its key test and counts as a miss. When a thread stores a position that another thread has already stored, the two intervals are intersected, since both are true.</p>
+        <p><strong>Replacement.</strong> A new position takes the first slot of its bucket if it stands for at least as much work as the entry there, which moves down to the second slot. Otherwise it takes the second slot. Large results are kept; small ones turn over.</p>
+        <p><strong>Generations.</strong> The table is never cleared. Each entry carries a generation number and entries of an older generation never match. In the opening proof the generation stays the same from one reply to the next, so what was proved under one reply is there for the next.</p>
+        <p><strong>Prefetch.</strong> A probe of a 2 GB table is a cache miss. The search asks the processor to load a child's bucket as soon as the move is played, and the bucket of the next move in line while the current one is searched. That took 5% off the time.</p>
+        <p>Every interval in the table is a proved bound, whoever wrote it and whenever. That is what makes the parallel search exact whatever the timing: threads can only differ in who does which work. The one soft spot is the key itself, which is taken up under <a href="#trust">what to trust</a>.</p>
+      </section>
+
+      <section id="rules">
+        <h2>Deciding a node without a search</h2>
+        <p>Every rule in this section is a statement about the game with an argument behind it. Each one changes how many nodes are searched and never a value. They are listed in the order they were built. Together they are most of the difference between a search that could not leave the endgame and one that solves positions four moves in.</p>
+
+        <h3>Length bounds</h3>
+        <p>The value depends only on the final lengths, so bounds on the final lengths can decide a node early.</p>
+        <p>The lower bound is the longest snake a player has now, since snakes never shrink. The upper bound is built in four steps.</p>
+        <ol>
+          <li>A player's future cells all lie in its <em>growable</em> cells: the empty cells that do not touch the body of one of its snakes.</li>
+          <li>The final longest snake is connected, so it lies inside one <em>cluster</em>: a connected set of own cells and growable cells.</li>
+          <li>New cells arrive as whole pieces, and each piece lies inside one connected region of growable cells. A region of n cells takes at most the largest total of pieces in hand that fits in n, which is a table lookup. A cluster takes at most the largest total that fits in the sum over its regions.</li>
+          <li>Old snakes enter the final snake whole, with a new piece between any two of them. With k pieces in hand at most k + 1 old snakes can be part of it, so only the k + 1 longest of a cluster count.</li>
+        </ol>
+        <figure>
+          <svg id="fig-pos" class="board" role="img" aria-label="The position after red's centre cell, a blue four-cell piece near the top, and a red four-cell piece joined to the centre. The empty cells that touch the body of red's snake are marked with a dot."></svg>
+          <figcaption><b>Figure 6.</b> After <code>1:60 4B:16,27,28,39 4B:70,81,82,93</code>. Red's snake is five cells long. The dotted cells touch its body, so red can never use them; they are still open to blue. Red's growable cells are the empty cells without a dot. This is also the first new result of the project: red wins from here, so this blue reply loses.</figcaption>
+        </figure>
+        <p>A node is decided when one player's lower bound beats the other's upper bound.</p>
+
+        <h3>The last pieces, in closed form</h3>
+        <p>When each player has at most one piece left, the value needs no search. The mover places its piece or passes, then the opponent takes its longest extension that is still legal. Because a placement only takes placements away, the opponent's best answer to each of the mover's placements can be read from one sorted list of the opponent's lengthening placements: it is the first one that the mover's placement neither covers nor, for a new snake, touches.</p>
+        <div class="note"><span class="lab">Measured</span><p>The search with this rule took 0.62 of the time on positions seven moves in.</p></div>
+
+        <h3>The reach test</h3>
+        <p>Near the end the cluster bound is loose and an exact answer is cheap. The reach test asks a one-player question: could this player still build a snake of length T if the opponent never moved again?</p>
+        <div class="note"><span class="lab">Why it is exact</span><p>The opponent's moves only take placements away. If a player cannot reach T alone, it cannot reach T in the real game. And building one snake outward is enough: the final snake is connected, so its new pieces can be put in an order in which each touches what is already there, and each such placement is legal now if it was legal in the game.</p></div>
+        <p>The search asks it for a player with one or two pieces in hand, with T set to the length that player needs for the question at hand. A "no" decides the node. The test has a budget of 200 positions; when it runs out the answer is "perhaps" and the search goes on as if it had not asked.</p>
+        <p>Three details make it cheap. It starts from the longest old snake that could be part of the target, because a piece touches own cells with at most its two ends and so brings in at most one more snake. It stops as soon as the pieces left cannot close the gap. And a sequence of placements that answered "yes" is kept as a witness: it answers "yes" again, with no search, at any nearby node where the player has the same cells and pieces and the witness's cells are still empty.</p>
+        <div class="note"><span class="lab">Measured</span><p>It decides 35 to 60% of the nodes it is asked about. Its first form halved the node count and lost time, at 1.2 microseconds a test. The same idea won once a test cost a fraction of that. A node count alone would have accepted the slow form.</p></div>
+
+        <h3>Threat zones</h3>
+        <p>Suppose the opponent has a placement b that would decide the game by the bounds if it were played now. Then any move that leaves b playable is worth no more than what b leaves. The only moves worth searching are those that take b away.</p>
+        <figure>
+          <div class="panels">
+            <div class="panel" style="flex-basis: 230px;"><svg id="fig-zone1" style="max-width: 230px;" role="img" aria-label="A blue snake of two cells and a three-cell placement that would extend it. The zone is the three cells of the placement."></svg><p><b>b grows a snake.</b> It stays legal until one of its cells is covered. The zone is b's cells.</p></div>
+            <div class="panel" style="flex-basis: 230px;"><svg id="fig-zone2" style="max-width: 230px;" role="img" aria-label="A three-cell placement standing alone. The zone is its three cells and all the cells around it."></svg><p><b>b starts a new snake.</b> Touching it also makes it illegal. The zone is b's cells and its border.</p></div>
+          </div>
+          <div class="key"><span><i class="k-blue"></i>blue's snake</span><span><i class="k-b"></i>b, the deciding placement</span><span><i class="k-zone"></i>zone</span></div>
+          <figcaption><b>Figure 7.</b> A threat and its zone. Red's moves with no cell in the zone are skipped. With several threats, a move must enter every zone.</figcaption>
+        </figure>
+        <div class="note"><span class="lab">Why it is exact</span><p>The mover's bound with b on the board is a bound over every continuation in which b's cells are blue. A move that leaves b legal, followed by b, is one such continuation.</p></div>
+        <p>This cuts the nodes where it hurts most: the nodes where every move must be answered. Up to six threats are kept, the smallest zones first.</p>
+        <div class="note"><span class="lab">Measured</span><p>0.63 of the time at seven moves in, and 0.54 one ply earlier.</p></div>
+
+        <h3>Reach threats</h3>
+        <p>The newest rule joins the last two. After a move fails, the reply r that refuted it is tested: with r on the board, can the mover still build a snake as long as the opponent's, playing alone? If the reach test says no, r is a threat, and the remaining moves that do not interfere with r are skipped.</p>
+        <div class="note"><span class="lab">Why it is exact</span><p>Take a move m that neither covers nor touches r. Then r is still legal after m, and m is still legal after r. Any sequence of the mover's placements after m and r is also a sequence after r alone, namely m followed by the rest. So the mover's best length after both is no more than after r alone, and that was already too short. A refinement lets some moves that touch r be skipped as well: when m grows a snake of the mover and r grows a snake of the opponent, each only needs its own cells empty, so the two still commute.</p></div>
+        <p>The cluster bound could not see most of these threats. The exact test can, at a budget of 2,000 positions a test.</p>
+        <div class="note"><span class="lab">Measured</span><p>Nodes 0.53, time 0.86 of the base before it, and 0.84 on whole proof jobs. The first version cut the nodes to 0.56 and saved no time, because the tests cost what the nodes saved. It paid only after the reach test itself got cheaper. An independent check ran 9.7 million paired test queries and re-searched 128.7 million pruned moves: no mismatch. One term of the bound rests on its argument and a unit test.</p></div>
+      </section>
+
+      <section id="order">
+        <h2>Move order</h2>
+        <p>The order in which moves are tried is the only part of the search that is a guess. It cannot change a value, only the cost. At a node the mover wins, one good move ends the node, so the order decides almost the whole price of that node.</p>
+        <p><strong>First move.</strong> The table's move, then two killers: moves that recently cut at the same ply. One of these is searched before the move list is even built.</p>
+        <p><strong>Scores.</strong> With seven or more pieces left, moves are scored by a linear model of eight features: the lead in length after the move, the piece's size, whether it grows an own snake, the length of the snake it joins, whether it covers a cell next to an opponent's snake end, whether it touches the opponent, and the free cells left at each side's snake ends. The weights are a logistic fit of "this move wins" on solved positions. Lower in the tree a fixed score does the same job for less: it prefers bigger pieces, growing an own snake and crowding the opponent's snake ends.</p>
+        <p><strong>The answer rule.</strong> When a move fails, the reply that beat it will beat most moves that leave it alone. So the moves that cover a cell of that reply jump to the front. This took 23% of the nodes off at seven moves in and 41% at five.</p>
+        <p><strong>The cheaper win.</strong> At the nodes that matter, red's first move already wins 97 to 99% of the time. What differs is the price: about a quarter of the moves at a winner's node win, and their proofs differ sixfold in size. So each killer carries the average size of the subtrees it has cut with. The cheaper killer goes first, and a new killer replaces the dearer one, not the older one. A history table of wins and their cost, by side, pieces left and move, picks among the first few candidates higher up. This passed its test at 0.80 of the time, and 0.66 on whole proof jobs.</p>
+        <h3>Order ideas that did not pay</h3>
+        <ul>
+          <li><strong>A learned order.</strong> Refitted linear models, a cost-aware model and small networks all came out at 0.97 to 1.00 of today's nodes on held-out positions. The first move already wins too often for a better classifier to matter.</li>
+          <li><strong>Looking up every child in the table before searching any.</strong> At most 1% of the nodes, for 30 to 75% more time where it found anything.</li>
+          <li><strong>More killer slots.</strong> 0.85 on single positions and 1.00 inside the proof driver, where neighbouring jobs already hand their killers on.</li>
+          <li><strong>A counter-move table, and reusing a refuting reply from a sibling node.</strong> No gain.</li>
+          <li><strong>The solver's own evaluation as the order.</strong> 1.04 to 1.09 on positions it was not tuned on.</li>
+        </ul>
+      </section>
+
+      <section id="driver">
+        <h2>The proof driver</h2>
+        <p>One search cannot hold the opening. The driver splits the proof into thousands of searches, runs sixteen at a time, writes down every result, and can be stopped and started again at any moment.</p>
+        <h3>A coordinator and sixteen workers</h3>
+        <p>The 172 replies are proved one after another. For the reply in work, a single coordinator thread holds a small tree: the position after the reply, with red to move; under it red's tries; under each try blue's answers. An answer is a leaf of the coordinator's tree and becomes a <em>job</em>: a position, a question, and a flag that can stop it.</p>
+        <p>Sixteen worker threads take jobs from a queue. Each worker owns a solver with its own killers, history and witnesses. All of them share the one table. A job is a plain single-thread search.</p>
+        <p>That shape was measured against the obvious alternative, which the solver can also do: one position at a time, searched by sixteen threads on the shared table, each setting aside the moves another thread is busy with. Sixteen single-thread jobs took 0.83 to 0.90 of the time. A job that takes one thread 600 seconds takes the driver 51 to 58 seconds, with slightly fewer nodes in total.</p>
+        <h3>The questions</h3>
+        <p>The coordinator's tree is searched with windows of one step, so that no window can move while a node's moves are under way. For the reply's own position the question is "can red win". For a try it becomes "can blue at least draw". For a job it is "can red win" again.</p>
+        <ul>
+          <li>A try <strong>wins</strong> when every one of blue's answers has come back as a red win. All of its jobs are needed.</li>
+          <li>A try <strong>fails</strong> when one job comes back with "red does not win here". That one job refutes the try, and the rest of the try's jobs are stopped.</li>
+        </ul>
+        <p>Asking "can red win" first matters. With the other question first, the same reply took 113.9 seconds instead of 58.2.</p>
+        <h3>Which job goes out next</h3>
+        <p>Sixteen workers and one try that needs a thousand answers is easy: hand out the answers. The hard case is a node that needs only one good move. Searching a second move beside the first is a bet that the first will fail. If the first move wins, the second was wasted.</p>
+        <p>The rule is: the least speculative work goes out first. Each job has a cost, the sum of small charges along its path from the root. Work under a node's first move is free. At a node that needs one good move, a second move beside the first costs 1, the next two cost 2, the next four cost 3. A worker gets the job with the lowest total.</p>
+<pre><code>/// What it costs to work on a move of node `n` that has `ahead` moves under way before it.
+fn cost(&amp;self, n: usize, ahead: usize) -&gt; u32 {
+    let node = &amp;self.nodes[n];
+    if ahead == 0 || node.finished &gt;= node.need {
+        0
+    } else {
+        usize::BITS - ahead.leading_zeros()     // 1, 2, 2, 3, 3, 3, 3, 4, ...
+    }
+}</code></pre>
+        <figure>
+          <div class="scroll"><svg id="fig-share" role="img" aria-label="Two rows of boxes. In the first, a node that needs one good move, the moves cost 0, 1, 2, 2, 3, 3, 3, 3 and 4 in order. In the second, a node where every move must be searched, every move costs 0."></svg></div>
+          <figcaption><b>Figure 8.</b> The charge for starting each further move of a node while the earlier ones are still running. Once enough moves have come back without ending the node, it is treated as a node where every move has to be searched, and the charge goes away.</figcaption>
+        </figure>
+        <p>How many is "enough" depends on the node. The reply's own position needs two failed tries. A node under a parent that still looks like "one good move" needs one. A node under a parent where every move is being searched needs six, because such a node probably ends on its first move.</p>
+        <p>Earlier versions used the usual scheme, in which everything after a node's first move is fair game. Free workers then piled onto the alternatives of one node ahead of work that had to be done anyway. Pricing the bets took one test position from 748 million nodes to 530 million.</p>
+        <h3>What carries over</h3>
+        <ul>
+          <li><strong>Killers travel with the tree.</strong> A job starts with the killers of the position searched just before it and returns what it learned, as if one thread had searched the positions in turn.</li>
+          <li><strong>The table and each worker's history</strong> stay from one reply to the next.</li>
+          <li><strong>Winning moves.</strong> A red move that beat one reply often beats the next reply too, turned or mirrored.</li>
+        </ul>
+        <h3>The order of red's tries</h3>
+        <p>At the top, the order of tries is nearly the whole cost. In the first long solve, 26 of 31 minutes went to 70 red moves that only draw, tried before the 72nd, which wins.</p>
+        <p>The tries are ordered by the same model as inside the search, with moves that a threat rules out dropped. Then two lists are merged in turn: the model's order, and the images under the twelve symmetries of moves that have already beaten earlier replies. The moves that beat the last two replies lead the list. After a try fails, the answer rule applies here too. Moves whose result is already in the results file go before everything, since they cost nothing.</p>
+        <p>The merge is recent and not settled. In the first run the images went first. In that run's record for 25 replies, 21 of the 25 winners were images of an earlier winner, and so were 36 of the 42 failed tries: the same bonus that finds winners puts failures first. Taking the two lists in turn read 0.77 of the time on one run. Replies vary so much that a proper test would need over a thousand of them. It is in use, and unproved.</p>
+        <h3>The results file</h3>
+        <p>Every finished job and every decided node of the coordinator's tree is appended to a text file, one line each: the position, the interval proved, the nodes, the milliseconds and the best move.</p>
+<pre><code>00000000000000001000000000000000_00000000000000000000008018010000_254_190_0_2_0 1 1 0 0 4B:70,81,82,93
+00000000000040301800000000000000_00000000000000000000401014030000_190_236_0_4_0 1 1 1423422 1801 4C:71,73,82,83</code></pre>
+        <p>The first line is a node of the coordinator's tree: in the position after <code>1:60 4B:16,27,28,39</code>, with red to move, the value lies between 1 and 1, by the move <code>4B:70,81,82,93</code>. The second is a job: a red win four moves in, proved in 1.4 million nodes and 1.8 seconds. A run reads the file before it starts and puts known results first, so a stopped proof is back where it was within seconds. Jobs under 2,000 nodes are not written; they are cheaper to redo than to keep.</p>
+        <h3>What a failed try costs</h3>
+        <p>A winning try is a thousand small jobs that all workers share, and it parallelises almost perfectly. A failed try is different. It ends when its one refuting job ends, and that job is a single-thread search of about a minute, some 35 times the average job. Until it is back, the other workers prove red wins under the same try and under the tries beside it, and most of that is thrown away when the try is cut. Of the 370 to 950 thread-seconds a failed try takes, the refuting job is about 75.</p>
+        <p>Failed tries are about 70% of the wall-clock at the top of the proof. This is the largest known inefficiency, and the next section of work.</p>
+        <h3>Watching it</h3>
+        <p>The project's analysis board runs this driver as its backend. It lists the 172 replies with their state, shows the reply in work on the board, and draws each of red's tries with a bar: the jobs that have come back as red wins, out of blue's answers to that try. A row marked 4/3 took four tries, of which three failed. A bar can sit at 1,104 of 1,105 for minutes while one hard answer is searched.</p>
+      </section>
+
+      <section id="pns">
+        <h2>Why not proof-number search</h2>
+        <p>Solvers of this kind often use proof-number search, and Elhage's does. It was tried here in several forms.</p>
+        <ul>
+          <li>A textbook depth-first proof-number search was 28 to 60 times slower than alpha-beta.</li>
+          <li>Given alpha-beta's move order, its killers and alpha-beta below a certain depth, it drew level: within 5% on proof positions, 14 to 20% behind on positions five moves in. It did not get ahead.</li>
+          <li>The one thing only a proof-number search can do, leave a move that is turning out dear and come back later, gained nothing that repeated and could cost 2.2 times.</li>
+        </ul>
+        <p>The reason seems to be the shape of this game's trees. Proof-number search spreads effort across the candidates of a node until one shows itself cheap. Here the losing moves are cheap to refute and the winning ones are expensive to prove, so spreading pays part of every expensive proof. A simulation on recorded costs put any blind spreading at 1.1 to 3.1 times the cost of committing to the first move.</p>
+        <p>The driver does share a skeleton with Elhage's two-level search: a small tree in memory at the top and independent workers below. His top tree carries proof numbers and his workers have a work budget. Ours is alpha-beta at both levels and a job runs until it is done.</p>
+      </section>
+
+      <section id="cost">
+        <h2>What it has cost</h2>
+        <figure>
+          <div class="scroll"><svg id="fig-chart" role="img" aria-label="Bar chart of the wall-clock time each of the 79 refuted replies took, in the order they were proved. Most took between two and ten minutes. Five took more than twenty, the longest 45 minutes."></svg></div>
+          <div class="key"><span><i class="k-bar"></i>first run, 15 November: one 16-thread search at a time</span><span><i class="k-barnew"></i>16 November: sixteen single-thread workers</span></div>
+          <figcaption><b>Figure 9.</b> Wall-clock time for each refuted reply, in the order they were proved. The median is 5 minutes, the mean 7.5, the longest 45. The first bar is the two-move position, solved on its own before the run began. Red's first try won for 35 of the 79 replies. The tallest bars are mostly replies that took many tries, up to 72.</figcaption>
+        </figure>
+        <p>Some markers along the way:</p>
+        <ul>
+          <li><strong>The first new result.</strong> After <code>1:60 4B:16,27,28,39</code> red wins with <code>4B:70,81,82,93</code>: 31 minutes on 16 threads, 25 billion nodes. The reference's notes left open whether red wins here.</li>
+          <li><strong>The first run at the opening</strong> refuted 74 replies in 7.6 hours before it was paused in favour of making the prover faster.</li>
+          <li><strong>The estimate that came before.</strong> The reference solver's authors put the centre opening at 10,000 to 30,000 thread-hours at their earlier solver's speed. At the rate of Figure 9 the whole of it is a few hundred thread-hours.</li>
+          <li><strong>On the reference's own benchmark</strong> (126 positions five moves in, one thread, same machine) this solver took 0.56 of the reference's time, with all 126 values equal. The current version takes fewer nodes than the reference and, by chaining two measurements, about 0.47 of its time.</li>
+        </ul>
+        <h3>Faster searches, more tries</h3>
+        <p>A replay of 25 replies with the current search gave a result that reshaped the plan. A reply cost 373 seconds, no better than the 326 seconds the first run had taken on the same replies. Each try had become much cheaper, 55 seconds against 122. But the replay made 2.5 times as many tries, and failed tries dominate.</p>
+        <p>The benchmarks that the speed work was tested on are positions where red wins. They measure what a try costs. They say nothing about how many tries a reply takes or what a failed try wastes, and that is where the top of the proof is.</p>
+        <p>The forecast from that replay was about ten hours for the 98 replies then open. The five replies proved since took 16, 8, 2, 4 and 39 tries, which is slower than that. The open replies are also not a sample like the replayed ones: the run takes the four-cell replies first, and the smaller pieces are still to come.</p>
+        <h3>How the speed got here</h3>
+        <p>Every change was one hypothesis, written down before it was built, and accepted only by a sequential test on positions that no earlier decision had touched. Changes that failed were reverted and logged. Each row is a version that later work was measured against.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Version</th><th>What it added</th><th class="n">Time at its test</th></tr></thead>
+            <tbody>
+              <tr><td class="m">v0</td><td>Alpha-beta, table, length bounds, fixed move order</td><td class="n">baseline</td></tr>
+              <tr><td class="m">v1</td><td>The last pieces in closed form</td><td class="n">0.62</td></tr>
+              <tr><td class="m">v2</td><td>Threat zones</td><td class="n">0.63</td></tr>
+              <tr><td class="m">v3</td><td>The reach test</td><td class="n">0.76</td></tr>
+              <tr><td class="m">v4</td><td>Moves ordered by the fitted model</td><td class="n">0.69</td></tr>
+              <tr><td class="m">v5</td><td>First move searched before the move list is built</td><td class="n">0.90</td></tr>
+              <tr><td class="m">v6</td><td>The exact reach question before the cluster bound</td><td class="n">0.86</td></tr>
+              <tr><td class="m">v7</td><td>Threat scan recomputes only the clusters a placement covers</td><td class="n">0.95</td></tr>
+              <tr><td class="m">v8</td><td>Reach test starts from the longest snake</td><td class="n">0.78</td></tr>
+              <tr><td class="m">v9</td><td>The answer rule</td><td class="n">0.80</td></tr>
+              <tr><td class="m">base 1</td><td>Another compiler toolchain, then a profile-guided build</td><td class="n">0.96, 0.94</td></tr>
+              <tr><td class="m">base 2</td><td>Seven same-node speed-ups; table prefetch</td><td class="n">0.92, 0.95</td></tr>
+              <tr><td class="m">base 3</td><td>The cheaper win first</td><td class="n">0.80</td></tr>
+              <tr><td class="m">base 4</td><td>Reach threats</td><td class="n">0.86</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The figure is the time of the new version over the time of the one before, on the positions of its test. The rows cannot be multiplied together. Each was read on harder positions as the solver got faster. Rows v1 to v9 are averages over test units at the point where a sequential test stopped, which reads high; the base rows are total time.</p>
+      </section>
+
+      <section id="trust">
+        <h2>What to trust</h2>
+        <h3>What stands behind the values</h3>
+        <ul>
+          <li><strong>The rules.</strong> The fast move generator, the snake bookkeeping, the hashes and the bounds are checked against a slow, obvious implementation on random games. The move counts match the reference's: 91, 194,388 and 315,706,848.</li>
+          <li><strong>Labelled positions.</strong> About 17,000 positions from five to eleven moves in carry values computed by the reference solver. Every version of the search gets every one of them right, and a wrong value blocks a change.</li>
+          <li><strong>Pruning rules are checked in place.</strong> Labels are not enough: a fault planted in the reach test gave no wrong label and fewer nodes. So each rule is compared with brute force, and special builds re-search every move a rule skipped and compare.</li>
+          <li><strong>The red win in Figure 6</strong> was found by the driver and repeated by two older versions of the search with cold tables: 4.95 and 14.7 billion nodes, the same value.</li>
+          <li><strong>Earlier results reproduced.</strong> Two results the reference had published for this opening, a blue win four moves in and a draw three moves in, came out the same.</li>
+        </ul>
+        <h3>What does not</h3>
+        <ul>
+          <li><strong>The proof is unfinished.</strong> 93 replies are open. Any one of them could hold, and then the centre opening is not a win.</li>
+          <li><strong>One program has checked it.</strong> No line of the certificate has yet been checked by an independent solver. The plan is to give each line to the reference solver, which shares no code with this one. That has not been run.</li>
+          <li><strong>Hash keys can collide.</strong> A table hit compares all 64 bits of a key, of which 26 are already implied by the bucket. Two different positions with the same key would be taken for each other. With two entries in a bucket that is a chance of about 2 in 2<sup>38</sup> per probe. The whole opening proof makes somewhere between 10<sup>11</sup> and 10<sup>12</sup> probes, so the expected number of false matches is between about one and seven. Most would change nothing; how many could is not known. This is an estimate made while writing this page, not a measurement, and it applies to every solver built on a hash table. An independent check of the certificate is what covers it.</li>
+          <li><strong>The rules come from the reference's code.</strong> If that reading of the game differs from the printed rules, the proof is of a different game.</li>
+          <li><strong>Timings are from one machine</strong>, and several of the figures on this page are single runs. Two runs of the parallel driver on the same job differ by about 12%.</li>
+        </ul>
+        <h3>What a finished proof would mean</h3>
+        <p>If all 172 replies fall and an independent check agrees, then red wins Snekagon with best play, by opening in the centre. The certificate gives red's second move against every reply. Beyond that the winning strategy exists only as the prover's ability to find it again from any position, a few minutes at a time. It would say nothing about how to win in words, and nothing about the eleven other opening cells.</p>
+      </section>
+
+      <section id="open">
+        <h2>Open ends</h2>
+        <ul>
+          <li><strong>Ending a failed try sooner.</strong> Hold the other workers back from a try until its first answers are in, or give the likely refuting job more than one thread. A first build exists. Its trial was cut short at 0.89 of the time, with no verdict.</li>
+          <li><strong>The cheapest win at the top.</strong> Against "cheapest winning move first", today's order pays several times over at the highest levels. Nothing cheap predicts which win is cheap.</li>
+          <li><strong>The model's first move against earlier winners.</strong> In 15 of 25 replayed replies the model's own first choice was a known winner, yet images of earlier winners and inherited killers went ahead of it.</li>
+          <li><strong>A stricter question near the end.</strong> One more exact rule from the reference solver cuts nodes to 0.87 at exactly six pieces left. Not yet verified.</li>
+          <li><strong>Symmetry across replies.</strong> Keying job results by the canonical position found almost nothing inside one reply's tree. Across replies it has not been counted.</li>
+        </ul>
+        <p class="foot">Written on 16 November 2026 while the proof was running. Counts and times are as of that afternoon.</p>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+  var S3 = Math.sqrt(3);
+  function el(tag, attrs, parent, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function cq(c) { return c % 11 - 5; }
+  function cr(c) { return Math.floor(c / 11) - 5; }
+  function idx(q, r) { return (r + 5) * 11 + (q + 5); }
+  function on(q, r) { return Math.abs(q) <= 5 && Math.abs(r) <= 5 && Math.abs(q + r) <= 5; }
+  var DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  function nbs(c) {
+    var out = [];
+    DIRS.forEach(function (d) { var q = cq(c) + d[0], r = cr(c) + d[1]; if (on(q, r)) out.push(idx(q, r)); });
+    return out;
+  }
+  function hex(x, y, s) {
+    var p = [];
+    for (var k = 0; k < 6; k++) {
+      var a = Math.PI / 180 * (60 * k - 30);
+      p.push((x + s * Math.cos(a)).toFixed(2) + "," + (y + s * Math.sin(a)).toFixed(2));
+    }
+    return p.join(" ");
+  }
+  // items: [{q, r, cls, text, tcls, dot}]
+  function drawCells(svg, items, s, natural) {
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    var pts = items.map(function (it) {
+      var x = s * S3 * (it.q + it.r / 2), y = s * 1.5 * it.r;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      return [x, y];
+    });
+    var pad = 2, w = x1 - x0 + s * S3 + 2 * pad, h = y1 - y0 + 2 * s + 2 * pad;
+    svg.setAttribute("viewBox", [x0 - s * S3 / 2 - pad, y0 - s - pad, w, h].map(function (v) { return v.toFixed(1); }).join(" "));
+    if (natural) { svg.setAttribute("width", w.toFixed(0)); svg.setAttribute("height", h.toFixed(0)); }
+    var order = items.map(function (it, i) { return i; });
+    order.sort(function (a, b) { return (items[a].cls ? 1 : 0) - (items[b].cls ? 1 : 0); });
+    order.forEach(function (i) {
+      var it = items[i], x = pts[i][0], y = pts[i][1];
+      el("polygon", { points: hex(x, y, s - 0.7), "class": "hx " + (it.cls || "") }, svg);
+      if (it.dot) el("circle", { cx: x.toFixed(2), cy: y.toFixed(2), r: (s * 0.17).toFixed(2), "class": "hdot" }, svg);
+      if (it.text != null) el("text", { x: x.toFixed(2), y: (y + (it.tcls && it.tcls.indexOf("big") >= 0 ? 4.2 : 3)).toFixed(2), "class": "hn " + (it.tcls || "") }, svg, it.text);
+    });
+  }
+  function board(id, o) {
+    var svg = document.getElementById(id);
+    if (!svg) return;
+    var red = o.red || [], blue = o.blue || [], soft = o.soft || [], dead = o.dead || [];
+    var items = [];
+    for (var c = 0; c < 121; c++) {
+      var q = cq(c), r = cr(c);
+      if (!on(q, r)) continue;
+      var cls = "", tcls = "";
+      if (red.indexOf(c) >= 0) { cls = "r"; tcls = "on"; }
+      else if (blue.indexOf(c) >= 0) { cls = "b"; tcls = "on"; }
+      else if (soft.indexOf(c) >= 0) cls = "bs";
+      items.push({ q: q, r: r, cls: cls, tcls: tcls, dot: dead.indexOf(c) >= 0, text: o.numbers ? String(c) : null });
+    }
+    drawCells(svg, items, 20);
+  }
+  // a small patch of an endless grid: groups = [{cls, cells: [[q, r], ...], text, tcls}], later groups win
+  function mini(id, groups, dist, s) {
+    var svg = document.getElementById(id);
+    if (!svg) return;
+    var seen = {};
+    groups.forEach(function (g) { g.cells.forEach(function (c) { seen[c[0] + "," + c[1]] = c; }); });
+    for (var d = 0; d < dist; d++) {
+      Object.keys(seen).forEach(function (k) {
+        var c = seen[k];
+        DIRS.forEach(function (dd) { var n = [c[0] + dd[0], c[1] + dd[1]]; if (!seen[n[0] + "," + n[1]]) seen[n[0] + "," + n[1]] = n; });
+      });
+    }
+    var items = {};
+    Object.keys(seen).forEach(function (k) { items[k] = { q: seen[k][0], r: seen[k][1], cls: "" }; });
+    groups.forEach(function (g) {
+      g.cells.forEach(function (c) {
+        var it = items[c[0] + "," + c[1]];
+        if (g.cls != null) it.cls = g.cls;
+        if (g.text != null) { it.text = g.text; it.tcls = g.tcls || ""; }
+      });
+    });
+    drawCells(svg, Object.keys(items).map(function (k) { return items[k]; }), s || 16, true);
+  }
+  function sym(t, q, r) {
+    if (t >= 6) { var x = q; q = r; r = x; }
+    for (var k = 0; k < t % 6; k++) { var nq = -r, nr = q + r; q = nq; r = nr; }
+    return [q, r];
+  }
+  function border(cells) {
+    var inb = {}, out = {};
+    cells.forEach(function (c) { inb[c[0] + "," + c[1]] = 1; });
+    cells.forEach(function (c) {
+      DIRS.forEach(function (d) { var n = [c[0] + d[0], c[1] + d[1]]; if (!inb[n[0] + "," + n[1]]) out[n[0] + "," + n[1]] = n; });
+    });
+    return Object.keys(out).map(function (k) { return out[k]; });
+  }
+
+  // Figure 1: the board and the pieces
+  board("fig-board", { red: [60], numbers: true });
+  var SHAPES = [["1", [[0, 0]]], ["2", [[0, 0], [1, 0]]], ["3I", [[0, 0], [0, 1], [0, 2]]], ["3V", [[0, 0], [1, 0], [1, 1]]],
+    ["4I", [[0, 0], [-1, 1], [-2, 2], [-3, 3]]], ["4A", [[0, 0], [1, 0], [1, 1], [1, 2]]], ["4B", [[0, 0], [0, 1], [1, 1], [1, 2]]], ["4C", [[0, 0], [-1, 1], [-1, 2], [0, 2]]]];
+  var box = document.getElementById("fig-pieces");
+  if (box) SHAPES.forEach(function (sh) {
+    var d = document.createElement("div");
+    d.className = "piece";
+    var svg = el("svg", { "aria-hidden": "true" }, null);
+    drawCells(svg, sh[1].map(function (c) { return { q: c[0], r: c[1], cls: "r" }; }), 10, true);
+    d.appendChild(svg);
+    var lab = document.createElement("span");
+    lab.textContent = sh[0];
+    d.appendChild(lab);
+    box.appendChild(d);
+  });
+
+  // Figure 2: the snake rule
+  mini("fig-rule1", [{ cls: "r", cells: [[0, 0], [1, 0], [1, 1]] }, { cls: "rn", cells: [[1, 2], [2, 2]] }], 1, 16);
+  mini("fig-rule2", [{ cls: "r", cells: [[0, 0], [1, 0], [1, 1]] }, { cls: "rn", cells: [[2, -1], [3, -1]] }, { cells: [[1, 0]], text: "3", tcls: "big on" }], 1, 16);
+  mini("fig-rule3", [{ cls: "r", cells: [[0, 0], [1, 0]] }, { cls: "rn", cells: [[0, 1], [-1, 2]] }, { cells: [[0, 1]], text: "×", tcls: "big" }], 1, 16);
+
+  // Figure 3: one reply and its images
+  var reply = [16, 27, 28, 39], images = [];
+  for (var t = 1; t < 12; t++) reply.forEach(function (c) {
+    var p = sym(t, cq(c), cr(c)), i = idx(p[0], p[1]);
+    if (reply.indexOf(i) < 0 && images.indexOf(i) < 0) images.push(i);
+  });
+  board("fig-sym", { red: [60], blue: reply, soft: images });
+
+  // Figure 6: the dead cells of red's snake
+  var redCells = [60, 70, 81, 82, 93], blueCells = [16, 27, 28, 39], occ = redCells.concat(blueCells), dead = [];
+  redCells.forEach(function (c) {
+    var own = nbs(c).filter(function (n) { return redCells.indexOf(n) >= 0; }).length;
+    if (own >= 2) nbs(c).forEach(function (n) { if (occ.indexOf(n) < 0 && dead.indexOf(n) < 0) dead.push(n); });
+  });
+  board("fig-pos", { red: redCells, blue: blueCells, dead: dead });
+
+  // Figure 7: threat zones
+  var b1 = [[2, 0], [3, 0], [4, 0]];
+  mini("fig-zone1", [{ cls: "b", cells: [[0, 0], [1, 0]] }, { cls: "zb", cells: b1 }], 2, 14);
+  var b2 = [[0, 0], [1, 0], [2, 0]];
+  mini("fig-zone2", [{ cls: "z", cells: border(b2) }, { cls: "zb", cells: b2 }], 1, 14);
+
+  // Figure 5: the grid of bits
+  (function () {
+    var svg = document.getElementById("fig-bits");
+    if (!svg) return;
+    var C = 30, M = 6;
+    svg.setAttribute("viewBox", "0 0 " + (11 * C + 2 * M) + " " + (11 * C + 2 * M));
+    var off = { 61: "+1", 59: "−1", 71: "+11", 49: "−11", 50: "−10", 70: "+10" };
+    for (var i = 0; i < 121; i++) {
+      var q = cq(i), r = cr(i), x = M + (q + 5) * C, y = M + (r + 5) * C, ok = on(q, r);
+      var cls = !ok ? "sq off" : i === 60 ? "sq c" : off[i] ? "sq nb" : "sq";
+      el("rect", { x: x + 1.5, y: y + 1.5, width: C - 3, height: C - 3, rx: 2, "class": cls }, svg);
+      if (!ok) continue;
+      if (off[i]) {
+        el("text", { x: x + C / 2, y: y + C / 2 - 1, "class": "sqo" }, svg, off[i]);
+        el("text", { x: x + C / 2, y: y + C - 5, "class": "sqn" }, svg, String(i));
+      } else {
+        el("text", { x: x + C / 2, y: y + C / 2 + 3, "class": i === 60 ? "sqn c" : "sqn" }, svg, String(i));
+      }
+    }
+  })();
+
+  // Figure 4: the top of the proof
+  (function () {
+    var svg = document.getElementById("fig-tree");
+    if (!svg) return;
+    svg.setAttribute("viewBox", "0 0 720 428");
+    var X0 = 268, STEP = 21, N = 20, B = 13, ys = [36, 122, 210, 298, 386];
+    var mid = X0 + (N - 1) * STEP / 2 + B / 2, right = X0 + (N - 1) * STEP + B;
+    function label(y, a, b, c) {
+      el("text", { x: 12, y: y, "class": "tl" }, svg, a);
+      el("text", { x: 12, y: y + 17, "class": "ts" }, svg, b);
+      if (c) el("text", { x: 12, y: y + 32, "class": "ts" }, svg, c);
+    }
+    function fan(px, py, y) { el("polygon", { points: px + "," + py + " " + X0 + "," + (y - 3) + " " + right + "," + (y - 3), "class": "fan" }, svg); }
+    function row(y, fn) { for (var i = 0; i < N; i++) fn(i, X0 + i * STEP, y); }
+    var pick2 = 6, win = 4;
+    fan(mid, ys[0] + 15, ys[1]);
+    fan(X0 + pick2 * STEP + B / 2, ys[1] + B, ys[2]);
+    fan(X0 + win * STEP + B / 2, ys[2] + B, ys[3]);
+    label(ys[0] + 2, "Red opens", "one move, chosen by us");
+    el("circle", { cx: mid, cy: ys[0], r: 13, "class": "dot1" }, svg);
+    el("text", { x: mid + 22, y: ys[0] + 4, "class": "tm" }, svg, "1:60");
+    label(ys[1] + 4, "Blue's replies", "172 classes", "every one must lose");
+    row(ys[1], function (i, x, y) { el("rect", { x: x, y: y, width: B, height: B, rx: 2, "class": "bx b" + (i === pick2 ? " on" : "") }, svg); });
+    label(ys[2] + 4, "Red's tries", "about 1,600 legal moves", "one must win");
+    row(ys[2], function (i, x, y) {
+      el("rect", { x: x, y: y, width: B, height: B, rx: 2, "class": "bx r" + (i === win ? " win" : i > win ? " faint" : "") }, svg);
+      if (i < win) { el("line", { x1: x + 3, y1: y + 3, x2: x + B - 3, y2: y + B - 3, "class": "x" }, svg); el("line", { x1: x + B - 3, y1: y + 3, x2: x + 3, y2: y + B - 3, "class": "x" }, svg); }
+    });
+    label(ys[3] + 4, "Blue's answers", "1,000 to 1,250 for each try", "every one must lose");
+    row(ys[3], function (i, x, y) { el("rect", { x: x, y: y, width: B, height: B, rx: 2, "class": "bx b" }, svg); });
+    label(ys[4] + 4, "Jobs", "one single-thread search each,", "to the end of the game");
+    row(ys[4] - 22, function (i, x, y) {
+      el("line", { x1: x + B / 2, y1: ys[3] + B + 2, x2: x + B / 2, y2: y - 2, "class": "tri" }, svg);
+      el("polygon", { points: (x + B / 2) + "," + y + " " + (x - 1) + "," + (y + 30) + " " + (x + B + 1) + "," + (y + 30), "class": "tri" }, svg);
+    });
+    [ys[1], ys[2], ys[3]].forEach(function (y) { el("text", { x: right + 10, y: y + 11, "class": "ts" }, svg, "…"); });
+  })();
+
+  // Figure 8: the sharing rule
+  (function () {
+    var svg = document.getElementById("fig-share");
+    if (!svg) return;
+    svg.setAttribute("viewBox", "0 0 720 168");
+    var X0 = 268, W = 38, G = 9, costs = [0, 1, 2, 2, 3, 3, 3, 3, 4];
+    function rowOf(y, vals, free, a, b) {
+      el("text", { x: 12, y: y + 18, "class": "tl" }, svg, a);
+      el("text", { x: 12, y: y + 35, "class": "ts" }, svg, b);
+      vals.forEach(function (v, i) {
+        var x = X0 + i * (W + G);
+        el("rect", { x: x, y: y, width: W, height: W, rx: 3, "class": "bx n" + (free || v === 0 ? " free" : "") }, svg);
+        el("text", { x: x + W / 2, y: y + W / 2 + 4.5, "class": "tc" }, svg, String(v));
+      });
+    }
+    el("text", { x: X0, y: 16, "class": "ts" }, svg, "moves of the node, in order →");
+    rowOf(28, costs, false, "Needs one good move", "each further move is a bet");
+    rowOf(108, costs.map(function () { return 0; }), true, "Every move must be searched", "nothing here is a bet");
+  })();
+
+  // Figure 9: seconds for each refuted reply
+  (function () {
+    var svg = document.getElementById("fig-chart");
+    if (!svg) return;
+    var secs = [2007, 237, 289, 218, 211, 94, 264, 500, 400, 339, 220, 840, 248, 322, 420, 356, 185, 208, 203, 168, 158, 191, 136, 205, 174, 555, 77, 100, 200, 247, 188, 675, 282, 340, 382, 162, 88, 186, 304, 280, 252, 465, 1227, 205, 163, 2263, 102, 113, 482, 329, 733, 390, 346, 312, 309, 213, 316, 140, 751, 732, 328, 863, 273, 662, 239, 299, 652, 492, 676, 1508, 99, 498, 206, 194, 1843, 804, 330, 351, 2707];
+    var tries = [72, 1, 2, 2, 1, 1, 8, 2, 1, 2, 1, 21, 4, 4, 1, 3, 1, 3, 1, 2, 2, 1, 1, 1, 3, 8, 1, 1, 2, 5, 1, 3, 7, 3, 9, 1, 1, 1, 4, 1, 4, 5, 19, 2, 1, 21, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 9, 3, 2, 7, 3, 3, 1, 1, 6, 2, 1, 6, 1, 3, 2, 1, 16, 8, 2, 4, 39];
+    var W = 760, H = 300, L = 58, R = 12, T = 14, Bm = 54, PW = W - L - R, PH = H - T - Bm, MAX = 3000;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    for (var m = 0; m <= 50; m += 10) {
+      var y = T + PH - (m * 60 / MAX) * PH;
+      el("line", { x1: L, y1: y, x2: W - R, y2: y, "class": "grid" }, svg);
+      el("text", { x: L - 8, y: y + 3.5, "class": "axis", "text-anchor": "end" }, svg, m === 0 ? "0" : m + " min");
+    }
+    var n = secs.length, step = PW / n;
+    secs.forEach(function (s, i) {
+      var h = Math.max(1, s / MAX * PH), x = L + i * step + step * 0.15;
+      var r = el("rect", { x: x.toFixed(1), y: (T + PH - h).toFixed(1), width: (step * 0.7).toFixed(1), height: h.toFixed(1), "class": "bar" + (i >= 74 ? " new" : "") }, svg);
+      el("title", {}, r, "Reply " + (i + 1) + ": " + s + " s, " + tries[i] + (tries[i] === 1 ? " try" : " tries"));
+    });
+    [1, 20, 40, 60, 79].forEach(function (k) {
+      el("text", { x: (L + (k - 0.5) * step).toFixed(1), y: T + PH + 16, "class": "axis", "text-anchor": "middle" }, svg, String(k));
+    });
+    el("text", { x: L + PW / 2, y: H - 12, "class": "axis", "text-anchor": "middle" }, svg, "replies, in the order they were proved");
+  })();
+})();
+</script>

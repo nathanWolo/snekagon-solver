@@ -114,3 +114,7 @@ machine, and were not reproduced here.
 - The proof driver (`prove`, branch `parallel-v9`) is exact and restartable but not faster than the
   shared-table solve on a drawn position (E18). Keep it on the branch, or merge it with the
   parallel solve?
+- The table's key check is 38 bits strong at `--tt 27` (64-bit key, 26 bits fixed by the bucket):
+  an estimated one to seven false matches over the whole opening proof (LOG, "An explainer of the
+  prover"). Cover it with the independent check of the certificate, a second run with other
+  Zobrist numbers, or a wider key in the entry?
