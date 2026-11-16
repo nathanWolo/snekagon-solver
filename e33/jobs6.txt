@@ -1,0 +1,7 @@
+# round 2 (after the restart): identity on the current source (v4 = 895536e), then the margin-3 question per position
+e6_id_p0|<scratchpad>/wt/tq-v4.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1
+e6_id_ply07|<scratchpad>/wt/tq-v4.exe|tests/set1/ply07.txt --to 590 --quiet
+e6_m3|<scratchpad>/wt/tq-v4.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --tight-q 6 --tight-q-min 6 --tight-q-hand 3 --tight-q-margin 3
+e6_m99|<scratchpad>/wt/tq-v4.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --tight-q 6 --tight-q-min 6 --tight-q-hand 3
+e6_off_nco|<scratchpad>/wt/tq-v4.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --no-cost-order
+e6_m3_nco|<scratchpad>/wt/tq-v4.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --no-cost-order --tight-q 6 --tight-q-min 6 --tight-q-hand 3 --tight-q-margin 3

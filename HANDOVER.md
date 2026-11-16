@@ -1,4 +1,43 @@
-# E33 hand-over (branch `climb/tightq`, worktree `<scratch>/wt/tq`), stopped 2026-11-16 for a PC restart
+# E33 hand-over (branch `climb/tightq`, worktree `<scratch>/wt/tq`)
+
+## Round 2 state (2026-11-16, stopped at about 10:50 at the coordinator's word: the owner wants the machine)
+
+Brief of round 2: correctness first (identity, `cargo test`, check build, `verify 100 1 8 8`, the margin-3
+node count, the exactness argument), then the wider screen. Done so far:
+- **`cargo test --release` on the current source (895536e): 3 passed** (`tight_question_verdicts_are_exact`,
+  `sure_next_length_matches_brute_force`, `start3_counts_one_other_snake_per_piece`). Run by
+  `sh tools/locked.sh sh e33/tq_build.sh test v4`; the plain and check builds it made (`tq-v4.exe`,
+  `tqchk-v4.exe`) have the same sha256 as v3 (4b67d45c0887 / b7bac1879235): cargo found nothing to rebuild, so
+  **tq-v3/tqchk-v3 are the current source**.
+- **The exactness argument is written** (section below), with line numbers and the weakest step named.
+- **Not done:** option-off identity on v3/v4 (only v1's, round 1), the check-build runs, `verify`, the
+  margin-3 explanation, the whole screen. No timing was taken in round 2 (none is void).
+- Note on `verify 100 1 8 8`: on this branch `verify` reads only GAMES and SEED (`src/main.rs` 561-565), so
+  `8 8` is ignored here and it is `verify 100 1` (the HAND3/THREAT3 arguments exist on `climb/threats`).
+  It does not take the rule's options; it checks G against the brute force at every position with <= 8 left.
+
+What was running when stopped: `python e33/tq_run.py e33/jobs6.txt` (identity + margin-3 per position), still
+waiting in the lock's queue; stopped by me, no job had started, no output file written (nothing partial).
+`e33/jobs7.txt` (check-build probe: proof4 position 0, bench_ply5_blue_wins 0-3) is written, not run.
+
+**Next commands** (from `<main>`; each job is one lock hold of about 35 s; `tq_run.py` skips done jobs):
+1. `python <scratch>/wt/tq/e33/tq_run.py <scratch>/wt/tq/e33/jobs6.txt` — expect e6_id_p0 26,095,441 and
+   e6_id_ply07 4,174,807; e6_m3 vs e6_m99 vs e6_id_p0 per position (non-quiet: column 5 = nodes) to find
+   where margin 3 searches more than the base; e6_off_nco vs e6_m3_nco: the same with E30's cost order off
+   (the verifier of E29 explained a node rise by the cost history this way).
+2. `python <scratch>/wt/tq/e33/tq_run.py <scratch>/wt/tq/e33/jobs7.txt` — time the check build; stderr
+   (`#ERR` in the output file) has the counters. Then chunk proof4 0-23, set1 ply05-ply08 tune-range
+   positions and the five `bench_ply5_*` files so each hold stays under ~2 min; settings: the chosen one
+   (`--tight-q 6 --tight-q-min 6 --tight-q-hand 3`), the margin-3 one, and the most-firing one
+   (`--tight-q 8 --tight-q-hand 4`, or `--tight-q 5` hand 2, 8.4M asked on proof4 0-23).
+3. `sh tools/locked.sh <scratch>/wt/tq-v3.exe verify 100 1 8 8`.
+4. Screen: `python tools/run.py E33-S6 tune --set proof4 --start 12 --units 32 --cand <scratch>/wt/tq-v3.exe
+   --base frozen/climb-base-plain.exe --cand-args "--window 0,1 --tight-q 6 --tight-q-min 6 --tight-q-hand 3"
+   --base-args "--window 0,1"` (proof4 tune = units 0-43, positions 0-87); likewise `--set proof4b`
+   (tune units 0-87), `--set ply05` (full window); fail4 0-19 by hand (all red to move, `--window 0,1`).
+   Then `python tools/hc.py report runs/KEY.jsonl --ratio --lower-is-better` and `hc.py plan`.
+
+## Round 1 state (stopped 2026-11-16 for a PC restart)
 
 `<scratch>` = `<scratchpad>`.
 `<main>` = the main checkout (branch `parallel-v9`). Outputs: `<main>/work/tightq/` (one file per run, bench stdout).
@@ -33,6 +72,78 @@ Brief: the coordinator's E33 task (the tight question made cheap, judged in plac
   random positions, G exact vs brute force at several floors; verdicts with unlimited work vs exact solves; whole
   solves with the rule at every node vs without, windows (-1,1), (-1,0), (0,1)). `verify` also checks G vs brute
   force at every position with <= 8 pieces left (no random numbers drawn, so the game sequence is unchanged).
+
+## The claim and why it is exact (for a verifier who has not seen the code; round 2, 2026-11-16)
+
+Line numbers are those of commit `895536e` (the source of tq-v3/v4).
+
+**Where.** `src/solver.rs` 1534-1549, step 2c of `search`, after the table probe (1367-1384), the
+cluster bounds (1386-1504) and the step 2b reach tests (1506-1533), before the move loop. It is
+asked when `--tight-q N` is set, `tight_q_min <= level <= tight_q` (level = pieces left, both sides),
+`reach_on`, and the opponent holds a piece. Note alpha >= -1 there: lo starts at -1 (1368) and
+`alpha = alpha.max(lo)` (1503); beta <= hi <= 1. Values are -1, 0, 1 (`game_result`, 480-484:
+sign of mover's longest snake minus the opponent's at the end of the game).
+
+**The claim** (`tight_question`, 1113-1204). If it returns true, the node's value is <= alpha. The
+caller returns alpha and stores the interval [lo, alpha] (1546): an upper bound of alpha.
+
+**The argument.** Let ours/theirs = the two final longest snakes under any continuation.
+1. *A lower bound G on theirs* (`sure_next_length`, `src/bounds.rs` 578-743). Exact definition: G =
+   min over our legal moves m of max over the opponent's placements e legal after m of
+   longest_after(e). Facts it uses:
+   a. *Rules* (`pos.rs` 217 `legal_placement`; `naive.rs` 40-70, the rulebook version that `verify`
+   compares against on every position): a placement is legal iff its cells are empty, and either it
+   touches no tile at all (a new snake: border free of every tile), or it touches an own cell and
+   the own cells plus it still form snakes (only own cells matter for that). So our move m can make
+   an opponent placement e illegal only by covering a cell of e (grow), or a cell of e or its border
+   (new snake). That set is e's `block` (bounds.rs 659 for the grow-only generator: cells; 669:
+   cells, or cells|border for a new snake). A move that does not intersect e's block leaves e legal.
+   The code treats every intersection as a block (bounds.rs 710, 734), which can only lower G.
+   b. *The game goes on after m*: m is a placement, so passes = 0, and the opponent holds a piece
+   (checked at 1535 and bounds.rs 584), so `is_over` (`pos.rs` 102: two passes or both hands empty)
+   is false and the opponent may play e. If we have no legal move we pass: with passes = 0 now the
+   game goes on and every e stays legal (G = top, 717-724); with a pass already made our pass ends
+   the game and G = their longest now (719-721).
+   c. *m changes nothing of the opponent's* (`pos.rs` 124-157: play adds our cells only), so
+   longest_after(e) computed now is the opponent's longest after e at the child; snakes never shrink
+   (152), so theirs >= that.
+   d. *Lower bound, not equality, is all that is needed*, and every shortcut lowers it: extensions
+   below `floor` are not collected (607-610, 641, 658, 668); at most `MAX_EXT` = 48 are kept, longest
+   first (614-628); a length class is "blocked" only when some candidate move meets every kept
+   extension of every length down to it (726-740); otherwise the return is `now` = their longest now
+   (always a lower bound). Our candidate moves are generated exactly (694-715: every legal anchor of
+   every orientation of every piece we may place now, `pos.pieces_now()`, filtered to those with a
+   cell in the smallest block b, `hit` a superset since cell k sits at anchor index + shift[k] with
+   shift >= 0, pieces.rs 36/122-124; then checked exactly against all top-length blocks). A missed
+   legal move of ours would *raise* G: this is the one place where an error makes the rule unsound.
+   So: G returned >= floor implies G <= true G <= theirs.
+2. *An upper bound on ours*, two ways, both facts proved earlier:
+   a. the cluster bound U (1536-1544: max of the longest snake and every cluster's upper; equal to
+   `upper_bound_ex`'s return, bounds.rs 61-162, which the base already uses as the mover's upper
+   bound at 1426 and 1475-1491; `verify` checks it against `upper_bound_reference` and that it never
+   rises along a game). Only used when the list did not overflow.
+   b. the reach test `can_reach_touching_w(..., target)` answering false (1185; bounds.rs 319-): the
+   mover cannot build a snake of `target` even if the opponent never moved again; the opponent's
+   tiles only make our placements illegal (rules in 1a), so ours < target in the real game too. Out
+   of work answers true (no decision). This is the same function step 2' (1404) and the E29 reach
+   threats use; its "cannot" was cleared by the E29 verifier (LOG, "E29, the verifier's verdict").
+3. *The verdict.* delta = [alpha >= 0] (1119), target = G + delta (1160). Decided iff U < target
+   (1161-1167) or the reach test says "cannot" for target (1184-1203). Then ours <= target - 1 =
+   G + delta - 1 <= theirs + delta - 1. alpha >= 0: ours <= theirs, value <= 0 <= alpha. alpha = -1:
+   ours < theirs, value = -1 = alpha. Either way value <= alpha.
+4. *What only decides how often it fires* (no effect on soundness): `known` and the witness
+   (1121-1133), the `floor` and the margin raise of the floor (1134-1141), the hand limit (1169),
+   the margin limit (1176-1182), the work limit (1184). All of them only make the rule return false.
+
+**The weakest step (named by me).** 1d, the completeness of our move generation inside
+`sure_next_length` (the `hit` prefilter at 702-706 plus `legal_anchors`): if one legal move of ours
+that blocks every top extension were not generated, G would be one or more too high and the rule
+would cut wrongly, and node counts and root labels would not show it. It is checked against the brute
+force (every legal move of ours from `pos.moves`, then every placement of the opponent) at every
+decided node of the check build, on a 1/8 sample of undecided asked nodes, by the unit test
+`sure_next_length_matches_brute_force`, and at every position with <= 8 pieces left in `verify`. The
+second weakest: 1b at the end of the game (a pass ends it only with a pass already made; G = `now`
+there), which the brute force (`sure_next_length_brute`, 748-773, plays the pass) also covers.
 
 ## Exes (`<scratch>/wt/`, all plain MSVC builds via `e33/tq_build.sh`, none profiled)
 
