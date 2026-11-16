@@ -3059,3 +3059,32 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - *State:* no agent is running. The board's server runs on port 8770. The owner started a
   no-limit solve of the position after `1:60` from the board at 10:40 (14 processes under the
   lock: one cold `solve` for each of blue's 1,932 replies).
+
+## 2026-11-16 The board gets the proof driver as a backend (owner's request, about 11:05)
+
+- The owner chose to keep the board's own no-limit solve of the position after `1:60` (one
+  cold `solve` for each of blue's 1,932 replies), cancelled it after 707 s with none solved,
+  cleared the standing goal of the climb (`/goal clear`), and asked: "can we have the gui use
+  the proof driver as the backend? i want to be able to watch the opening get solved". The
+  climb stays paused; this is the owner's word to go on with the centre opening, through the
+  board.
+- *Design:* a Prove mode on the board (branch `gui-prove`, an Opus agent builds it). For a
+  position P its roots are P's children, one a symmetry class; the driver proves them one after
+  another in the configuration measured on the replay: `prove ROOTS --threads 16
+  --job-threads 1 --depth 2 --tt 27 --upper-first --replay --win-turns --out RESULTS`. A proof
+  store for each P under `work/gui/proofs/`; for the position after `1:60` it starts from a
+  copy of `work/long/ply1_results.txt` (74 of 172 refuted), and `work/long/` itself is never
+  written. The page lists the replies with their state, red's answer, tries and seconds, and
+  can follow the reply in work on the board. A reply that red does not win stops the run and
+  is shown plainly.
+- *The driver used:* `frozen/prove-replay.exe`, a copy of `work/replay/replay-c9cf438f95c7.exe`
+  (the profiled build of `climb/replay` at `a762d50`: base 4 plus the replay options). Its
+  source is not merged into `parallel-v9` yet.
+- *Why `--win-turns`:* it is held, not gated (0.771x on one run of 25 replies, a reply +35%
+  better with interval [+0.04%, +83%]). It changes only the order of red's tries, never a
+  value, and the one read we have favours it; for a run the owner watches that is the better
+  bet. The estimate for the 98 open replies: about 8 hours of the whole machine with it, about
+  10 without (one replay run each, 25 replies).
+- *What this run is not:* a measurement. Its replies include the 49 kept for a top-of-proof
+  gate; once the board proves them they are used up as gate data, and a later driver change
+  has to be judged on the 25 tune replies and whatever new openings give.

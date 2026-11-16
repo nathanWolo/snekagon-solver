@@ -20,15 +20,20 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 
 Update this section in the same change that freezes a version.
 
-- **Paused on 2026-11-16 at 10:37 at the owner's request ("lets pause the climbing agents
-  for now im just gonna play with the gui for a bit"). No agent is running; do not restart the
+- **The climb is paused since 2026-11-16 10:37 at the owner's request, and its standing goal
+  was cleared by the owner at about 11:00. No climbing agent is running; do not restart the
   climb without the owner's word.** The three lines each have a current `HANDOVER.md` on their
   branch (`git show BRANCH:HANDOVER.md`): `climb/failtry` (E34, `450dfa5`), `climb/tightq`
   (E33, `b1ba8c4`), `climb/evalorder` (E32, `9a382fa`). Copies of the candidate executables
-  are in `work/exes/`. While the owner uses the board (port 8770) no timing counts: look at
-  `work/gui/runs.log`. After stopping agents, look at `ps -ef` for replay loops and lock
+  are in `work/exes/`. After stopping agents, look at `ps -ef` for replay loops and lock
   waiters that outlived them, then at `.git/run.lock` and `.git/run.queue`. LOG, "Paused
   again at 10:37".
+- **In work for the owner: the board's Prove mode (branch `gui-prove`)**: the proof driver
+  (`frozen/prove-replay.exe`, built from `climb/replay`) as the board's backend, so the owner
+  can watch the centre opening being proved from the 74 replies already done. Its store is
+  `work/gui/proofs/`; `work/long/` stays as it was at the pause. While the board proves or
+  solves, no timing counts (`work/gui/runs.log`). LOG, "The board gets the proof driver as a
+  backend".
 
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
