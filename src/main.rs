@@ -53,7 +53,9 @@ fn perft(t: &Tables, pos: &Pos, depth: u32) -> u64 {
 }
 
 /// Random games; at every position the fast code is compared with the naive rules.
-fn verify(t: &Tables, games: usize, seed: u64) {
+/// `hand3`: three-piece hands get the reach check at 1 position in `hand3`; `threat3`: the
+/// reach-threat check at 1 in `threat3` (defaults 40 and 20).
+fn verify(t: &Tables, games: usize, seed: u64, hand3: usize, threat3: usize) {
     let mut rng = Rng(seed);
     let (mut positions, mut placements_checked, mut threat_checks, mut reach_checks) = (0u64, 0u64, 0u64, 0u64);
     let mut moves = Vec::new();
@@ -92,7 +94,7 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             {
                 let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
                 let k = pos.left[me].count_ones();
-                if !moves.is_empty() && pos.left[opp] != 0 && k >= 2 && (k == 2 || (k == 3 && rng.below(20) == 0)) {
+                if !moves.is_empty() && pos.left[opp] != 0 && k >= 2 && (k == 2 || (k == 3 && rng.below(threat3) == 0)) {
                     for _ in 0..40 {
                         let b = &t.placements[rng.below(t.placements.len())];
                         if pos.left[opp] >> b.piece & 1 == 0 || !pos.legal_placement(t, opp, b) {
@@ -153,7 +155,7 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             // the reach test against every sequence of placements, where that is affordable
             for player in 0..2 {
                 let k = pos.left[player].count_ones();
-                if k == 0 || k > 3 || (k == 3 && rng.below(40) != 0) || (k == 2 && rng.below(3) != 0) {
+                if k == 0 || k > 3 || (k == 3 && rng.below(hand3) != 0) || (k == 2 && rng.below(3) != 0) {
                     continue;
                 }
                 let optimum = bounds::one_player_optimum(t, &pos, player);
@@ -529,7 +531,10 @@ fn main() {
         "verify" => {
             let games: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(200);
             let seed: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1);
-            verify(t, games, seed);
+            // optional: how often three-piece hands are checked (1 in N; defaults 40 and 20)
+            let hand3: usize = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(40).max(1);
+            let threat3: usize = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(20).max(1);
+            verify(t, games, seed, hand3, threat3);
         }
         "solve" => {
             let o = parse_opts(&args[2..]);
