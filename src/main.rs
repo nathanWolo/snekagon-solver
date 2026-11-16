@@ -6,6 +6,8 @@ mod pieces;
 mod pns;
 mod pos;
 mod prove;
+#[cfg(feature = "shadow")]
+mod shadow;
 mod solver;
 mod study;
 
@@ -449,6 +451,16 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let t = tables();
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("help");
+    #[cfg(feature = "shadow")]
+    struct Report;
+    #[cfg(feature = "shadow")]
+    impl Drop for Report {
+        fn drop(&mut self) {
+            shadow::report();
+        }
+    }
+    #[cfg(feature = "shadow")]
+    let _report = Report;
     match cmd {
         "info" => {
             println!("placements {}", t.placements.len());
@@ -505,6 +517,19 @@ fn main() {
         "prove" => {
             let o = parse_opts(&args[2..]);
             prove_cmd(t, &o);
+        }
+        #[cfg(feature = "shadow")]
+        "rtcheck" => {
+            let o = parse_opts(&args[2..]);
+            let d = o.cfg;
+            let all = Config { reach_threat: true, reach_threat_max: 14, reach_threat_start: 14, ..d };
+            let cfgs = [
+                ("default", d),
+                ("all-levels", all),
+                ("all-levels-nogrow", Config { reach_threat_grow: false, ..all }),
+                ("all-levels-cache-after0", Config { reach_threat_cache: true, reach_threat_after: 0, ..all }),
+            ];
+            shadow::rtcheck(&o.rest[0], d, &cfgs, o.from, o.to);
         }
         "text" => {
             // the position text of a list of moves, as the results file of `prove` writes it

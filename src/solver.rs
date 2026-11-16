@@ -288,6 +288,18 @@ impl Threats {
         }
         b
     }
+    /// `bound_for_move` with the reach threats only (shadow checks).
+    #[cfg(feature = "shadow")]
+    fn bound_reach(&self, cells: BB, grows: bool) -> i32 {
+        let mut b = NO_BOUND;
+        for i in 0..self.n {
+            let z = if grows { self.zone_grow[i] } else { self.zone[i] };
+            if self.reach[i] && cells & z == 0 && self.value[i] < b {
+                b = self.value[i];
+            }
+        }
+        b
+    }
     /// `bound_for_move` without the reach threats (study counters only).
     fn bound_for_move_plain(&self, cells: BB, grows: bool) -> i32 {
         let mut b = NO_BOUND;
@@ -458,6 +470,11 @@ impl Solver {
             return (UNKNOWN, PASS);
         }
         (v, self.probe(pos.hash).map_or(PASS, |e| e.mv))
+    }
+
+    /// The bounds the table holds for `pos` ([-1, 1] when it holds none).
+    pub fn root_bounds(&self, pos: &Pos) -> (i32, i32) {
+        self.probe(pos.hash).map_or((-1, 1), |e| (e.lo as i32, e.hi as i32))
     }
 
     /// For the proof driver: what is already known about a position goes into the table.
@@ -782,6 +799,8 @@ impl Solver {
             }
             if rv <= 0 {
                 self.rt_stats[2] += 1;
+                #[cfg(feature = "shadow")]
+                crate::shadow::hit(10);
                 // A move m that touches b without covering it, when m grows one of our snakes and b
                 // grows one of theirs: a placement that grows a snake is legal exactly when its cells
                 // are empty and the player's own cells allow it, so m and b stay legal after each
@@ -825,6 +844,8 @@ impl Solver {
                 let e = &self.no_reach[slot];
                 if e.own == own && e.left == left && need >= e.need && e.opp & !child.cells[me ^ 1] == 0 {
                     self.rt_stats[1] += 1;
+                    #[cfg(feature = "shadow")]
+                    crate::shadow::check_no_reach(child, me, need, true);
                     return false;
                 }
             }
@@ -834,6 +855,10 @@ impl Solver {
         self.rts.work += (self.cfg.reach_threat_work - work) as u64;
         if !r && slot != usize::MAX {
             self.no_reach[slot] = NoReach { own, opp: child.cells[me ^ 1] & near, left, need };
+        }
+        #[cfg(feature = "shadow")]
+        if !r {
+            crate::shadow::check_no_reach(child, me, need, false);
         }
         r
     }
@@ -1281,6 +1306,9 @@ impl Solver {
             }
         }
 
+        // shadow checks: the moves a reach threat ruled out, (move, reach bound, only by it, alpha)
+        #[cfg(feature = "shadow")]
+        let mut sh_pruned: Vec<(u16, i32, bool, i32)> = Vec::new();
         // 4. generate and score the moves
         let mut buf = std::mem::take(&mut self.bufs[ply]);
         buf.clear();
@@ -1299,6 +1327,14 @@ impl Solver {
                     let bound = th.bound_for_move(p.cells, p.border & pos.cells[me] != 0);
                     if bound <= alpha {
                         skipped = skipped.max(bound);
+                        #[cfg(feature = "shadow")]
+                        {
+                            let g = p.border & pos.cells[me] != 0;
+                            let rb = th.bound_reach(p.cells, g);
+                            if rb <= alpha {
+                                sh_pruned.push((m, rb, th.bound_for_move_plain(p.cells, g) > alpha, alpha));
+                            }
+                        }
                         return;
                     }
                 }
@@ -1404,6 +1440,14 @@ impl Solver {
                             skipped = skipped.max(bound);
                             if self.cfg.rt_study && th.bound_for_move_plain(pm.cells, pm.border & pos.cells[me] != 0) > alpha {
                                 rskip += 1;
+                            }
+                            #[cfg(feature = "shadow")]
+                            {
+                                let g = pm.border & pos.cells[me] != 0;
+                                let rb = th.bound_reach(pm.cells, g);
+                                if rb <= alpha {
+                                    sh_pruned.push((m, rb, th.bound_for_move_plain(pm.cells, g) > alpha, alpha));
+                                }
                             }
                             continue;
                         }
@@ -1538,6 +1582,22 @@ impl Solver {
         debug_assert!(nlo <= nhi);
         if best_move == PASS {
             best_move = tt_move;
+        }
+        #[cfg(feature = "shadow")]
+        if self.cfg.reach_threat {
+            let fired = !sh_pruned.is_empty();
+            if fired {
+                crate::shadow::hit(0);
+                for &(m, rb, only, a) in &sh_pruned {
+                    crate::shadow::hit(1);
+                    if only {
+                        crate::shadow::hit(2);
+                    }
+                    crate::shadow::check_pruned(&self.cfg, pos, m, rb, only, a);
+                }
+                crate::shadow::check_node(&self.cfg, pos, alpha_in, beta_in, best, nlo, nhi);
+            }
+            crate::shadow::dump(pos, fired, alpha_in, beta_in);
         }
         self.store_if(use_tt, pos.hash, nlo, nhi, best_move, self.nodes - nodes_at_start + 1);
         best
