@@ -75,7 +75,21 @@ pub struct Config {
     pub reach_threat_start: u32,
     /// Study counters for reach-threat tests (`--rt-study`; costs time).
     pub rt_study: bool,
+    /// Keep the "cannot reach" answers of reach-threat tests and reuse them where they still hold.
+    pub reach_threat_cache: bool,
 }
+
+/// A "cannot reach" answer: the player with the cells `own` and the pieces `left` cannot build
+/// `need` cells while the opponent holds the cells `opp` (only those within reach are kept).
+#[derive(Clone, Copy)]
+struct NoReach {
+    own: BB,
+    opp: BB,
+    left: u8,
+    need: i32,
+}
+
+const NO_REACH_BITS: u32 = 13;
 
 /// Reach-threat study counters, by pieces left at the node.
 pub struct RtStudy {
@@ -112,7 +126,7 @@ pub fn outside_bucket(n: u32) -> usize {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4, rt_study: false }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4, rt_study: false, reach_threat_cache: false }
     }
 }
 
@@ -339,6 +353,7 @@ pub struct Solver {
     /// Reach-threat tests: [tests, answered by a witness, threats found].
     pub rt_stats: [u64; 3],
     pub rts: Box<RtStudy>,
+    no_reach: Vec<NoReach>,
     node_limit: u64,
     aborted: bool,
     /// Parallel solve: the ply of the root, the nodes on the path from it by ply (hash and window at
@@ -385,6 +400,7 @@ impl Solver {
             rwit: [Witness::NONE; MAX_PLY],
             rt_stats: [0; 3],
             rts: Box::new(RtStudy::new()),
+            no_reach: vec![NoReach { own: 0, opp: 0, left: 0, need: 0 }; 1 << NO_REACH_BITS],
             node_limit: u64::MAX,
             aborted: false,
             root_ply: 0,
@@ -795,9 +811,30 @@ impl Solver {
             self.rt_stats[1] += 1;
             return true;
         }
+        // A "cannot reach" found before, for the same cells and pieces of ours: see `near_cells`.
+        let own = child.cells[me];
+        let left = child.left[me];
+        let mut slot = usize::MAX;
+        let mut near = 0;
+        if self.cfg.reach_threat_cache {
+            let rem = hand_cells(left);
+            if need > rem {
+                near = near_cells(own, rem);
+                let h = ((own as u64) ^ ((own >> 64) as u64).rotate_left(29) ^ left as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                slot = (h >> (64 - NO_REACH_BITS)) as usize;
+                let e = &self.no_reach[slot];
+                if e.own == own && e.left == left && need >= e.need && e.opp & !child.cells[me ^ 1] == 0 {
+                    self.rt_stats[1] += 1;
+                    return false;
+                }
+            }
+        }
         let mut work = self.cfg.reach_threat_work;
         let r = can_reach_touching_w(self.t, child, me, need, &mut work, &mut self.rwit[ply]);
         self.rts.work += (self.cfg.reach_threat_work - work) as u64;
+        if !r && slot != usize::MAX {
+            self.no_reach[slot] = NoReach { own, opp: child.cells[me ^ 1] & near, left, need };
+        }
         r
     }
 

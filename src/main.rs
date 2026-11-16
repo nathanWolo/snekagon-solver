@@ -157,6 +157,19 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                     continue;
                 }
                 let optimum = bounds::one_player_optimum(t, &pos, player);
+                // what the cache of "cannot reach" answers relies on: above the cells in hand, only
+                // the opponent's cells near ours matter, and fewer of them can only help
+                {
+                    let rem = bounds::hand_cells(pos.left[player]);
+                    let near = bounds::near_cells(pos.cells[player], rem);
+                    let mut fewer = pos;
+                    fewer.cells[player ^ 1] &= near;
+                    fewer.recompute();
+                    let opt2 = bounds::one_player_optimum(t, &fewer, player);
+                    assert!(opt2 >= optimum, "fewer opponent cells lowered the optimum at {}", pos.to_text());
+                    assert_eq!(opt2.max(rem), optimum.max(rem), "opponent cells far away changed the optimum at {}", pos.to_text());
+                    reach_checks += 1;
+                }
                 for target in pos.longest[player] as i32 + 1..=optimum + 2 {
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_alone(t, &pos, player, target, &mut work), target <= optimum, "reach test wrong for {} at {}", target, pos.to_text());
@@ -231,6 +244,8 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-threat-after" => o.cfg.reach_threat_after = val().parse().unwrap(),
             "--reach-threat-start" => o.cfg.reach_threat_start = val().parse().unwrap(),
             "--rt-study" => o.cfg.rt_study = true,
+            "--reach-threat-cache" => o.cfg.reach_threat_cache = true,
+            "--no-reach-threat-cache" => o.cfg.reach_threat_cache = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
