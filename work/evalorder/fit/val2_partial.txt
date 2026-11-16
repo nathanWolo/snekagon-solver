@@ -1,0 +1,2 @@
+lgA 48 wrong 0 total 1.050 meanlog +0.040 +-0.263 pos 0 .. 47
+lgB 48 wrong 0 total 1.093 meanlog +0.071 +-0.285 pos 0 .. 47

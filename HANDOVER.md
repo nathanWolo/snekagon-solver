@@ -7,7 +7,37 @@
   `wt/eoport` at climb/field 5e73da7 + an uncommitted `refmoves` command, never on a branch).
   Script `work/evalorder/scripts/toprank.py DIR [--perreply ORDERS] [--sim ORDERS] [--top N ORDERS]`;
   output `top/rank1.txt`. Labels: base 145 F, turns 70 F, paused 42 F (= recorded), 59 known winners, 0 conflicts.
-- Task 2 step 2 (lgA/lgB on 48 val roots): RUNNING/queued, out `fit/val2.jsonl` (copy of val1 + new arms), log `fit/val2.log`.
+- Task 1 numbers (rank1.txt). Pure orders (no killers/images/answer rule): label of the FIRST move, W/F/? over 25:
+  model 15/3/7, port 5/1/19, lgA 3/2/20, lgB 2/2/21, W0 3/4/18, W1 4/4/17. Known failures ranked before the first
+  known winner (sum): model 27, port 18, lgA 19, lgB 29, W0 16, W1 18 -- but with 826-1457 unlabelled moves before
+  it for the eval orders (1172 for model, all in 7 replies), so these are not comparable: labels come from arms that
+  ran model-based orders (selection bias toward the model). Lower bound on failures (known F before first non-F):
+  model 4, port 1, lgA 2, lgB 2. Recorded: base 145, turns 70, paused 42.
+  Driver simulation (`--sim`, chained, killers+images+answer rule) of model: 97 F + 20 unlabelled vs recorded 145:
+  the sim is sequential, the driver opens tries in parallel once the root has 2 failures (cost rule in prove.rs),
+  so recorded failures include tries run beside the winner.
+  Reading so far: the pure model order's first move is a known winner in 15/25 replies (base arm: 7 first-try wins);
+  the images bonus/killers, not the model, push winners back. No eval order can be judged without labels for its
+  top moves. `top/unl_model.txt` lists the model's 7 unlabelled first moves (blue to move, label -1 = red wins):
+  proving them (~50-230 s each on 16 threads) would fix the model's first-try rate.
+- How the driver orders red's tries at a replay root (src/prove.rs new_node, climb/replay a762d50): `top.ordered_moves`
+  (static+MODEL score at level>=7, threat-ruled moves dropped; hint = known move, killers = last two root winners
+  handed down by --replay at TT_MOVE/KILLER scores), then +WINNER_BONUS (2^24) on images under the 12 symmetries of
+  every earlier root winner (--win-cap N keeps N images, --win-recent K the K latest winners, --win-turns interleaves
+  model and image lists as ranks), known results first, symmetry dedup; after a failed try the answer rule adds
+  answer_bonus(1024)<<16 to moves covering the refuting reply (dominant over the model's 22..158 range).
+  `--eval-order` does NOT reach this node: it is only in Solver::search step 4; ordered_moves is a separate copy.
+  To reach it: add the use_eval branch (evalorder::score of the child + model/static terms) into ordered_moves.
+- Task 2 step 2 DONE (node counts, valid despite the board's unlocked load): 48 val roots, cand3, L=11, vs off
+  (from val1): lgA total 1.050, mean log +0.040 +-0.263; lgB total 1.093, mean log +0.071 +-0.285; 0 wrong.
+  `fit/val2.jsonl`, `fit/val2_partial.txt` (results salvaged from the lane outputs after the stop; all 96 had finished).
+  lgB does NOT hold out of sample: line stopped per the brief (0.656 in sample was overfit, like W1).
+- Stopped 10:40 on the coordinator's order (owner uses the board). Nothing of mine running; no lock waiter of mine.
+- Next (if resumed): label the model's unlabelled first moves, e.g. for each line of top/unl_model.txt
+  `sh tools/locked.sh <main>/frozen/climb-base.exe prove FILE --threads 16 --job-threads 1 --depth 1 --tt 27 --upper-first --out OUT --deadline 170`
+  (check option names in src/main.rs; resume via results file), then rerun
+  `python work/evalorder/scripts/toprank.py work/evalorder/top --perreply model,port,lgA,lgB,W0,W1 --sim model,port,lgA,lgB,W0,W1 --top 5 model,port`
+  with the new labels added as a fourth SRC.
 
 # Earlier hand-over, stopped 2026-11-16 ~10:02 for a restart
 
