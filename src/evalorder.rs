@@ -19,6 +19,7 @@
 //!   short cells in hand that the best snake has no room for
 //!   fresh room for a new snake: the largest group of cells that touch no tile and that the other
 //!         side does not reach first, at most the cells in hand
+//! The order score is the weighted sum of these terms and of the model's score of the move.
 //! The weights are fitted on our own solved positions (LOG, E32).
 
 use crate::bounds::*;
@@ -29,8 +30,9 @@ use crate::pieces::*;
 pub const NFEAT: usize = 8;
 pub const NAMES: [&str; NFEAT] = ["est", "ub", "long", "terr", "hand", "ends", "short", "fresh"];
 
-/// The fitted weights (scaled by 64), in the order of `NAMES`.
-pub const WEIGHTS: [i32; NFEAT] = [64, 0, 0, 0, 0, 0, 0, 0];
+/// The fitted weights, in the order of `NAMES`, then the weight of the model's score (`MODEL`, the
+/// order below these levels; 64 with every other weight 0 is today's order).
+pub const WEIGHTS: [i32; NFEAT + 1] = [0, 0, 0, 0, 0, 0, 0, 0, 64];
 
 fn largest_group(mut b: BB) -> i32 {
     let mut best = 0;
@@ -116,7 +118,7 @@ pub fn features(t: &Tables, child: &Pos) -> [i32; NFEAT] {
 
 /// The order score of a move: higher first.
 #[inline]
-pub fn score(t: &Tables, child: &Pos, w: &[i32; NFEAT]) -> i32 {
+pub fn score(t: &Tables, child: &Pos, w: &[i32; NFEAT + 1]) -> i32 {
     let f = features(t, child);
     let mut s = 0;
     for i in 0..NFEAT {

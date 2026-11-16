@@ -292,7 +292,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--eval-bonus" => o.cfg.eval_bonus = val().parse().unwrap(),
             "--eval-w" => {
                 let v: Vec<i32> = val().split(',').map(|x| x.parse().unwrap()).collect();
-                assert!(v.len() == crate::evalorder::NFEAT, "--eval-w needs {} weights", crate::evalorder::NFEAT);
+                assert!(v.len() == crate::evalorder::NFEAT + 1, "--eval-w needs {} weights", crate::evalorder::NFEAT + 1);
                 o.cfg.eval_w.copy_from_slice(&v);
             }
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),

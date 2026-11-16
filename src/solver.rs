@@ -115,7 +115,7 @@ pub struct Config {
     /// evaluation of the position after each (`evalorder.rs`) instead of the model (99 = never).
     pub eval_level: u32,
     /// E32: the weights of that evaluation.
-    pub eval_w: [i32; crate::evalorder::NFEAT],
+    pub eval_w: [i32; crate::evalorder::NFEAT + 1],
     /// E32: the answer bonus at those nodes (added to the score of each move that covers the reply
     /// that refuted the move before; the scores of the evaluation lie below 1 << 21).
     pub eval_bonus: u64,
@@ -1558,22 +1558,6 @@ impl Solver {
                         return;
                     }
                 }
-                if use_eval {
-                    // E32: the evaluation of the position after the move
-                    let mut child = *pos;
-                    child.play(t, m);
-                    let v = if child.is_over() { -game_result(&child) << 19 } else { crate::evalorder::score(t, &child, &ew) };
-                    let mut score = (v + (1 << 20)).clamp(0, (1 << 21) - 1) as u64;
-                    if m == tt_move {
-                        score = TT_MOVE;
-                    } else if m == k1 {
-                        score = KILLER1;
-                    } else if m == k2 {
-                        score = KILLER2;
-                    }
-                    buf.push(score << 16 | m as u64);
-                    return;
-                }
                 let mut score = p.n as u64 * 64;
                 if p.border & own != 0 {
                     score += 256;
@@ -1583,6 +1567,7 @@ impl Solver {
                 } else if p.border & theirs != 0 {
                     score += 32;
                 }
+                let mut model_s = 0i32;
                 if use_model {
                     let mut joined = p.n as i32;
                     for j in 0..pos.nsnakes[me] as usize {
@@ -1613,6 +1598,14 @@ impl Solver {
                         s += w[8] * their_best as i32 + w[9] * my_next as i32 + w[10] * upper_bound(t, &child, opp) + w[11] * upper_bound(t, &child, me);
                     }
                     score = (s + (1 << 20)).max(0) as u64;
+                    model_s = s;
+                }
+                if use_eval {
+                    // E32: the evaluation of the position after the move, with the model's score as one term
+                    let mut child = *pos;
+                    child.play(t, m);
+                    let v = if child.is_over() { -game_result(&child) << 19 } else { crate::evalorder::score(t, &child, &ew) + ew[crate::evalorder::NFEAT] * model_s };
+                    score = (v + (1 << 20)).clamp(0, (1 << 21) - 1) as u64;
                 }
                 if m == tt_move {
                     score = TT_MOVE;
