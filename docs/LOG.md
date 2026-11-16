@@ -2144,3 +2144,54 @@ can set up a position and run the solver on it?" Built by an Opus agent on branc
 **`tools/build.sh`, the test of the fix** (`work/buildfix_test.txt`): a good build, then the
 same tree with a compile error while the earlier exe is still in the build directory. The
 script printed cargo's errors and "the build failed", returned 1, and copied no exe out.
+
+## 2026-11-16 Same machine, the reference solver: ours takes 0.555x of its time on its own bench files
+
+Owner, 2026-11-16: "And have you measured how we compare to the solver in the original yt
+video speed wise?" Not on one machine until now. Asked "Build and run the reference solver
+on this PC for a same-machine comparison?", the owner answered "Yes, run it".
+
+- **What ran:** `github.com/BoltKey/snekagon-lab` at `61eb3a4` (the checkout the test data came
+  from; nothing fetched), built in WSL2 (Ubuntu 24.04, g++ 13.3, `-O3 -march=native -std=c++20
+  -pthread`, the README's flags) in `/opt/snekref`; `BENCH_FRESH=1 ./build/snek benchset
+  bench/ply5_<file>.txt 1` (one thread, every position from an empty table), without network
+  (`unshare -n`) as user `nobody`. Before building, its source was read for process, network
+  and file calls: the network code is in its `worker` and `serve` modes, which were not run;
+  `benchset` reads a file and prints.
+- **Against:** `frozen/climb-base.exe` (`03e5963b7ba5`, the base with E30; a profiled MSVC
+  build, native Windows), `bench tests/set1/bench_ply5_<file>.txt --quiet`, one thread, every
+  position from an empty table.
+- **How:** the two solvers alternate file by file, each run alone under the run lock, two
+  rounds with the order swapped (`work/ref/`). No run from the analysis board fell in the
+  window (00:10 to 00:40).
+
+  | File | Positions | Ours, s (two rounds) | Reference, thread-s (two rounds) | Reference / ours | Our nodes | Its nodes |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | `ply5_other_openings` | 24 | 4.06, 3.98 | 12.1, 12.2 | 3.02x | 8.42 M | 7.45 M |
+  | `ply5_blue_wins` | 24 | 9.42, 9.72 | 10.8, 10.7 | 1.12x | 14.43 M | 4.40 M |
+  | `ply5_blue_wins_holdout` | 24 | 9.23, 9.26 | 10.8, 10.9 | 1.17x | 14.31 M | 4.31 M |
+  | `ply5_random_units` | 24 | 8.62, 8.76 | 13.3, 13.6 | 1.55x | 13.75 M | 6.16 M |
+  | `ply5_ublock_refutations` | 30 | 46.32, 46.96 | 93.2, 94.0 | 2.01x | 53.58 M | 37.37 M |
+  | Total | 126 | **77.6, 78.7** | **140.2, 141.4** | **1.80x** | 104.49 M | 59.71 M |
+
+- **Result:** ours takes 0.554x and 0.556x of the reference's time (1.80x faster) on these
+  126 positions. It searches 1.75x more nodes and spends 0.75 microseconds a node against
+  2.36. Two rounds agree to 1%.
+- **Values:** all 126 agree. On the four all-win files both give 24 wins; on the refutation
+  file both give 27 losses and the same three draws (positions 6, 15, 23), compared one by
+  one.
+- **The reference reproduces its published counts exactly** (59,709,026 nodes here; 59.7 M
+  published) and takes 141 thread-seconds here against the 197 it publishes for its
+  authors' machine.
+- **What this is not:** a like-for-like build. Theirs is g++ in a WSL2 virtual machine, ours
+  a profiled native build; they publish a MinGW build on Windows, which was not made here.
+  One thread only; their parallel solve and ours were not compared. These are positions
+  five moves in, their benchmark; nothing here says how the two compare on a whole proof.
+- **Where the gap is:** on the two `blue_wins` files it searches 3.3x fewer nodes and we are
+  barely ahead (1.12x, 1.17x). Its move order and bounds there are better than ours. The
+  reach-threat candidate (`f24a2d2`, unverified) reads 53.2 M nodes on these files in its
+  agent's label runs, which would be below the reference's count for the first time.
+- **A slip on the way:** the first build went to `/tmp` in WSL, which was gone by the next
+  call (the distribution had stopped in between), so the first comparison script timed only
+  ours and was stopped. Rebuilt in `/opt/snekref`. Also new: `RUN_LOCK_FIRST=1` in
+  `tools/lockfair.sh` puts a caller ahead of the queue, for what the owner is waiting on.

@@ -96,6 +96,12 @@ equivalence.
 
 Measured on a Ryzen 7 250 (16 threads) with other work running. So v4 spends about 3 microseconds a node.
 
+**On this PC (2026-11-16, at the owner's word):** the same five files, v4 at `61eb3a4`, one thread,
+`BENCH_FRESH=1`, built with g++ 13.3 in WSL2: 59,709,026 nodes (its published counts, exactly) in 140.2
+and 141.4 thread-seconds (two rounds); 2.36 microseconds a node. This project's frozen base of that day
+took 77.6 and 78.7 s on the same files (104.5 M nodes), and all 126 values agree. `docs/LOG.md`,
+"Same machine, the reference solver".
+
 ## What is known about the game
 
 - After `1:60 4B:16,27,28,39 4A:7,8,9,20`, blue wins with `4I:15,25,35,45` (all 956 red replies lose).
@@ -114,15 +120,17 @@ Measured on a Ryzen 7 250 (16 threads) with other work running. So v4 spends abo
 
 ## Not verified here
 
-- The reference code was not run on this machine: running downloaded code needs the owner's word. Every
-  figure above is as reported in that repository's README and data files.
+- The reference code was run on this machine once, on 2026-11-16, for its `benchset` on its five bench
+  files (the owner's word, that day: "Yes, run it"). Every other figure above is as reported in that
+  repository's README and data files. Its other modes (`serve`, `worker`, which use the network) have not
+  been run.
 - The piece shapes were read from that repository's `RULES.md` and reference implementation, which read
   them off the print-and-play sheet. I did not see the sheet.
 
 ## Running the reference solver yourself (for a same-machine comparison)
 
-Not done here: it is downloaded code, and an attempt to build it was declined. If you want the
-comparison, in WSL (or any Linux shell with g++ 11 or later), from a checkout of
+Done here on 2026-11-16 (see above; the build is in WSL at `/opt/snekref`, not in `/tmp`, which WSL
+empties when the distribution stops). To repeat it, in WSL (or any Linux shell with g++ 11 or later), from a checkout of
 `github.com/BoltKey/snekagon-lab` at commit `61eb3a4`:
 
 ```bash
