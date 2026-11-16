@@ -1,4 +1,5 @@
 mod bounds;
+mod evalorder;
 mod geom;
 mod naive;
 mod par;
@@ -287,6 +288,13 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-start3" => bounds::START3.store(true, std::sync::atomic::Ordering::Relaxed),
             "--no-reach-start3" => bounds::START3.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
+            "--eval-order" => o.cfg.eval_level = val().parse().unwrap(),
+            "--eval-bonus" => o.cfg.eval_bonus = val().parse().unwrap(),
+            "--eval-w" => {
+                let v: Vec<i32> = val().split(',').map(|x| x.parse().unwrap()).collect();
+                assert!(v.len() == crate::evalorder::NFEAT, "--eval-w needs {} weights", crate::evalorder::NFEAT);
+                o.cfg.eval_w.copy_from_slice(&v);
+            }
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
             "--model" => {
                 for (i, x) in val().split(',').enumerate() {

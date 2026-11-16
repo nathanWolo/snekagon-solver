@@ -111,6 +111,14 @@ pub struct Config {
     /// that cut the child (the killer when the child did not cut by a move) for the reach-threat
     /// test, 2 that also for the answer bonus.
     pub rt_refuter: u8,
+    /// E32: at nodes with at least this many pieces left, the listed moves are ordered by the
+    /// evaluation of the position after each (`evalorder.rs`) instead of the model (99 = never).
+    pub eval_level: u32,
+    /// E32: the weights of that evaluation.
+    pub eval_w: [i32; crate::evalorder::NFEAT],
+    /// E32: the answer bonus at those nodes (added to the score of each move that covers the reply
+    /// that refuted the move before; the scores of the evaluation lie below 1 << 21).
+    pub eval_bonus: u64,
 }
 
 /// A "cannot reach" answer: the player with the cells `own` and the pieces `left` cannot build
@@ -175,7 +183,7 @@ pub fn outside_bucket(n: u32) -> usize {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0, eval_level: 99, eval_w: crate::evalorder::WEIGHTS, eval_bonus: 1 << 21 }
     }
 }
 
@@ -1535,7 +1543,9 @@ impl Solver {
             let theirs = pos.cells[opp];
             let front = neighbours(shape_of(theirs).ends) & pos.empty();
             let use_model = level as u32 >= self.cfg.model_level;
+            let use_eval = level as u32 >= self.cfg.eval_level;
             let w = self.cfg.model;
+            let ew = self.cfg.eval_w;
             let empty = pos.empty();
             let their_shape = shape_of(theirs);
             let their_free = neighbours(their_shape.ends) & empty & !neighbours(their_shape.body);
@@ -1547,6 +1557,22 @@ impl Solver {
                         skipped = skipped.max(bound);
                         return;
                     }
+                }
+                if use_eval {
+                    // E32: the evaluation of the position after the move
+                    let mut child = *pos;
+                    child.play(t, m);
+                    let v = if child.is_over() { -game_result(&child) << 19 } else { crate::evalorder::score(t, &child, &ew) };
+                    let mut score = (v + (1 << 20)).clamp(0, (1 << 21) - 1) as u64;
+                    if m == tt_move {
+                        score = TT_MOVE;
+                    } else if m == k1 {
+                        score = KILLER1;
+                    } else if m == k2 {
+                        score = KILLER2;
+                    }
+                    buf.push(score << 16 | m as u64);
+                    return;
                 }
                 let mut score = p.n as u64 * 64;
                 if p.border & own != 0 {
@@ -1739,7 +1765,7 @@ impl Solver {
                     if k != PASS && k != answered {
                         answered = k;
                         let reply = t.placements[k as usize].cells;
-                        let bonus = self.cfg.answer_bonus << 16;
+                        let bonus = if level as u32 >= self.cfg.eval_level { self.cfg.eval_bonus } else { self.cfg.answer_bonus } << 16;
                         for e in buf[i..].iter_mut() {
                             if t.placements[(*e & 0xFFFF) as usize].cells & reply != 0 {
                                 *e += bonus;
