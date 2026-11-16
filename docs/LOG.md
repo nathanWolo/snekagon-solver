@@ -3263,3 +3263,58 @@ through its own script under `tools/locked.sh` because the check build needs a f
   browser: 0.9, 1.0, 0.9, 2.8, 7.0 s). Six moves in, 43 positions: median 3 ms, slowest 29 ms.
   The node counts differ from the PC's run by under 1% because that page uses a table of 2^21
   entries, not 2^22. One run, one phone, model not noted.
+
+## 2026-11-16 A private page that plays red against the proof so far (15:45-16:20)
+
+- Owner, asked "Should I build a private prototype now, on the replies already proved, or wait
+  until the proof is done?": "Sure go ahead".
+- *Built* (branch `wasm`, commits `1e2261f` and `06fd595`; not merged, nothing pushed):
+  - `tools/mkbook.py STORE OUT.json`, the book. For every reply that the results file proves
+    lost (the certificate's rule: the position after red's answer must be on file as a loss for
+    blue): red's answer; and for every red win four moves in under that answer: blue's second
+    move and red's third. A move is its text, and the page looks a position up under the twelve
+    symmetries, so the book does not depend on the solver's placement numbers. At 15:53: 107
+    replies proved, 29,939 third moves, 160 KB. Of the 54,232 red wins four moves in on file,
+    24,298 are not under the winning answer of a proved reply (failed tries, replies still
+    in work). 4 pairings were dropped: blue's second piece would start a new snake next to a
+    red tile (the same cells are legal with blue's two pieces in the other order).
+  - `wasm/src/lib.rs`: `snek_best` (the value by two window searches, then a move that reaches
+    it, confirmed by a search of the position after it, because a node decided by a bound has
+    no move in the table) and `snek_info` (longest snakes, side to move, game over).
+  - `wasm/play/`: `play.html` (the reader is blue and taps cells to shape a piece; Undo and
+    New game stop a running solve by starting the worker again), `worker.js` (solver, book,
+    red's move), `selftest.html`. The built `snek.wasm` and `book.json` are not in git.
+  - Published as a private artifact with the book of 15:53:
+    https://claude.ai/artifact/ENmNkdWWKGVoFCUqXeUFJH . The publisher has not been contacted
+    and a public page waits for his OK (the owner's call).
+- *Checked* (the app's browser pane on this PC, beside the proof; the pane was hidden and its
+  two test workers together got about one core, so these times are upper bounds and do not
+  compare with the timing at 15:30):
+  - every move of the book is legal where the book plays it, by the solver's own move
+    generator: 107 answers, 29,939 third moves, no fault (the first export had the 4 pairings
+    above; this check found them);
+  - 2,000 random games through the book (37 replies with third moves, each turned by a random
+    symmetry; blue's second move drawn from those the book answers, then random legal moves):
+    red won all 2,000, by 1 to 21; 10,488 moves from the solver, each a proven win; six moves
+    in a move took 16 ms on average and 375 ms at most;
+  - 138 random games from all 107 replies with any legal second move: red won all 138; in 91
+    of them red's third move came from the solver: about 2.0 M nodes and 9.3 s on average,
+    88 s at most here. 40 more such games from the replies with third moves: red won all 40;
+  - 12 third moves drawn from the book, each followed by a search of blue's position: lost
+    for blue all 12 times (16.5 M nodes);
+  - in the page at phone width, by clicks and by a script that clicks: a reply and red's answer from the book, a third
+    move solved live (7.4 s), a whole game (red 21, blue 11), Undo from the end, New game,
+    a reply that is not proved yet (refused, with one line of text), Undo while red thinks.
+- *What the book covers:* for the 33 replies proved by the board's run (74 to 106 in the
+  proof's order) it answers all of blue's second moves but one or two in a thousand (1,087 of
+  1,087; 1,062 of 1,063; 1,007 of 1,009). The 74 replies of the first run have no jobs four
+  moves in on file (4 of them have one or two through another order of moves), so there red's
+  third move is solved in the page: seconds, sometimes a minute or more.
+- *Not checked:* the published page itself (the browser pane is not signed in, so only the
+  owner can open it); a blue that plays well. Random blue loses by a wide margin, so these
+  games test the plumbing (symmetries, book, legality, the browser build's values), and the
+  claim that red always wins rests on the solver's values, as the proof does. The 65 open
+  replies cannot be played yet.
+- *When the proof ends:* export the book again and publish it to the same link. Solving the
+  third moves of the first 74 replies would take about 67,000 jobs (74 replies at the 907 a
+  reply of the other 33), a few hours of the PC: an estimate, and the owner's call.

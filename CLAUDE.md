@@ -55,7 +55,12 @@ Update this section in the same change that freezes a version.
   for red's second and third moves, then the solver compiled to WebAssembly (branch `wasm`,
   crate `wasm/`, timed in a browser). The reference solver's author is the game's publisher;
   the owner will write to him once the proof is done, and a public page waits for his OK.
-  LOG, "A page to play against the proof".
+  LOG, "A page to play against the proof". **A private prototype is published** (owner:
+  "Sure go ahead"; https://claude.ai/artifact/ENmNkdWWKGVoFCUqXeUFJH, book of 15:53 with 107
+  replies): source in `wasm/play/` on branch `wasm`, book by `python tools/mkbook.py
+  work/gui/proofs/<hash> OUT.json` (that script is on `wasm` too), build and publish steps in
+  LOG, "A private page that plays red". After the proof: export the book again and publish
+  to the same link (pass the link as `url` from a new conversation).
 
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
