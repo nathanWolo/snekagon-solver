@@ -524,12 +524,16 @@
     cache.set(text, e);
     return e;
   }
-  function connect() {
-    const es = new EventSource("/api/events?client=" + client);
-    es.addEventListener("state", e => {
-      run = JSON.parse(e.data);
+  let jumped = false;
+  function onState(r) {
+      run = r;
       if (run.mode === "prove") {
         if (run.prove && run.prove.n) proofs.set(run.position, Object.assign({ exists: true }, run.prove));
+        // a page opened while a proof runs starts on the proof's position
+        if (!jumped && run.status === "running" && st.line.length === 0 && !st.baseText) {
+          try { const got = SN.parseInput(run.position); setLine(got.base, got.baseText, got.moves); } catch (e) {}
+        }
+        jumped = true;
         if (run.message && run.status === "error") say(run.message);
         follow();
         renderRun();
@@ -544,13 +548,27 @@
       if (run.message && ["error"].includes(run.status)) say(run.message);
       renderRun();
       if (c && run.position === posText()) renderBoard();
-    });
-    es.addEventListener("result", e => {
-      const r = JSON.parse(e.data);
+  }
+  function onResult(r) {
       const c = entryFor(r.run, r.position, null, null);
       if (r.move !== null) c.results.set(r.move, r);
       if (r.position === posText()) { renderBoard(); renderVerdict(); }
-    });
+  }
+  let lastStream = 0;
+  function connect() {
+    const es = new EventSource("/api/events?client=" + client);
+    es.addEventListener("state", e => { lastStream = Date.now(); onState(JSON.parse(e.data)); });
+    es.addEventListener("result", e => { lastStream = Date.now(); onResult(JSON.parse(e.data)); });
+    // A tunnel can hold the event stream back. While the stream is silent, ask for the state instead.
+    setInterval(async () => {
+      if (document.hidden || Date.now() - lastStream < 10000) return;
+      try {
+        const j = await (await fetch("/api/status")).json();
+        if (!j.run || (run && run.id === j.run.id && JSON.stringify(run) === JSON.stringify(j.run))) return;
+        for (const r of j.run.results || []) onResult(Object.assign({ run: j.run.id, position: j.run.position }, r));
+        onState(j.run);
+      } catch (e) {}
+    }, 5000);
   }
 
   $("iProcs").addEventListener("input", () => { $("iProcs").dataset.touched = "1"; });
