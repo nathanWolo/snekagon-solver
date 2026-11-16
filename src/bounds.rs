@@ -342,6 +342,11 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
         for j in 0..ns {
             len_of[j] = count(pos.snakes[player][j]) as i32;
         }
+        // `top` keeps 4 lengths and at most min(pieces, 4) of them are summed. That is enough: every
+        // snake was started by a piece already placed, and a player has 8 pieces in all (blue 7), so
+        // snakes + pieces in hand <= 8. With 4 or fewer pieces in hand the sum takes `pieces` lengths;
+        // with 5 or more there are at most 3 snakes, so at most 2 others to sum.
+        debug_assert!(ns + pieces as usize <= 8, "more snakes and pieces than a player has");
         let mut start: BB = 0;
         for j in 0..ns {
             let mut top = [0i32; 4]; // the longest other snakes no longer than j, longest first
@@ -711,4 +716,53 @@ pub fn upper_bound_reference(t: &Tables, pos: &Pos, player: usize) -> i32 {
         upper = upper.max(reach);
     }
     upper
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pieces::tables;
+    use crate::pos::Pos;
+    use std::sync::atomic::Ordering::Relaxed;
+
+    /// The reach test against every sequence of placements, for every target from one above the
+    /// longest snake to two above the optimum, with the three-piece test from the longest snake
+    /// (START3) off and on.
+    fn agrees_with_brute_force(text: &str, player: usize) -> i32 {
+        let t = tables();
+        let pos = Pos::from_text(text).expect("bad position text");
+        let opt = one_player_optimum(t, &pos, player);
+        for s3 in [false, true] {
+            START3.store(s3, Relaxed);
+            for target in pos.longest[player] as i32 + 1..=opt + 2 {
+                let mut work = u32::MAX;
+                assert_eq!(can_reach_touching(t, &pos, player, target, &mut work), target <= opt, "start3 {} target {} optimum {} at {}", s3, target, opt, text);
+            }
+        }
+        START3.store(true, Relaxed);
+        opt
+    }
+
+    /// The k term of START3: the final snake must take in S and three other old snakes with a hand
+    /// of three pieces (the verifier's position; red snakes of 4, 4, 4, 1 and a bar of 4, hand
+    /// 2 + 3 + 3). With k - 1 other snakes counted the test says "cannot" for 21.
+    #[test]
+    fn start3_counts_one_other_snake_per_piece() {
+        let t = tables();
+        let text = "000100000100200478800801002084e0_00000000000000000000000000000000_14_14_0_12_0";
+        let pos = Pos::from_text(text).unwrap();
+        for s3 in [false, true] {
+            START3.store(s3, Relaxed);
+            let mut work = u32::MAX;
+            assert!(can_reach_touching(t, &pos, 0, 21, &mut work), "start3 {}: red can reach 21", s3);
+        }
+        START3.store(true, Relaxed);
+        let opt = agrees_with_brute_force(text, 0);
+        assert!(opt >= 21, "optimum {}", opt);
+        // a neighbour: a fifth snake of 5 next to the bar (S is now longer than the snakes it
+        // must take in; the snakes of 4 tie with each other)
+        agrees_with_brute_force("0001000001002004f8800801002084e0_00000000000000000000000000000000_14_14_0_12_0", 0);
+        // a neighbour: a blue tile in the gap between the first two snakes of the ring
+        agrees_with_brute_force("000100000100200478800801002084e0_00000000000000000000000000000100_14_14_0_12_0", 0);
+    }
 }
