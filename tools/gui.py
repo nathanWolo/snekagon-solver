@@ -841,6 +841,127 @@ def proof_summary(rows):
             "avg": round(sum(secs) / len(secs), 1) if secs else None}
 
 
+def class_counts(solver, texts):
+    """For each position text: (the number of its moves, one for each class under the symmetries it has, and
+    the set of its children's texts)."""
+    out = []
+    for text, kids in zip(texts, solver.children(texts)):
+        p = parse_text(text)
+        stab = [t for t in range(12) if sym_mask(t, p["cells"][0]) == p["cells"][0] and sym_mask(t, p["cells"][1]) == p["cells"][1]]
+        keys = set()
+        for m, c in kids:
+            f = c.split("_")
+            a, b = int(f[0], 16), int(f[1], 16)
+            keys.add((min((sym_mask(t, a), sym_mask(t, b)) for t in stab), f[2], f[3]))
+        out.append((len(keys), {c for m, c in kids}))
+    return out
+
+
+class Tries:
+    """The tries of the root in work (the root's mover's moves), read from the results file: a decided try has
+    a line at the root's ply + 1, a finished job (a reply to a try) a line at the root's ply + 2. Built once from
+    the lines the file holds, then the file is read on from a byte offset."""
+
+    def __init__(self, solver, root_text, path):
+        self.solver, self.path = solver, Path(path)
+        r = parse_text(root_text)
+        self.ply, self.opp = r["ply"], r["stm"]  # opp: the side that tries; me: the side that replies
+        self.me = self.opp ^ 1
+        self.mine = r["cells"][self.me]
+        self.kids = {}  # the trying side's cells after a try -> (move, try position text)
+        for m, c in solver.children([root_text])[0]:
+            self.kids[int(c.split("_")[self.opp], 16)] = (m, c)
+        self.tries = {}  # the trying side's cells -> try
+        self.jobs = {}  # job position text -> (try key, lo, hi)
+        self.off, self.rest = 0, b""
+        self.new = []  # tries without their total yet
+        self.changed = True
+        self.read()
+
+    def read(self):
+        try:
+            size = self.path.stat().st_size
+        except OSError:
+            return
+        if size < self.off:  # the file was replaced: start again
+            self.off, self.rest, self.tries, self.jobs = 0, b"", {}, {}
+        if size == self.off:
+            return
+        with open(self.path, "rb") as f:
+            f.seek(self.off)
+            data = f.read(size - self.off)
+        self.off += len(data)
+        lines = (self.rest + data).split(b"\n")
+        self.rest = lines.pop()
+        for raw in lines:
+            self.line(raw.decode(errors="replace"))
+        if self.new:
+            news, self.new = self.new, []
+            try:
+                # The replies of a try, one a class: an upper bound of the jobs the try needs (the driver drops
+                # some replies without a job, and does not record a job of fewer than MIN_RECORD nodes).
+                for t, (n, kids) in zip(news, class_counts(self.solver, [t["text"] for t in news])):
+                    t["total"], t["kids"] = n, kids
+            except (RuntimeError, OSError, subprocess.SubprocessError):
+                pass
+            self.changed = True
+
+    def try_for(self, key):
+        t = self.tries.get(key)
+        if t is None:
+            m, c = self.kids[key]
+            cells = [] if m == "pass" else [int(x) for x in m.split(":")[1].split(",")]
+            t = self.tries[key] = {"move": m, "cells": cells, "text": c, "state": "work", "done": 0, "total": None, "reply": None,
+                                   "kids": None, "lost": set()}
+            self.new.append(t)
+        return t
+
+    def line(self, line):
+        f = line.split()
+        if len(f) < 6:
+            return
+        t = f[0].split("_")
+        if len(t) != 7 or not t[5].isdigit():
+            return
+        ply = int(t[5])
+        if ply != self.ply + 1 and ply != self.ply + 2:
+            return
+        try:
+            a, b, lo, hi = int(t[self.opp], 16), int(t[self.me], 16), int(f[1]), int(f[2])
+        except ValueError:
+            return
+        if a not in self.kids:
+            return
+        if ply == self.ply + 1:
+            if b != self.mine:
+                return
+            tr = self.try_for(a)  # values for the side that replies
+            if hi <= -1:
+                tr["state"] = "won"
+            elif lo >= 0:
+                tr["state"], tr["reply"] = "failed", f[5]
+            self.changed = True
+        elif b & self.mine == self.mine and b != self.mine:
+            # a job under a try; it counts once the try's children are known (a position reached in another
+            # order, from another root, has the same cells and need not be a reply of this try)
+            tr = self.try_for(a)
+            self.jobs[f[0]] = a
+            if lo >= 1 and f[0] not in tr["lost"]:  # the reply is lost for the side that replies
+                tr["lost"].add(f[0])
+                self.changed = True
+
+    def summary(self):
+        ts = list(self.tries.values())
+        for t in ts:
+            t["done"] = len(t["lost"] & t["kids"]) if t["kids"] is not None else 0
+        work = [t for t in ts if t["state"] == "work"]
+        frac = [t["done"] / t["total"] for t in work if t["total"]]
+        return {"list": [{k: v for k, v in t.items() if k not in ("text", "kids", "lost")} for t in ts],
+                "work": len(work), "failed": sum(t["state"] == "failed" for t in ts), "won": sum(t["state"] == "won" for t in ts),
+                "best": round(max(frac), 3) if frac else None,
+                "jobs": sum(1 for j, a in self.jobs.items() if self.tries[a]["kids"] is not None and j in self.tries[a]["kids"])}
+
+
 RE_ROOT = re.compile(r"^(\d+) (\d+) (\S+) (-?\d+) (\d+) (\d+) (\S+) (\d+) (\d+) (\d+) ([0-9.]+) (\S+)")
 RE_TRY = re.compile(r"root move (\d+) of (\d+)\s+(\S+)\s+value (-?\d+)")
 RE_GAVE = re.compile(r"window \((-?\d+),(-?\d+)\) gave (-?\d+): the value lies in \[(-?\d+), (-?\d+)\]")
@@ -876,6 +997,8 @@ class ProveRun:
         self.nodes = 0
         self.pieces = 0
         self.last_save = 0.0
+        self.tracker, self.tracker_root = None, None
+        self.tries_pub, self.tries_pub_t, self.tries_read = None, 0.0, 0.0
 
     def cur(self):
         if self.proc is not None and self.drv < len(self.rows) and self.rows[self.drv]["state"] in ("open", "work"):
@@ -888,7 +1011,8 @@ class ProveRun:
             now = time.time()
             c = self.cur()
             rate = round(self.worked_secs / self.worked, 1) if self.worked else s["avg"]
-            s.update({"rows": [dict(r) for r in self.rows], "cur": c, "rate": rate,
+            tries = self.tries_pub if c is not None and self.tries_pub and self.tries_pub["root"] == c else None
+            s.update({"rows": [dict(r) for r in self.rows], "cur": c, "rate": rate, "tries": tries,
                       "cur_seconds": round(self.piece_secs[c] + now - self.cur_t0, 1) if c is not None and self.cur_t0 else None})
             return {"id": self.id, "mode": "prove", "position": self.pos_text, "status": self.status, "message": self.message,
                     "total": s["n"], "done": s["refuted"], "running": 1 if self.proc is not None else 0, "nodes": self.nodes,
@@ -921,7 +1045,8 @@ class ProveRun:
     def drive(self):
         """One piece of the driver. Returns "end", "held", "cancel", "yield" or "error"."""
         st = self.store
-        args = [self.prover, "prove", st.roots_path.name, "--threads", str(self.procs)] + PROVE_ARGS + ["--out", st.results_path.name]
+        exe = [sys.executable, "-u", self.prover] if self.prover.endswith(".py") else [self.prover]  # a .py: a stand-in for tests
+        args = exe + ["prove", st.roots_path.name, "--threads", str(self.procs)] + PROVE_ARGS + ["--out", st.results_path.name]
         lines = queue.Queue()
         with self.cv:
             self.piece_secs = [r["seconds"] for r in self.rows]
@@ -967,6 +1092,8 @@ class ProveRun:
                 if (outcome is None and self.lock and self.lock.held and time.time() - self.lock.since > YIELD_AFTER
                         and self.lock.others_waiting()):
                     outcome = "yield"
+                if outcome is None and time.time() - self.tries_read > 0.5:
+                    self.tick_tries()
         finally:
             if p.poll() is None:
                 p.kill()
@@ -987,6 +1114,33 @@ class ProveRun:
                 self.cv.notify_all()
             st.fix_tail()
         return outcome
+
+    def tick_tries(self):
+        """The tries of the root in work: built from the results file when the driver takes a root up, then read
+        on from where the file was; published to the page at most once a second, when something changed."""
+        self.tries_read = time.time()
+        c = self.cur()
+        if c is None:
+            if self.tracker is not None:
+                self.tracker = None
+            return
+        try:
+            if self.tracker is None or self.tracker_root != c:
+                self.tracker, self.tracker_root = Tries(self.solver, self.rows[c]["child"], self.store.results_path), c
+            else:
+                self.tracker.read()
+        except (RuntimeError, OSError, subprocess.SubprocessError, ValueError) as e:
+            with self.cv:
+                self.message = "tries: %s" % e
+            return
+        t = self.tracker
+        if t.changed and time.time() - self.tries_pub_t >= 1:
+            s = dict(t.summary(), root=c)
+            with self.cv:
+                self.tries_pub = s
+                self.tries_pub_t = time.time()
+                self.cv.notify_all()
+            t.changed = False
 
     def mark_work(self):
         c = self.cur()
@@ -1154,7 +1308,7 @@ class App:
         if r is not None and r.mode == "prove" and r.pos_text == text and r.rows:
             s = r.snapshot()["prove"]
             return dict(s, exists=True, live=self.active())
-        if (self.proofs / text / "meta.json").is_file():
+        if (self.proofs / store_key(text) / "meta.json").is_file():
             st = ProofStore(self.proofs, self.solver, text)
         elif text in SEEDS:  # planned from its seed, written only when a run starts
             st = self.stores.get(text) or ProofStore(self.proofs, self.solver, text)
@@ -1307,7 +1461,7 @@ def make_handler(app):
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            sent_run, sent_n, last_state, last_beat = None, 0, None, 0.0
+            sent_run, sent_n, last_state, last_beat, last_sent = None, 0, None, 0.0, 0.0
             try:
                 while True:
                     if client:
@@ -1323,11 +1477,15 @@ def make_handler(app):
                         for e in new:
                             chunks.append("event: result\ndata: %s\n\n" % json.dumps(dict(e, run=r.id, position=r.pos_text)))
                         st = r.snapshot()
-                        key = json.dumps({k: v for k, v in st.items() if k not in ("elapsed", "waited")})
-                        if key != last_state or time.time() - last_beat > 0.5:
+                        kv = {k: v for k, v in st.items() if k not in ("elapsed", "waited")}
+                        if "prove" in kv:
+                            kv["prove"] = {k: v for k, v in kv["prove"].items() if k != "cur_seconds"}
+                        key = json.dumps(kv)
+                        gap, beat = (1.0, 5.0) if r.mode == "prove" else (0.0, 0.5)
+                        if (key != last_state and time.time() - last_sent >= gap) or time.time() - last_sent > beat:
                             chunks.append("event: state\ndata: %s\n\n" % json.dumps(st))
                             last_state = key
-                            last_beat = time.time()
+                            last_beat = last_sent = time.time()
                     if not chunks and time.time() - last_beat > 1:
                         chunks.append(": ping\n\n")
                         last_beat = time.time()
