@@ -33,6 +33,8 @@ def collect(FILE, DIR):
     pieces = [l.split() for l in open(f'{DIR}/pieces.txt')]
     acc = {i: [0.0, 0, 0.0, 0.0, None, 0] for i in range(len(roots))}  # wall, nodes, thread-s, stopped-s, best, value
     carry = 0.0
+    completed = set()
+    cut = {}  # root: pieces in which it was cut off
     for k in range(1, len(pieces) + 1):
         lines = [l.rstrip('\n') for l in open(f'{DIR}/piece-{k}.out')]
         dur = float(pieces[k - 1][4])
@@ -44,6 +46,10 @@ def collect(FILE, DIR):
             body, t = l.rsplit(' @', 1)
             f = body.split()
             i = int(f[0])
+            last = float(t)
+            if i in completed:
+                continue  # a piece first decides the roots done before from the results file
+            completed.add(i)
             a = acc[i]
             a[0] += int(f[5]) / 1e6 + carry
             carry = 0.0
@@ -52,9 +58,11 @@ def collect(FILE, DIR):
             a[3] += float(f[12])
             a[4] = f[11]
             a[5] = int(f[3])
-            last = float(t)
         if not finished:
             carry += dur - last  # a root cut off: its seconds go to it when it is done
+            nxt = min(set(range(len(roots))) - completed, default=None)
+            if nxt is not None:
+                cut[nxt] = cut.get(nxt, 0) + 1
     rows = []
     for i, r in enumerate(roots):
         f0 = r.split('_')
@@ -74,7 +82,7 @@ def collect(FILE, DIR):
             mk = 0 if stm == 0 else 1
             hit = [p for p, (lo, hi) in tr if cells(p.split('_')[mk]) == want and hi <= -1]
             ok = 'ok' if value == 1 and hit else 'FAILED'
-        rows.append(dict(i=i, blue=cells(other), tries=len(tr), failed=failed, wall=wall, nodes=nodes, thread=ts, stopped=ss, best=best, ok=ok))
+        rows.append(dict(i=i, blue=cells(other), tries=len(tr), failed=failed, wall=wall, nodes=nodes, thread=ts, stopped=ss, best=best, ok=ok, cut=cut.get(i, 0)))
     return rows
 
 
@@ -90,11 +98,11 @@ def main():
     rows = collect(FILE, sys.argv[2])
     tot = [0.0, 0, 0.0, 0.0, 0, 0]
     bad = 0
-    print('root  blue              tries failed  wall_s     Gnodes  thread_s  stopped_s  winning move     check')
+    print('root  blue              tries failed  wall_s     Gnodes  thread_s  stopped_s  winning move     check  cut')
     for r in rows:
         if r['ok'] != 'ok':
             bad += 1
-        print(f"{r['i']:4}  {','.join(map(str, r['blue'])):16s} {r['tries']:5} {r['failed']:6} {r['wall']:7.1f} {r['nodes']/1e9:10.2f} {r['thread']:9.0f} {r['stopped']:10.0f}  {r['best'] or '-':16s} {r['ok']}")
+        print(f"{r['i']:4}  {','.join(map(str, r['blue'])):16s} {r['tries']:5} {r['failed']:6} {r['wall']:7.1f} {r['nodes']/1e9:10.2f} {r['thread']:9.0f} {r['stopped']:10.0f}  {r['best'] or '-':16s} {r['ok']:6s} {r['cut'] or ''}")
         for j, x in enumerate([r['wall'], r['nodes'], r['thread'], r['stopped'], r['tries'], r['failed']]):
             tot[j] += x
     print(f"total {'':16s} {tot[4]:5} {tot[5]:6} {tot[0]:7.1f} {tot[1]/1e9:10.2f} {tot[2]:9.0f} {tot[3]:10.0f}  {'':16s} {'all ok' if bad == 0 else str(bad) + ' NOT OK'}")
