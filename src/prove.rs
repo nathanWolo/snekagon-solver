@@ -69,6 +69,11 @@ pub struct ProveCfg {
     /// coordinator node that is decided, with the path from the root (each move with its place in
     /// its node's order), start and end seconds, the result and whether it was stopped.
     pub job_log: Option<String>,
+    /// `--hold S` (E34; 0 = off): a coordinator node one of whose jobs has run at least S seconds
+    /// opens no new move while other work can be handed out. A job that runs long is likely the
+    /// one that refutes the node's move (the failed try of the replay), and the moves opened beside
+    /// it are thrown away when it does. Only the order in which jobs go out changes.
+    pub hold: f64,
 }
 
 pub struct ProveResult {
@@ -154,6 +159,8 @@ struct Node {
     given: bool,
     /// The move's place in its parent's order (the job log).
     place: u32,
+    /// A leaf whose job is under way: when it went out (seconds since the driver began).
+    sent: f64,
     done: bool,
     dead: bool,
     stop: Option<Arc<AtomicBool>>,
@@ -210,6 +217,12 @@ struct Driver<'a> {
     root_index: usize,
     pass_window: (i32, i32),
     jmeta: HashMap<usize, (String, f64)>,
+    /// `--hold`: while true, a node with a job under way for `hold` seconds or more opens no new
+    /// move; `now` is the time of the current hand-out (seconds since the driver began).
+    holding: bool,
+    now: f64,
+    /// Jobs handed out from a node that was held, because nothing else was left.
+    pub held_out: u64,
 }
 
 /// The cells of `bb` after symmetry `s` of the board.
@@ -294,6 +307,7 @@ impl<'a> Driver<'a> {
             running: false,
             given: false,
             place: 0,
+            sent: 0.0,
             done: false,
             dead: false,
             stop: None,
@@ -507,6 +521,15 @@ impl<'a> Driver<'a> {
             }
             if self.nodes[n].kids.get(i) == Some(&k) {
                 i += 1; // k is still under way; otherwise it is gone and the next has taken its place
+            }
+        }
+        // E34 (--hold): a job of this node that has run long is likely its cut; while it runs the
+        // node opens no new move, as long as there is other work (see `pass`)
+        if self.holding {
+            let (hold, now) = (self.c.hold, self.now);
+            let nodes = &self.nodes;
+            if nodes[n].kids.iter().any(|&k| nodes[k].leaf && nodes[k].running && now - nodes[k].sent >= hold) {
+                return None;
             }
         }
         // then a new move, if the budget allows one more
@@ -732,11 +755,29 @@ impl<'a> Driver<'a> {
             while self.busy < self.c.threads && !self.nodes[ROOT].done {
                 let mut freed = std::mem::take(&mut self.freed);
                 self.free.append(&mut freed);
-                let Some(j) = (0..=MAX_BUDGET).find_map(|budget| self.find_work(ROOT, budget)) else { break };
+                let mut found = None;
+                if self.c.hold > 0.0 {
+                    self.now = self.start.elapsed().as_secs_f64();
+                    self.holding = true;
+                    found = (0..=MAX_BUDGET).find_map(|budget| self.find_work(ROOT, budget));
+                    self.holding = false;
+                    if found.is_none() {
+                        // nothing else to do: the held nodes' moves rather than an idle worker
+                        found = (0..=MAX_BUDGET).find_map(|budget| self.find_work(ROOT, budget));
+                        if found.is_some() {
+                            self.held_out += 1;
+                        }
+                    }
+                } else {
+                    found = (0..=MAX_BUDGET).find_map(|budget| self.find_work(ROOT, budget));
+                }
+                let Some(j) = found else { break };
                 let stop = Arc::new(AtomicBool::new(false));
+                let sent = self.start.elapsed().as_secs_f64();
                 let n = &mut self.nodes[j];
                 n.stop = Some(stop.clone());
                 n.running = true;
+                n.sent = sent;
                 let job = Job { id: j, pos: n.pos, alpha: n.alpha, beta: n.beta, killers: n.killers, stop };
                 if self.jlog.is_some() {
                     let path = self.path_of(j);
@@ -863,6 +904,9 @@ impl Prover {
             root_index: self.root_index,
             pass_window: (0, 0),
             jmeta: HashMap::new(),
+            holding: false,
+            now: 0.0,
+            held_out: 0,
         };
         let table = &self.table;
         let (mut lo, mut hi) = (-1, 1);
@@ -970,6 +1014,9 @@ impl Prover {
                 }
                 if !c.quiet {
                     eprintln!("# {:8.1} s  window ({},{}) gave {}: the value lies in [{}, {}]", start.elapsed().as_secs_f64(), a, b, v, lo, hi);
+                    if c.hold > 0.0 {
+                        eprintln!("# hold {}: {} jobs went out from held nodes (nothing else was left)", c.hold, d.held_out);
+                    }
                 }
             }
             // let the workers go
