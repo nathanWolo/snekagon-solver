@@ -2433,3 +2433,79 @@ winners only. No long run before the gate of `f24a2d2` is through. The first lon
 is `tune25.txt` with the base frozen then. It serves twice: as the ruler's baseline, and as
 today's estimate of what the 98 replies left of the centre-opening proof would cost.
 That estimate goes to the owner; resuming is the owner's call.
+
+## 2026-11-16 E29, fifth report: the test of the k term is written; no cut inside the dear reach test yet
+
+Agent's report (the reach agent's round five). Its numbers. The candidate is still exactly
+`f24a2d2`.
+
+- **The test commit, `64d2bf4`, branch `climb/threats-tests`, on top of `f24a2d2`** (the
+  verifier's condition for the freeze):
+  - `bounds::tests::start3_counts_one_other_snake_per_piece`: the verifier's position, red,
+    target 21 must be "can" with start3 off and on; the same position against the brute
+    force (one-player optimum 24) for every target from the longest snake + 1 to 26; two
+    neighbours of it (a fifth red snake of 5, so S is longer than four snakes that tie; a
+    blue tile in the ring's gap), checked the same way. No hand-of-four case: the brute
+    force is too slow there.
+  - With k changed to k-1 locally the test fails ("start3 true: red can reach 21"); restored,
+    it passes.
+  - `debug_assert!(ns + pieces <= 8)` before the 4-slot `top` array, with the reason.
+  - `cargo test` passes; a plain build gives proof 0-23 narrow 26,095,441 and ply07 0-589
+    4,174,807, as `f24a2d2`.
+- **Inside the three-piece reach tests** (study build, proof 0-23): the bound of the child
+  after the first piece is 14.5 G cycles over 16.0 M calls (906 each), about 39% of the dear
+  tests and 10% of the run; the last piece 7.0 G; copies 1.4 G. "Cannot" at 6 left is
+  806,506 tests and 28.0 G, spread over many middling proofs (most visit 8 to 255
+  positions); "can" answers are cheap (72% visit one position at 5 left).
+- **The same question rarely comes back:** an exact repeat of a "cannot" 2,878 times in 4.12 M
+  tests; a monotone cache would answer 6,151 (0.15%). Dropped.
+- **`--reach-ub-upto` (`df82bf5`, off):** the prune after a piece uses the early-stopping
+  flood. Same nodes everywhere (26,095,441; 36,202,062; ply06 3,669,218; ply07 4,174,807;
+  ply08 4,223,127). Plain builds, three rounds: 0.96-0.97x on medians, 0.99-1.01x on
+  minima, and the arm that ran first was faster in every round. Within the order effect;
+  not a candidate.
+- **Ruled out with a number or an argument:** one search for both targets (ceiling 4%, the
+  second test runs only after a "can"); a "cannot" kept from the parent (the mover differs,
+  and our cells change in between); first-piece order (a "cannot" must try every branch).
+- **`snek verify GAMES SEED HAND3 THREAT3` (`ba347dc`):** how often three-piece hands are
+  checked; the defaults (40, 20) give the old sequence; `verify 100 1 8 8` passes (4,108
+  reach checks against 3,271).
+- **What is left, its words:** the child's bound computed from the parent's instead of from
+  scratch. Mechanical if exact, but needs care.
+
+## 2026-11-16 The top of the proof, third report: three orders of red's tries are built, none run
+
+Agent's report (the ordering agent's round seven), `climb/replay` at `2149110`, all options
+off by default. No replay was run (the lock was kept for the reach-threat gate).
+
+- **`--win-turns`:** where the image bonus applies, the model's order (no bonus) and the
+  image order take turns, the model's first. **`--win-cap N`:** only the N images that most
+  winners map onto keep the bonus. **`--win-recent K`:** only the K most recent winners count.
+- **Identity, options off:** proof 0-23 narrow 56,301,796; ply07 0-589 6,404,487. That the
+  smoke replay's tries are unchanged is argued (same image set, same list), not run.
+- **The replay's tools:** `--deadline` now stops a piece only after one root that needed
+  work; the resume path was run on three tiny roots with `--deadline 0` (three pieces, one
+  new root each, certificate checks ok); `tools/replay_sum.py --pairs CAND_DIR BASE_DIR`
+  writes one pair a root for `tools/hc.py report --ratio`. Smoke run A against B through
+  it: -0.8% [-7.2%, +6.1%], sd 0.059 a root.
+- **Simulation on the paused run's recorded tries** (25 tune replies, 8,145 recorded seconds;
+  a variant is ranked only where its winner was tried, so the cap is flattered):
+
+  | Variant | Replies ranked | Cost against recorded | Unranked replies (recorded s) |
+  | --- | --- | --- | --- |
+  | Images by count | 25 | 0.954x | 0 |
+  | Oracle | 25 | 0.788x | 0 |
+  | recent 1 / 2 / 3 / 5 / 10 | 13 / 19 / 20 / 22 / 24 | 0.930 / 0.982 / 0.975 / 0.993 / 1.000x | 12 / 6 / 5 / 3 / 1 |
+  | cap 1 / 2 / 4 / 8 | 16 / 20 / 24 / 24 | 0.968 / 0.915 / 0.896 / 0.896x | 9 / 5 / 1 / 1 |
+  | turns | cannot be ranked | | the model's own first tries were never recorded |
+
+- **Its choice: `--win-turns` first.** On the five replies where both orders are known the
+  cold winners would come at tries 1, 1, 3 and 7 (3, 4, 5 and 19 in the paused run) and the
+  image winner at try 2 instead of 1: about 14 tries against 32. Second: `--win-cap 4`.
+- **Its doubt:** turns re-scores a node's moves as ranks, so after a failed try the moves
+  lifted by the answer rule jump the whole list, where today the bonus band keeps images
+  above them. Untested.
+
+**Decision.** Nothing here is gated or run yet. After the reach-threat gate: one replay of
+`tune25.txt` with the base of that moment (the baseline and the estimate for the owner),
+then `--win-turns` on the same file as a screen. The 49 other replies stay unused for a gate.
