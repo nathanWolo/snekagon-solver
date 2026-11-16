@@ -35,6 +35,12 @@ pub static FROM_LONGEST: std::sync::atomic::AtomicBool = std::sync::atomic::Atom
 /// In reach_from, the cut on the upper bound after a piece asks only whether the bound is below the
 /// target: the flood stops as soon as it is not (`--reach-ub-upto`).
 pub static UB_UPTO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// In reach_from with three or more pieces, the cut on the child's upper bound is decided from the
+/// parent's clusters: only the cluster the piece lies in is flooded again (`--reach-ub-inc`).
+pub static UB_INC: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Check build only: [decisions compared, decisions that differ, values compared, values that differ].
+#[cfg(feature = "ubcheck")]
+pub static mut UBC: [u64; 4] = [0; 4];
 pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 /// With START3: after the first piece, the later pieces can only bring in snakes not yet joined and
 /// no longer than the longest snake the first piece joined (`--reach3-cap`).
@@ -695,6 +701,146 @@ fn reach2_cap(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, top:
     })
 }
 
+const DET_REGIONS: usize = 24;
+
+/// The clusters of `upper_bound_cells` with what their bound is made of: the growable cells, the
+/// sizes of their regions and the lengths of the snakes in them. `overflow`: something did not fit
+/// (the caller then computes the bound from scratch).
+pub struct ClDetail {
+    n: usize,
+    cells: [BB; MAX_CLUSTERS],
+    nreg: [u8; MAX_CLUSTERS],
+    reg: [[u8; DET_REGIONS]; MAX_CLUSTERS],
+    nl: [u8; MAX_CLUSTERS],
+    lens: [[i32; MAX_SNAKES]; MAX_CLUSTERS],
+    overflow: bool,
+}
+
+/// The clusters exactly as `upper_bound_cells` forms them (the same floods and the same pull-in of
+/// snakes; the result does not depend on the order), recorded.
+pub fn cluster_detail(ctx: &BoundCtx, mut rest: BB) -> ClDetail {
+    let mut d = ClDetail { n: 0, cells: [0; MAX_CLUSTERS], nreg: [0; MAX_CLUSTERS], reg: [[0; DET_REGIONS]; MAX_CLUSTERS], nl: [0; MAX_CLUSTERS], lens: [[0; MAX_SNAKES]; MAX_CLUSTERS], overflow: false };
+    let ns = ctx.ns;
+    let mut used = 0u32;
+    while rest != 0 {
+        if d.n >= MAX_CLUSTERS {
+            d.overflow = true;
+            return d;
+        }
+        let i = d.n;
+        d.n += 1;
+        let mut cluster = flood(bit(first(rest)), rest);
+        rest &= !cluster;
+        d.reg[i][0] = count(cluster) as u8;
+        d.nreg[i] = 1;
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for j in 0..ns {
+                if used >> j & 1 == 0 && ctx.snake_nb[j] & cluster != 0 {
+                    used |= 1 << j;
+                    d.lens[i][d.nl[i] as usize] = ctx.snake_len[j];
+                    d.nl[i] += 1;
+                    let mut more = ctx.snake_nb[j] & rest;
+                    while more != 0 {
+                        let region = flood(bit(first(more)), rest);
+                        rest &= !region;
+                        more &= !region;
+                        if d.nreg[i] as usize >= DET_REGIONS {
+                            d.overflow = true;
+                            return d;
+                        }
+                        d.reg[i][d.nreg[i] as usize] = count(region) as u8;
+                        d.nreg[i] += 1;
+                        cluster |= region;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        d.cells[i] = cluster;
+    }
+    d
+}
+
+/// The best bound of the recorded clusters other than `skip`, for a player holding the pieces
+/// `left`: what upper_bound_cells gives each of them (the joinable longest snakes and the fill of
+/// the regions' capacity), with the fill table of `left`.
+fn bound_others(t: &Tables, d: &ClDetail, skip: usize, left: u8) -> i32 {
+    let fill = &t.best_fill[left as usize];
+    let joinable = left.count_ones() as usize + 1;
+    let mut best = i32::MIN;
+    for i in 0..d.n {
+        if i == skip {
+            continue;
+        }
+        let mut capacity = 0usize;
+        for r in 0..d.nreg[i] as usize {
+            capacity += fill[d.reg[i][r] as usize] as usize;
+        }
+        let nl = d.nl[i] as usize;
+        let mut own = 0;
+        if nl > joinable {
+            let mut l2 = d.lens[i];
+            l2[..nl].sort_unstable_by(|a, b| b.cmp(a));
+            for l in &l2[..joinable] {
+                own += l;
+            }
+        } else {
+            for l in &d.lens[i][..nl] {
+                own += l;
+            }
+        }
+        best = best.max(own + fill[capacity.min(GRID)] as i32);
+    }
+    best
+}
+
+/// Is upper_bound(child) below `target`, where child is the position after the player placed p (a
+/// placement that grows a snake, the player still holding pieces) and `d` the clusters of the
+/// position before it? Only the decision is computed (that is all reach_from uses). The clusters the
+/// placement does not lie in keep their cells, regions and snakes: p's cells are growable and
+/// connected, so they lie in one region of one cluster C; every snake p joins touches p, so it is
+/// in C; the cells that stop being growable (p's cells and the neighbours of the new body cells,
+/// which are cells of p or of the joined snakes) are in C or were not growable. Only the pieces in
+/// hand change for the other clusters, and bound_others applies the new fill table. C's cells
+/// (growable after p) are flooded again with the child's snakes: they are whole clusters of the child.
+fn child_bound_below(t: &Tables, d: &ClDetail, child: &Pos, player: usize, p: &Placement, target: i32) -> bool {
+    let mut cp = usize::MAX;
+    if !d.overflow {
+        for i in 0..d.n {
+            if d.cells[i] & p.cells != 0 {
+                cp = i;
+                break;
+            }
+        }
+    }
+    if cp == usize::MAX || p.cells & !d.cells[cp] != 0 {
+        return upper_bound(t, child, player) < target;
+    }
+    if child.longest[player] as i32 >= target {
+        return false;
+    }
+    if bound_others(t, d, cp, child.left[player]) >= target {
+        return false;
+    }
+    upper_bound_cells_upto(t, &BoundCtx::new(child, player), growable(child, player) & d.cells[cp], target - 1) < target
+}
+
+/// The same, as a number: upper_bound(child) from the parent's clusters (check build only).
+#[cfg(feature = "ubcheck")]
+fn child_bound_value(t: &Tables, d: &ClDetail, child: &Pos, player: usize, p: &Placement) -> Option<i32> {
+    if d.overflow {
+        return None;
+    }
+    let cp = (0..d.n).find(|&i| d.cells[i] & p.cells != 0)?;
+    if p.cells & !d.cells[cp] != 0 {
+        return None;
+    }
+    let part = upper_bound_cells(t, &BoundCtx::new(child, player), growable(child, player) & d.cells[cp], None);
+    Some(part.max(bound_others(t, d, cp, child.left[player])).max(child.longest[player] as i32))
+}
+
 /// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.
 fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good: BB, work: &mut u32) -> bool {
     if *work == 0 {
@@ -734,6 +880,12 @@ fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good
     // snake. extra[r]: the most that r further pieces can add in old snakes.
     let mut sorted = len_of;
     sorted[..ns].sort_unstable_by(|a, b| b.cmp(a));
+    // the parent's clusters, for the cut on the child's bound (`--reach-ub-inc`)
+    let det = if pieces >= 3 && UB_INC.load(std::sync::atomic::Ordering::Relaxed) && left != 0 {
+        Some(cluster_detail(&BoundCtx::new(pos, player), growable(pos, player)))
+    } else {
+        None
+    };
     let mut extra = [0i32; MAX_SNAKES + 1];
     for j in 0..ns {
         extra[j + 1] = extra[j] + sorted[j];
@@ -793,14 +945,34 @@ fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good
         // upper_bound_cells on its growable cells, and upper_bound_cells_upto with the limit
         // target - 1 gives the same answer to 'is it below the target': the exact bound when the
         // bound is at most target - 1, otherwise a number above target - 1.
-        if later > 1
-            && (if UB_UPTO.load(std::sync::atomic::Ordering::Relaxed) {
-                upper_bound_cells_upto(t, &BoundCtx::new(&child, player), growable(&child, player), target - 1)
+        if later > 1 {
+            let below = if let Some(d) = &det {
+                let b = child_bound_below(t, d, &child, player, p, target);
+                #[cfg(feature = "ubcheck")]
+                {
+                    let full = upper_bound(t, &child, player);
+                    unsafe {
+                        UBC[0] += 1;
+                        if b != (full < target) {
+                            UBC[1] += 1;
+                        }
+                        if let Some(v) = child_bound_value(t, d, &child, player, p) {
+                            UBC[2] += 1;
+                            if v != full {
+                                UBC[3] += 1;
+                            }
+                        }
+                    }
+                }
+                b
+            } else if UB_UPTO.load(std::sync::atomic::Ordering::Relaxed) {
+                upper_bound_cells_upto(t, &BoundCtx::new(&child, player), growable(&child, player), target - 1) < target
             } else {
-                upper_bound(t, &child, player)
-            }) < target
-        {
-            return false;
+                upper_bound(t, &child, player) < target
+            };
+            if below {
+                return false;
+            }
         }
         reach_from(t, &child, player, target, joined, 0, work)
     })

@@ -5,6 +5,11 @@ edition = "2021"
 
 [dependencies]
 
+[features]
+# a check build: with --reach-ub-inc, every incremental child bound is compared with the bound
+# computed from scratch (counts printed by bench); never in the release path
+ubcheck = []
+
 [profile.release]
 opt-level = 3
 lto = "fat"

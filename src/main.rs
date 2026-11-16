@@ -192,6 +192,10 @@ fn verify(t: &Tables, games: usize, seed: u64, hand3: usize, threat3: usize) {
                     let saved = bounds::START3.swap(true, std::sync::atomic::Ordering::Relaxed);
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test from the longest snake wrong for {} at {}", target, pos.to_text());
+                    let inc = bounds::UB_INC.swap(true, std::sync::atomic::Ordering::Relaxed);
+                    let mut work = u32::MAX;
+                    assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test with the incremental child bound wrong for {} at {}", target, pos.to_text());
+                    bounds::UB_INC.store(inc, std::sync::atomic::Ordering::Relaxed);
                     let ub = bounds::UB_UPTO.swap(true, std::sync::atomic::Ordering::Relaxed);
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test with the bound up to the target wrong for {} at {}", target, pos.to_text());
@@ -215,6 +219,11 @@ fn verify(t: &Tables, games: usize, seed: u64, hand3: usize, threat3: usize) {
         for player in 0..2 {
             assert!(pos.longest[player] as i32 <= prev_upper[player], "final snake above the bound");
         }
+    }
+    #[cfg(feature = "ubcheck")]
+    unsafe {
+        let c = bounds::UBC;
+        println!("# ubcheck decisions {} differ {} values {} differ {}", c[0], c[1], c[2], c[3]);
     }
     println!("verify ok: {} games, {} positions, {} placement checks, {} threat-bound checks, {} reach checks", games, positions, placements_checked, threat_checks, reach_checks);
 }
@@ -314,6 +323,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-reach-start3" => bounds::START3.store(false, std::sync::atomic::Ordering::Relaxed),
             "--reach3-cap" => bounds::CAP3.store(true, std::sync::atomic::Ordering::Relaxed),
             "--reach-ub-upto" => bounds::UB_UPTO.store(true, std::sync::atomic::Ordering::Relaxed),
+            "--reach-ub-inc" => bounds::UB_INC.store(true, std::sync::atomic::Ordering::Relaxed),
             "--reach3-cap2" => {
                 bounds::CAP3.store(true, std::sync::atomic::Ordering::Relaxed);
                 bounds::CAP3B.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -469,6 +479,11 @@ fn bench(t: &Tables, o: &Opts) {
         }
     }
     writeln!(out, "# positions {} nodes {} seconds {:.3} wrong {} unknown {}", n, total_nodes, total_us as f64 / 1e6, wrong, unknown).unwrap();
+    #[cfg(feature = "ubcheck")]
+    unsafe {
+        let c = bounds::UBC;
+        writeln!(out, "# ubcheck decisions {} differ {} values {} differ {}", c[0], c[1], c[2], c[3]).unwrap();
+    }
     if o.pn {
         writeln!(out, "# pn: nodes {} expansions {} leaf calls {}", pn_stats[0], pn_stats[1], pn_stats[2]).unwrap();
     }
