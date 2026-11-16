@@ -192,6 +192,7 @@ fn parse_opts(args: &[String]) -> Opts {
                 o.cfg.kc_evict = false;
                 o.cfg.hc_k = 0;
                 o.cfg.hc_staged = false;
+                o.cfg.xk = 0;
             }
             "--oracle" => o.cfg.oracle_level = val().parse().unwrap(),
             "--kc-order" => o.cfg.kc_order = val().parse().unwrap(),

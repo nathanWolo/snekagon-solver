@@ -92,12 +92,13 @@ pub struct Config {
     pub hc_select: bool,
     /// E30b: this many more killer slots (0-2) that keep a move pushed out of the two with its cost;
     /// all killers are tried as staged first moves in the history's order, then by recorded cost.
+    /// On by default with two slots (E31); `--xk 0` or `--no-cost-order` switches it off.
     pub xk: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, hc_key: 0, hc_job: 0, hc_all: false, hc_select: false, xk: 0 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, hc_key: 0, hc_job: 0, hc_all: false, hc_select: false, xk: 2 }
     }
 }
 
