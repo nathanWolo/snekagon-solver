@@ -73,11 +73,46 @@ pub struct Config {
     /// Also test the killer replies as reach threats at the start of a node with at most this many
     /// pieces left (0 = never).
     pub reach_threat_start: u32,
+    /// Study counters for reach-threat tests (`--rt-study`; costs time).
+    pub rt_study: bool,
+}
+
+/// Reach-threat study counters, by pieces left at the node.
+pub struct RtStudy {
+    /// [answer: 0 none, 1 threat] -> [tests, reach positions, cycles]
+    pub by_ans: [[[u64; 3]; 2]; 16],
+    /// [hand of the mover 0..3][margin bucket 0..7] -> [tests, threats, positions]
+    pub margin: [[[[u64; 3]; 8]; 4]; 16],
+    /// [moves left outside the zone, bucket 0..6] -> [tests, threats, positions]
+    pub outside: [[[u64; 3]; 7]; 16],
+    /// [moves skipped only by reach threats, estimated nodes under them, nodes with such skips,
+    ///  moves searched at those nodes, nodes under those moves]
+    pub skip: [[u64; 5]; 16],
+    pub work: u64,
+    pub outside_now: u32,
+}
+
+impl RtStudy {
+    pub fn new() -> RtStudy {
+        RtStudy { by_ans: [[[0; 3]; 2]; 16], margin: [[[[0; 3]; 8]; 4]; 16], outside: [[[0; 3]; 7]; 16], skip: [[0; 5]; 16], work: 0, outside_now: 0 }
+    }
+}
+
+pub fn outside_bucket(n: u32) -> usize {
+    match n {
+        0 => 0,
+        1..=2 => 1,
+        3..=5 => 2,
+        6..=10 => 3,
+        11..=20 => 4,
+        21..=40 => 5,
+        _ => 6,
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 4, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 4, rt_study: false }
     }
 }
 
@@ -201,6 +236,8 @@ pub(crate) struct Threats {
     zone: [BB; MAX_THREATS],
     /// The zone for a move that grows one of the mover's snakes (a subset of `zone`).
     zone_grow: [BB; MAX_THREATS],
+    /// Whether the threat is a reach threat (study counters only).
+    reach: [bool; MAX_THREATS],
     value: [i32; MAX_THREATS],
     tried: [u16; MAX_TRIED],
     ntried: usize,
@@ -211,7 +248,7 @@ pub(crate) struct Threats {
 
 impl Threats {
     pub(crate) fn new() -> Threats {
-        Threats { n: 0, zone: [0; MAX_THREATS], zone_grow: [0; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0, rtried: [PASS; MAX_TRIED], nrtried: 0 }
+        Threats { n: 0, zone: [0; MAX_THREATS], zone_grow: [0; MAX_THREATS], reach: [false; MAX_THREATS], value: [0; MAX_THREATS], tried: [PASS; MAX_TRIED], ntried: 0, rtried: [PASS; MAX_TRIED], nrtried: 0 }
     }
     /// Upper bound on our value for a move covering `cells`.
     #[inline]
@@ -237,8 +274,20 @@ impl Threats {
         }
         b
     }
+    /// `bound_for_move` without the reach threats (study counters only).
+    fn bound_for_move_plain(&self, cells: BB, grows: bool) -> i32 {
+        let mut b = NO_BOUND;
+        for i in 0..self.n {
+            let z = if grows { self.zone_grow[i] } else { self.zone[i] };
+            if !self.reach[i] && cells & z == 0 && self.value[i] < b {
+                b = self.value[i];
+            }
+        }
+        b
+    }
     #[inline]
     fn push(&mut self, zone: BB, zone_grow: BB, value: i32) {
+        self.reach[self.n] = false;
         self.zone[self.n] = zone;
         self.zone_grow[self.n] = zone_grow;
         self.value[self.n] = value;
@@ -289,6 +338,7 @@ pub struct Solver {
     rwit: [Witness; MAX_PLY],
     /// Reach-threat tests: [tests, answered by a witness, threats found].
     pub rt_stats: [u64; 3],
+    pub rts: Box<RtStudy>,
     node_limit: u64,
     aborted: bool,
     /// Parallel solve: the ply of the root, the nodes on the path from it by ply (hash and window at
@@ -334,6 +384,7 @@ impl Solver {
             wit: [[Witness::NONE; 2]; MAX_PLY],
             rwit: [Witness::NONE; MAX_PLY],
             rt_stats: [0; 3],
+            rts: Box::new(RtStudy::new()),
             node_limit: u64::MAX,
             aborted: false,
             root_ply: 0,
@@ -682,6 +733,8 @@ impl Solver {
             let mut child = *pos;
             child.place_for(t, opp, m);
             self.rt_stats[0] += 1;
+            let study = self.cfg.rt_study;
+            let (c0, w0) = if study { (unsafe { core::arch::x86_64::_rdtsc() }, self.rts.work) } else { (0, 0) };
             let rv = if !self.threat_reach(&child, ply, me, opp_len) {
                 -1
             } else if value == 2 && alpha >= 0 && !self.threat_reach(&child, ply, me, opp_len + 1) {
@@ -689,6 +742,28 @@ impl Solver {
             } else {
                 2
             };
+            if study {
+                let cyc = unsafe { core::arch::x86_64::_rdtsc() } - c0;
+                let work = self.rts.work - w0;
+                let lv = ((pos.left[0].count_ones() + pos.left[1].count_ones()) as usize).min(15);
+                let found = (rv <= 0) as u64;
+                let a = &mut self.rts.by_ans[lv][found as usize];
+                a[0] += 1;
+                a[1] += work;
+                a[2] += cyc;
+                let exact = upper_bound_cells_upto(t, &BoundCtx::new(pos, me), growable(pos, me) & !b.cells, i32::MAX);
+                let mb = ((exact - opp_len).max(0) as usize).min(7);
+                let hand = (pos.left[me].count_ones() as usize).min(3);
+                let g = &mut self.rts.margin[lv][hand][mb];
+                g[0] += 1;
+                g[1] += found;
+                g[2] += work;
+                let ob = outside_bucket(self.rts.outside_now);
+                let o = &mut self.rts.outside[lv][ob];
+                o[0] += 1;
+                o[1] += found;
+                o[2] += work;
+            }
             if rv <= 0 {
                 self.rt_stats[2] += 1;
                 // A move m that touches b without covering it, when m grows one of our snakes and b
@@ -698,6 +773,7 @@ impl Solver {
                 // the rest), and the argument above holds for m too.
                 let zone_grow = if self.cfg.reach_threat_grow { threat_zone(pos, opp, b) } else { b.cells | b.border };
                 th.push(b.cells | b.border, zone_grow, rv);
+                th.reach[th.n - 1] = true;
                 return;
             }
         }
@@ -720,7 +796,9 @@ impl Solver {
             return true;
         }
         let mut work = self.cfg.reach_threat_work;
-        can_reach_touching_w(self.t, child, me, need, &mut work, &mut self.rwit[ply])
+        let r = can_reach_touching_w(self.t, child, me, need, &mut work, &mut self.rwit[ply]);
+        self.rts.work += (self.cfg.reach_threat_work - work) as u64;
+        r
     }
 
     /// Adds every opponent placement after which our value is at most alpha by the bounds.
@@ -1100,6 +1178,8 @@ impl Solver {
             self.try_threat(pos, ply, self.killers[ply + 1][1], alpha, deep, &mut th);
         }
         let mut skipped = -2; // the best bound of the moves skipped because of threats
+        let mut rskip = 0u64; // study: moves skipped only because of reach threats
+        let nodes_before_moves = self.nodes;
         let mut scanned = !threats_on;
 
         // 4a. The first move of the order is the table move, else a killer, when one of them is
@@ -1285,6 +1365,9 @@ impl Solver {
                         let bound = th.bound_for_move(pm.cells, pm.border & pos.cells[me] != 0);
                         if bound <= alpha {
                             skipped = skipped.max(bound);
+                            if self.cfg.rt_study && th.bound_for_move_plain(pm.cells, pm.border & pos.cells[me] != 0) > alpha {
+                                rskip += 1;
+                            }
                             continue;
                         }
                     }
@@ -1361,6 +1444,14 @@ impl Solver {
                 // first move has failed this is probably a node where every move must be refuted, so
                 // look for all of the opponent's threats.
                 if threats_on && first_pass && i + 1 < n {
+                    if self.cfg.rt_study {
+                        let k = self.killers[ply + 1][0];
+                        if k != PASS {
+                            let r = &t.placements[k as usize];
+                            let z = r.cells | r.border;
+                            self.rts.outside_now = buf[i..n].iter().filter(|e| t.placements[(**e & 0xFFFF) as usize].cells & z == 0).count() as u32;
+                        }
+                    }
                     self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, self.cfg.reach_threat && searched >= self.cfg.reach_threat_after, &mut th);
                     if !scanned {
                         scanned = true;
@@ -1377,6 +1468,15 @@ impl Solver {
                 self.defer_bufs[ply] = deferred;
             }
             best = best.max(skipped);
+            if rskip > 0 {
+                let under = self.nodes - nodes_before_moves;
+                let s = &mut self.rts.skip[level];
+                s[0] += rskip;
+                s[1] += rskip * under / searched.max(1);
+                s[2] += 1;
+                s[3] += searched;
+                s[4] += under;
+            }
             self.prof[level][3] += searched;
             self.prof[level][6] += (n as u64).saturating_sub(searched);
             if alpha < beta {

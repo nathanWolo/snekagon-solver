@@ -230,6 +230,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-reach-threat-grow" => o.cfg.reach_threat_grow = false,
             "--reach-threat-after" => o.cfg.reach_threat_after = val().parse().unwrap(),
             "--reach-threat-start" => o.cfg.reach_threat_start = val().parse().unwrap(),
+            "--rt-study" => o.cfg.rt_study = true,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
@@ -396,6 +397,33 @@ fn bench(t: &Tables, o: &Opts) {
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
         writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
         writeln!(out, "# reach-threat tests, answered by a witness, threats: {:?}", solver.rt_stats).unwrap();
+    }
+    if o.cfg.rt_study {
+        let r = &solver.rts;
+        writeln!(out, "# rt-study by pieces left | none: tests positions cycles/test | threat: tests positions cycles/test | skipped moves, est nodes, nodes w/ skips, moves searched there, nodes under them").unwrap();
+        for l in 2..12 {
+            let (a, b) = (r.by_ans[l][0], r.by_ans[l][1]);
+            if a[0] + b[0] == 0 {
+                continue;
+            }
+            writeln!(out, "# {:2}: {:8} {:10} {:7} | {:8} {:10} {:7} | {:?}", l, a[0], a[1], a[2] / a[0].max(1), b[0], b[1], b[2] / b[0].max(1), r.skip[l]).unwrap();
+        }
+        writeln!(out, "# rt-study margin (exact bound after R minus R's length, 0..7+), by level and hand: [tests, threats, positions]").unwrap();
+        for l in 2..12 {
+            for h in 0..4 {
+                if r.margin[l][h].iter().all(|x| x[0] == 0) {
+                    continue;
+                }
+                writeln!(out, "# L{} hand {}: {:?}", l, h, r.margin[l][h]).unwrap();
+            }
+        }
+        writeln!(out, "# rt-study moves left outside the zone (0,1-2,3-5,6-10,11-20,21-40,41+): [tests, threats, positions]").unwrap();
+        for l in 2..12 {
+            if r.outside[l].iter().all(|x| x[0] == 0) {
+                continue;
+            }
+            writeln!(out, "# L{}: {:?}", l, r.outside[l]).unwrap();
+        }
     }
     if wrong > 0 {
         std::process::exit(1);
