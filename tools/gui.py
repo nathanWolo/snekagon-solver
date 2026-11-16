@@ -8,7 +8,8 @@ per position, several at once, each killed when it reaches the time limit or the
 
 A run waits for the machine's run lock (the protocol of tools/lockfair.sh, done here in Python: a ticket
 in .git/run.queue, the lock directory .git/run.lock), one lock for the whole run, unless the page says
-"run now". A run that holds the lock for more than 15 minutes while others wait stops starting new
+"run now". Its ticket is a priority ticket ("0-<time>-<pid>", which sorts before every ordinary
+ticket), so it waits only for the command that holds the lock now, never for the whole queue. A run that holds the lock for more than 15 minutes while others wait stops starting new
 solves, lets the running ones finish, gives the lock back and queues again. Every run is logged to
 work/gui/runs.log. Solver processes live in a Windows job object, so they die with this server.
 """
@@ -308,7 +309,9 @@ class RunLock:
     def acquire(self, give_up, on_wait):
         """Waits for the lock. Returns True when held, False when give_up() said to stop waiting."""
         self.queue.mkdir(parents=True, exist_ok=True)
-        self.ticket = self.queue / ("%d-%d" % (time.time_ns(), os.getpid()))
+        # A priority ticket: "0-" sorts before the timestamps of ordinary tickets, so the owner's run
+        # goes next, after the command that holds the lock now (tools/lockfair.sh: the first name wins).
+        self.ticket = self.queue / ("0-%d-%d" % (time.time_ns(), os.getpid()))
         self.ticket.touch()
         try:
             while True:
@@ -532,7 +535,7 @@ class Run:
 
         def on_wait(ahead, busy):
             with self.cv:
-                self.ahead = ahead + (1 if busy else 0)
+                self.ahead = ahead
                 self.cv.notify_all()
 
         got = self.lock.acquire(lambda: self.cancelled or self.run_now, on_wait)
@@ -635,6 +638,11 @@ class App:
 
     def start(self, mode, text, seconds, procs, use_lock, owner):
         with self.mu:
+            r = self.run
+            if r is not None and self.active() and r.cancelled:
+                t0 = time.time()  # a cancelled run that is still stopping: wait for it
+                while self.active() and time.time() - t0 < 15:
+                    time.sleep(0.05)
             if self.active():
                 raise Conflict("a run is in progress (in this tab or another)")
             self.ids += 1

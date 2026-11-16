@@ -12,8 +12,11 @@ function fnv(s) {
 }
 (async () => {
   const out = document.getElementById("out");
+  const stage = s => fetch("/check/stage?" + encodeURIComponent(s)).catch(() => {});
+  await stage("started");
   try {
     const data = await (await fetch("/check/data")).json();
+    await stage("data received");
     const t0 = performance.now();
     const res = { placements: SN.PLACEMENTS.length, perft1: SN.perft(SN.initial(), 1), perft2: SN.perft(SN.initial(), 2),
       positions: [], games: [] };
@@ -36,8 +39,14 @@ function fnv(s) {
     res.bad = data.bad.map(s => { try { SN.parseInput(s); return null; } catch (e) { return e.message; } });
     res.ms = Math.round(performance.now() - t0);
     const body = JSON.stringify(res);
-    try { await fetch("/check/result", { method: "POST", body }); }
-    catch (e) { out.textContent = "posting failed: " + e; return; }
+    for (let k = 0; ; k++) {
+      try { await fetch("/check/result", { method: "POST", body }); break; }
+      catch (e) {
+        await stage("posting failed: " + e);
+        if (k >= 4) { out.textContent = "posting failed: " + e; return; }
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
     out.textContent = "done";
   } catch (e) {
     await fetch("/check/result", { method: "POST", body: JSON.stringify({ fatal: String(e.stack || e) }) });

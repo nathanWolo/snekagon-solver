@@ -16,6 +16,7 @@
   let hint = null;      // cells to outline (hovered result)
   let info = { cpus: 16, typical: {} };
   let run = null;       // the last run snapshot from the server
+  let cancelling = false; // Cancel was pressed and the run has not ended yet
   const cache = new Map(); // position text -> {mode, results: Map(move -> result), value, best, status, seconds}
 
   const pos = () => st.positions[st.cur];
@@ -269,10 +270,11 @@
   function renderRun() {
     const busy = run && (run.status === "waiting" || run.status === "running" || run.status === "starting");
     const over = SN.isOver(pos());
-    $("bSolve").disabled = $("bAll").disabled = busy || over || !info.solver_found;
+    if (run && !busy) cancelling = false;
+    $("bSolve").disabled = $("bAll").disabled = busy || cancelling || over || !info.solver_found;
     const waiting = busy && run.status !== "running";
     let rh = "";
-    if (waiting) rh = `<span class="wait">waiting for the run lock</span> ${run.ahead} ahead · ${fmtT(run.waited)}`;
+    if (waiting) rh = `<span class="wait">${run.ahead ? "waiting for the run lock" : "waiting for the run in progress"}</span> ${run.ahead ? run.ahead + " ahead · " : ""}${fmtT(run.waited)}`;
     else if (busy) rh = `${run.mode === "solve" ? "solve" : "all moves"}: ${run.done}/${run.total} moves · ${fmtN(run.nodes)} nodes · ${fmtT(run.elapsed)} · ${run.running} running${run.held_lock ? "" : " · no lock"}`;
     setHtml($("runtext"), rh);
     $("runstate").hidden = !busy;
@@ -407,7 +409,7 @@
   }
   $("bSolve").onclick = () => startRun("solve");
   $("bNow").onclick = () => run && post("/api/runnow", { run: run.id });
-  $("bCancel").onclick = () => run && post("/api/cancel", { run: run.id });
+  $("bCancel").onclick = () => { if (!run) return; cancelling = true; renderRun(); post("/api/cancel", { run: run.id }); };
   $("bAll").onclick = () => startRun("all");
 
   // ---------------------------------------------------------------- server events

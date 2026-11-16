@@ -20,6 +20,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -114,6 +115,7 @@ def main():
 
     data = {"positions": texts, "games": [" ".join(line) for line, _ in games], "bad": bad, "full": []}
     result = {}
+    stages = []
     done = threading.Event()
 
     class H(BaseHTTPRequestHandler):
@@ -121,6 +123,11 @@ def main():
             pass
 
         def do_GET(self):
+            if self.path.startswith("/check/stage?"):
+                stages.append(urllib.parse.unquote(self.path.split("?", 1)[1]))
+                self.send_response(204)
+                self.end_headers()
+                return
             if self.path == "/check/data":
                 b = json.dumps(data).encode()
                 ctype = "application/json"
@@ -152,14 +159,23 @@ def main():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = "http://127.0.0.1:%d/check.html" % srv.server_address[1]
     profile = tempfile.mkdtemp(prefix="gui-check-")
-    proc = subprocess.Popen([browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-                             "--user-data-dir=" + profile, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = None
     try:
-        if not done.wait(600):
-            sys.exit("the page did not answer within 10 minutes")
+        for attempt in range(2):  # a headless browser that does not get going is started once more
+            proc = subprocess.Popen([browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+                                     "--user-data-dir=" + profile, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if done.wait(120):
+                break
+            print("the page did not answer within 2 minutes (stages: %s)" % (", ".join(stages) or "none"), flush=True)
+            proc.kill()
+            proc.wait()
+            proc = None
+        if not done.is_set():
+            sys.exit("giving up")
     finally:
-        proc.kill()
-        proc.wait()
+        if proc:
+            proc.kill()
+            proc.wait()
         srv.shutdown()
         time.sleep(0.5)
         shutil.rmtree(profile, ignore_errors=True)
