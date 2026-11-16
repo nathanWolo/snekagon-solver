@@ -171,11 +171,15 @@ Update this section in the same change that freezes a version.
 
 ## Standing rules
 
-- **Ask the owner first** before pushing, publishing, or running the reference C++ solver (downloaded
-  code). The owner allowed one thing on 2026-11-16 ("Yes, run it", to "Build and run the reference
-  solver on this PC for a same-machine comparison?"): its `benchset` on its own bench files, as in
-  LOG, "Same machine, the reference solver" (WSL, `/opt/snekref`, no network). Its other modes, and
-  any other downloaded code, still need asking. Standing permissions, in the owner's words: "dont block on anything that needs interaction from
+- **Ask the owner first** before pushing or publishing. **The reference C++ solver may be run:**
+  owner, 2026-11-16, about 13:15: "You have my ok going forward to run the reference solver"
+  (said when the coordinator proposed checking the opening's certificate with it). Read as:
+  its local solving modes on this PC (`benchset FILE THREADS`, `solvepos SECONDS THREADS MOVES`,
+  in WSL at `/opt/snekref`), on any position, without asking again. Not covered, still ask: its
+  `serve` and `worker` modes (they talk over the network), fetching a newer copy of it, any
+  other downloaded code, and taking its code or weights into our source (no licence). Earlier,
+  the same day: "Yes, run it" for its `benchset` on its own bench files (LOG, "Same machine,
+  the reference solver"). Standing permissions, in the owner's words: "dont block on anything that needs interaction from
   me" (2026-11-14, for the overnight run): local commits and heavy CPU use are fine; nothing outward.
 - **A wrong value is the only unforgivable result.** Every run checks every position against its label.
   A candidate that gives one wrong value is blocked, whatever its speed.

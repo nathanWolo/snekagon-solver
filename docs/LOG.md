@@ -3183,3 +3183,20 @@ through its own script under `tools/locked.sh` because the check build needs a f
   `.git/run.lock` behind (a killed process cannot give it back); the next run waits for it
   until it goes stale after 20 minutes. Removed by hand at 12:34 after checking that no
   driver or solver process was alive.
+
+## 2026-11-16 The owner allows the reference solver (about 13:15)
+
+- Asked whether a finished run would mean the game is solved, the coordinator answered: yes in
+  the weak sense, pending a check by a second program, and named the reference solver as one
+  way to check the 172 certificate lines. Owner: "You have my ok going forward to run the
+  reference solver".
+- Read as its local solving modes on any position, no network (`serve`, `worker` stay out), no
+  newer download, no code or weights into our source. Written into the standing rules.
+- Its source has what a check needs: `snek solvepos SECONDS THREADS MOVE...` solves a position
+  given as moves with several threads, and with `SOLVER_LOSS_TEST=1` only proves or refutes
+  that the side to move loses, which is exactly one certificate line (`1:60`, blue's reply,
+  red's answer; blue to move loses). `benchset FILE THREADS` with `BENCH_WINTEST=1` does the
+  same for a file of move lists.
+- Not started: the board's proof has the machine (78 of 172 at 13:02). The plan when it ends
+  or pauses: time one line first, then all 172 (and say what it costs before running them).
+
