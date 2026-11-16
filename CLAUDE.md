@@ -28,12 +28,15 @@ Update this section in the same change that freezes a version.
   are in `work/exes/`. After stopping agents, look at `ps -ef` for replay loops and lock
   waiters that outlived them, then at `.git/run.lock` and `.git/run.queue`. LOG, "Paused
   again at 10:37".
-- **In work for the owner: the board's Prove mode (branch `gui-prove`)**: the proof driver
-  (`frozen/prove-replay.exe`, built from `climb/replay`) as the board's backend, so the owner
-  can watch the centre opening being proved from the 74 replies already done. Its store is
-  `work/gui/proofs/`; `work/long/` stays as it was at the pause. While the board proves or
-  solves, no timing counts (`work/gui/runs.log`). LOG, "The board gets the proof driver as a
-  backend".
+- **The board's Prove mode is live since 2026-11-16 11:30** (`tools/gui.py`, merged from
+  `gui-prove`): the proof driver (`frozen/prove-replay.exe`, a build of `climb/replay`, whose
+  source is not merged here yet) refutes the replies of the position on the board one after
+  another. Its stores are `work/gui/proofs/<hash>/` (`results.txt` is the proof's only state;
+  `meta.json` names the position). **The centre opening is proved there, by the owner, from a
+  copy of the 74 replies already done: look at that store, not at `work/long/`, for how far
+  it is** (`work/long/` stays as it was at the pause). While the board proves or solves, no
+  timing counts (`work/gui/runs.log`). The 49 replies once kept for a top-of-proof gate are
+  used up as the board proves them. LOG, "The board's Prove mode is live".
 
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first

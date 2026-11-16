@@ -3088,3 +3088,36 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - *What this run is not:* a measurement. Its replies include the 49 kept for a top-of-proof
   gate; once the board proves them they are used up as gate data, and a later driver change
   has to be judged on the 25 tune replies and whatever new openings give.
+
+## 2026-11-16 The board's Prove mode is live (11:30)
+
+- Built by an Opus agent on `gui-prove` (`b88d460`), merged into `parallel-v9` (`81e6fe6`), the
+  board's server restarted with it. `tools/gui.py` runs `frozen/prove-replay.exe prove roots.txt
+  --threads N --job-threads 1 --depth 2 --tt 27 --upper-first --replay --win-turns --out
+  results.txt` on the replies of the position on the board, one a symmetry class; the store of
+  a position is `work/gui/proofs/<16-character hash>/` (`roots.txt`, `results.txt`,
+  `meta.json` with the position text). The position after `1:60` starts from a copy of
+  `work/long/ply1_results.txt`: 74 of 172 refuted, shown without a search; the driver decides
+  a root known from that file at once (checked by the agent on two proved replies: 0 jobs,
+  0.006 s). The 98 open replies are taken in the solver's static order, not the driver's own
+  (the driver prints no move list).
+- *The agent's checks:* `tools/gui_test.py` with new prove tests (a winning ply-3 try proved
+  to 767 of 767 with a cancel and a resume in the middle; a failed try stopped at the reply
+  red does not win, confirmed by `solve`; stores readable without a run and after a server
+  restart; no driver left after cancel and server exit), the lock yield with a planted waiter,
+  and the page in headless Edge. A six-minute run on the opening in its worktree finished no
+  try, so a failed try on the opening was not seen live.
+- *A fault the coordinator's browser check and the owner both hit:* the store's folder was
+  named by the full position text, and under this checkout's long path the files passed
+  Windows' 260 characters ("WinError 3" on Prove). The agent's tests ran in a short temporary
+  folder and could not see it. Fixed in `0fe09ff` (a 16-character hash as the folder name).
+- *The coordinator's checks on the live board (port 8770):* the position after `1:60` shows
+  "refuted 74 of 172" with its rows; a click on a refuted row plays the reply and shows red's
+  answer; Prove on the winning ply-3 try ran live (90 of 767 after 6 s, the row in work on
+  top, the estimate) and Cancel stopped it with no driver process and no lock left.
+- *Not done:* `tools/gui_test.py` was not run again after the folder-name fix (it takes the
+  lock and 16 processes for some minutes, and the owner was about to start the proof); the
+  source of the driver (`climb/replay`) is not merged into `parallel-v9`; job counts of the
+  reply in work arrive only once a minute.
+- *A lesson for tests of anything that writes files here:* run them once from the main
+  checkout, whose path is 189 characters long, not only from a short scratch folder.
