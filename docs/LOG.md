@@ -1756,3 +1756,17 @@ base's node counts). Every option only reorders moves, so no value can change.
 - **Not chosen now, kept for later:** the 7+ variant with a cheaper window (its nodes at the
   staged path's cost a node), the history over every candidate, win rate times cost as the
   key, the history's life in the driver.
+
+## 2026-11-15 E30: the screen on profiled builds, and the gate's cap
+
+- **Profiled candidate:** `work/e30/cand.exe` = `03e5963b7ba5` (commit `8f6adce`, profile
+  collected with the defaults on). With `--no-cost-order` ply 7 0-99 = 1,724,647 (the base's).
+  All five ply-5 files, ply 8, `verify 100` and ply 6 on 16 threads: every value right.
+- **Screen `E30-S`** (`proof4b` tune units 0-19, 40 positions, against `frozen/climb-base.exe`,
+  `--window 0,1`): total time 66.7 s against 87.2 s (0.765x), nodes 0.703x; log ratio
+  +0.305 +/- 0.156, sd 0.356 a unit; 4 of 20 units slower (1.10x to 1.42x), the best 0.35x.
+- **Cap, fixed now:** 120 units. At sd 0.356 `SPRT[0, 0.05]` needs about 30 units if the
+  effect is what the screen read, 60 if it is half that, and 270 if it is only 5%; 120 covers
+  a true effect down to about 0.10. An effect smaller than that would end undecided, which
+  for a change that screened at 0.77x would itself be news.
+- **Gate `E30`:** `proof4b` gate units from 88, profiled builds, `--window 0,1`.
