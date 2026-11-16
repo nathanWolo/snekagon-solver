@@ -52,6 +52,11 @@ pub struct ProveCfg {
     /// has one move under way at a time, so no move is searched with a window that has since moved.
     /// Cheaper for a drawn position (LOG, the window study); the workers are idle more.
     pub wide: bool,
+    /// The proof-order replay (`--replay`): the roots of a file are proved as the replies of one
+    /// proof are. Kept from one root to the next: the table (no new generation), the winners of the
+    /// image bonus, the root's killers (as a parent hands them to its next child) and the workers'
+    /// solvers (their history). The known results are kept in any case.
+    pub replay: bool,
 }
 
 pub struct ProveResult {
@@ -63,6 +68,8 @@ pub struct ProveResult {
     pub nodes: u64,
     pub thread_seconds: f64,
     pub seconds: f64,
+    /// Seconds of the jobs that were stopped (their work is not kept).
+    pub stopped_seconds: f64,
 }
 
 /// What is known about a position: its value lies in [lo, hi]; mv was its best move.
@@ -78,6 +85,11 @@ pub struct Prover {
     table: Arc<Table>,
     known: HashMap<u64, Known>,
     log: Option<std::fs::File>,
+    /// The replay's state between roots (see `ProveCfg::replay`).
+    winners: Vec<Vec<u16>>,
+    root_killers: Killers,
+    workers: Vec<Vec<Solver>>,
+    started: bool,
 }
 
 const NONE: usize = usize::MAX;
@@ -167,6 +179,8 @@ struct Driver<'a> {
     /// symmetric start the same idea wins again turned or mirrored, so the images of these moves
     /// under the board's symmetries are tried before the rest of the order.
     winners: Vec<Vec<u16>>,
+    /// The killers a root starts from (the replay hands on the last root's).
+    root_killers: Killers,
     known: &'a mut HashMap<u64, Known>,
     log: &'a mut Option<std::fs::File>,
     start: Instant,
@@ -226,7 +240,7 @@ impl<'a> Driver<'a> {
             next: 0,
             th: Threats::new(),
             kids: Vec::new(),
-            killers: if parent == NONE { [[PASS; 2]; MAX_PLY] } else { self.nodes[parent].killers },
+            killers: if parent == NONE { self.root_killers } else { self.nodes[parent].killers },
             finished: 0,
             need: if parent == NONE {
                 2
@@ -572,6 +586,7 @@ impl<'a> Driver<'a> {
         self.nodes[id].killers = done.killers;
         if done.value == UNKNOWN {
             self.res.stopped += 1;
+            self.res.stopped_seconds += done.micros as f64 / 1e6;
             if self.nodes[id].dead {
                 self.freed.push(id);
             } else {
@@ -691,7 +706,7 @@ impl Prover {
         }
         let log = c.out.as_deref().map(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).expect("cannot open the results file"));
         let table = Arc::new(Table::new(c.cfg.tt_bits));
-        Prover { c, table, known, log }
+        Prover { c, table, known, log, winners: vec![Vec::new(); MAX_PLY], root_killers: [[PASS; 2]; MAX_PLY], workers: Vec::new(), started: false }
     }
 
     /// The exact value of `root` for the side to move. Two questions, each a search with a window of
@@ -700,7 +715,13 @@ impl Prover {
     /// side where one is enough.
     pub fn prove(&mut self, root: &Pos) -> ProveResult {
         let start = Instant::now();
-        self.table.next_generation();
+        let replay = self.c.replay;
+        if !replay || !self.started {
+            self.table.next_generation();
+        }
+        self.started = true;
+        let mut carried = if replay { std::mem::take(&mut self.workers) } else { Vec::new() };
+        let mut returned: Vec<Vec<Solver>> = Vec::new();
         let queue = Arc::new(Queue { jobs: Mutex::new((VecDeque::new(), false)), ready: Condvar::new() });
         let (tx, rx) = mpsc::channel::<Done>();
         let c = &self.c;
@@ -712,26 +733,33 @@ impl Prover {
             free: Vec::new(),
             freed: Vec::new(),
             top: Solver::with_table(c.cfg, self.table.clone()),
-            winners: vec![Vec::new(); MAX_PLY],
+            winners: if replay { std::mem::take(&mut self.winners) } else { vec![Vec::new(); MAX_PLY] },
+            root_killers: if replay { self.root_killers } else { [[PASS; 2]; MAX_PLY] },
             known: &mut self.known,
             log: &mut self.log,
             start,
             busy: 0,
-            res: ProveResult { value: UNKNOWN, best: PASS, jobs: 0, stopped: 0, reused: 0, nodes: 0, thread_seconds: 0.0, seconds: 0.0 },
+            res: ProveResult { value: UNKNOWN, best: PASS, jobs: 0, stopped: 0, reused: 0, nodes: 0, thread_seconds: 0.0, seconds: 0.0, stopped_seconds: 0.0 },
         };
         let table = &self.table;
         let (mut lo, mut hi) = (-1, 1);
         let mut best = PASS;
+        let returned = &mut returned;
         std::thread::scope(|scope| {
+            let mut handles = Vec::new();
             // --emulate W: one worker thread, W solvers taking the jobs in turn (exact node counts)
             let emulate = c.cfg.drv_emulate as usize;
             for _ in 0..(if emulate > 0 { 1 } else { c.threads }) {
                 let queue = queue.clone();
                 let tx = tx.clone();
                 let nsolvers = if emulate > 0 { emulate } else { c.job_threads.max(1) };
-                let mut solvers: Vec<Solver> = (0..nsolvers).map(|_| Solver::with_table(c.cfg, table.clone())).collect();
+                let mut solvers: Vec<Solver> = match carried.pop() {
+                    Some(s) => s,
+                    None => (0..nsolvers).map(|_| Solver::with_table(c.cfg, table.clone())).collect(),
+                };
                 let mut turn = 0usize;
-                scope.spawn(move || loop {
+                handles.push(scope.spawn(move || {
+                loop {
                     let job = {
                         let mut g = queue.jobs.lock().unwrap();
                         loop {
@@ -794,7 +822,9 @@ impl Prover {
                     if tx.send(Done { id: job.id, value, best, killers: job.killers, nodes, micros: t0.elapsed().as_micros() }).is_err() {
                         break;
                     }
-                });
+                }
+                solvers
+                }));
             }
             drop(tx);
             let passes: &[(i32, i32)] = if c.wide {
@@ -825,7 +855,17 @@ impl Prover {
             g.1 = true;
             drop(g);
             queue.ready.notify_all();
+            for h in handles {
+                returned.push(h.join().unwrap());
+            }
         });
+        if replay {
+            self.winners = std::mem::take(&mut d.winners);
+            if let Some(r) = d.nodes.get(ROOT) {
+                self.root_killers = r.killers;
+            }
+            self.workers = std::mem::take(returned);
+        }
         assert!(lo == hi, "the two passes left the value open");
         d.res.value = lo;
         d.res.best = best;
