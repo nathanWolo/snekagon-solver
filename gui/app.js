@@ -18,6 +18,8 @@
   let run = null;       // the last run snapshot from the server
   let cancelling = false; // Cancel was pressed and the run has not ended yet
   const cache = new Map(); // position text -> {mode, results: Map(move -> result), value, best, status, seconds}
+  const proofs = new Map(); // position text -> its proof store's state (rows of replies), null when it has none
+  let lastFollow = null;  // the reply the board last followed
 
   const pos = () => st.positions[st.cur];
   const posText = () => SN.text(pos());
@@ -47,6 +49,19 @@
     drag = null; hint = null;
     $("msg").textContent = "";
     render();
+    fetchProof(posText());
+  }
+  // the state of a position's proof store, read once per position (a run's events keep it current)
+  async function fetchProof(text) {
+    if (proofs.has(text) || SN.isOver(pos())) return;
+    proofs.set(text, null);
+    try {
+      const j = await (await fetch("/api/proof?position=" + encodeURIComponent(text))).json();
+      if (j.ok && j.proof && !(run && run.mode === "prove" && run.position === text && proofs.get(text))) {
+        proofs.set(text, j.proof);
+        renderVerdict();
+      }
+    } catch (e) { proofs.delete(text); }
   }
 
   // ---------------------------------------------------------------- board
@@ -264,7 +279,9 @@
     if (li) go(+li.dataset.k);
   });
 
-  const fmtT = s => (s >= 60 ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : s.toFixed(s < 10 ? 1 : 0) + " s");
+  const p2 = x => String(Math.floor(x)).padStart(2, "0");
+  const fmtT = s => (s >= 3600 ? Math.floor(s / 3600) + ":" + p2(s % 3600 / 60) + ":" + p2(s % 60) :
+    s >= 60 ? Math.floor(s / 60) + ":" + p2(s % 60) : s.toFixed(s < 10 ? 1 : 0) + " s");
   const fmtN = n => (n >= 1e9 ? (n / 1e9).toFixed(2) + "G" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(0) + "k" : String(n));
 
   function renderRun() {
@@ -272,9 +289,11 @@
     const over = SN.isOver(pos());
     if (run && !busy) cancelling = false;
     $("bSolve").disabled = $("bAll").disabled = busy || cancelling || over || !info.solver_found;
+    $("bProve").disabled = busy || cancelling || over || !info.solver_found;
     const waiting = busy && run.status !== "running";
     let rh = "";
     if (waiting) rh = `<span class="wait">${run.ahead ? "waiting for the run lock" : "waiting for the run in progress"}</span> ${run.ahead ? run.ahead + " ahead · " : ""}${fmtT(run.waited)}`;
+    else if (busy && run.mode === "prove") rh = `prove: ${fmtT(run.elapsed)}${run.held_lock ? "" : " · no lock"}`;
     else if (busy) rh = `${run.mode === "solve" ? "solve" : "all moves"}: ${run.done}/${run.total} moves · ${fmtN(run.nodes)} nodes · ${fmtT(run.elapsed)} · ${run.running} running${run.held_lock ? "" : " · no lock"}`;
     setHtml($("runtext"), rh);
     $("runstate").hidden = !busy;
@@ -306,7 +325,84 @@
     }
     renderResults();
   }
+  // ---------------------------------------------------------------- prove: the replies of a position, refuted one by one
+  // The proof shown: the nearest position at or before the current one on the line that has a proof store,
+  // unless the current position has results of its own (a solve or all moves).
+  function proveView() {
+    const own = cache.get(posText());
+    if (own && own.mode !== "proof") return null;
+    for (let k = st.cur; k >= 0; k--) {
+      const t = SN.text(st.positions[k]);
+      const pr = proofs.get(t);
+      if (pr) return { k, text: t, pr };
+    }
+    return null;
+  }
+  const PSTATE = { refuted: ["refuted", "v-win"], work: ["in work", "v-run"], open: ["open", "v-unk"], held: ["holds", "v-held"] };
+  function proveLive(text) { return run && run.mode === "prove" && run.position === text && run.status === "running"; }
+  function renderProveHead(ctx) {
+    const pr = ctx.pr, live = proveLive(ctx.text);
+    const bits = [`refuted ${pr.refuted} of ${pr.n}`];
+    if (live) bits.push(fmtT(run.elapsed));
+    if (pr.rate && pr.open) {
+      bits.push(fmtT(pr.rate) + " a reply");
+      const cur = live && pr.cur_seconds ? pr.cur_seconds : 0;
+      bits.push(fmtT(Math.max(pr.rate * (pr.open - 1), pr.rate * pr.open - cur)) + " left");
+    }
+    let html = esc(bits.join(" · "));
+    const p = st.positions[ctx.k];
+    if (pr.held && pr.held.length) html += ` · <span class="held">holds: ${esc(pr.rows[pr.held[0]].move)}</span>`;
+    else if (pr.n && pr.refuted === pr.n) html += ` · <span class="v-win">${SIDE[p.stm ^ 1]} wins</span>`;
+    setHtml($("provetext"), html);
+  }
+  function renderProve(ctx) {
+    const pr = ctx.pr, ol = $("results");
+    const rank = r => (r.state === "work" ? 0 : r.state === "open" ? 2 : 1);
+    const rows = pr.rows.slice().sort((a, b) => rank(a) - rank(b) ||
+      (rank(a) === 1 ? (b.seq ?? -1) - (a.seq ?? -1) : a.i - b.i));
+    const shown = st.cur > ctx.k ? SN.text(st.positions[ctx.k + 1]) : null;
+    setHtml(ol, rows.map(r => {
+      const [label, vc] = PSTATE[r.state] || [r.state, "v-unk"];
+      const cls = ["pr", r.state === "work" ? "work" : "", r.child === shown ? "here" : ""].join(" ");
+      return `<li class="${cls}" data-i="${r.i}" data-mv="${esc(r.move)}"><span class="v ${vc}">${label}</span>` +
+        `<span class="mv">${esc(r.move)}</span><span class="ans">${esc(r.answer || "")}</span>` +
+        `<span class="n">${r.tries || r.state !== "open" ? r.tries + "/" + r.failed : ""}</span>` +
+        `<span class="t">${r.seconds ? fmtT(r.seconds) : ""}</span></li>`;
+    }).join(""));
+    // the reply in work: its seconds tick in place, so that the list is not rebuilt (and a click lost) twice a second
+    const w = ol.querySelector("li.work .t");
+    if (w && proveLive(ctx.text) && pr.cur_seconds) w.textContent = fmtT(pr.cur_seconds);
+  }
+  // the reply on the board (after P), with its answer as the next move when it is known
+  function showReply(ctx, r, withAnswer) {
+    const pl = r.move === "pass" ? null : SN.BY_KEY.get(r.move);
+    if (pl === undefined) return;
+    const line = st.line.slice(0, ctx.k).concat([pl]);
+    if (withAnswer && r.answer && r.state === "refuted") {
+      const a = r.answer === "pass" ? null : SN.BY_KEY.get(r.answer);
+      if (a !== undefined) {
+        line.push(a);
+        // proved: the reply's mover-to-be wins with the answer
+        if (!cache.has(r.child)) cache.set(r.child, { mode: "proof", results: new Map(), value: 1, best: r.answer, status: "done" });
+      }
+    }
+    setLine(st.base, st.baseText, line, ctx.k + 1);
+  }
+  function follow() {
+    if (!$("iFollow").checked || !run || run.mode !== "prove" || !proveLive(run.position)) return;
+    const ctx = proveView();
+    if (!ctx || ctx.text !== run.position) return;
+    const c = ctx.pr.cur;
+    if (c === null || c === undefined || c === lastFollow) return;
+    lastFollow = c;
+    showReply(ctx, ctx.pr.rows[c], false);
+  }
+  $("iFollow").addEventListener("change", () => { lastFollow = null; follow(); });
+
   function renderResults() {
+    const ctx = proveView();
+    $("provehead").hidden = !ctx;
+    if (ctx) { renderProveHead(ctx); renderProve(ctx); return; }
     const here = resultsHere();
     const ol = $("results");
     if (!here) { setHtml(ol, ""); return; }
@@ -322,6 +418,11 @@
   $("results").addEventListener("click", e => {
     const li = e.target.closest("li");
     if (!li) return;
+    if (li.dataset.i !== undefined) {
+      const ctx = proveView();
+      if (ctx && ctx.pr.rows[+li.dataset.i]) showReply(ctx, ctx.pr.rows[+li.dataset.i], true);
+      return;
+    }
     const mv = li.dataset.mv;
     if (mv === "pass") playMove(null);
     else if (SN.BY_KEY.get(mv)) playMove(SN.BY_KEY.get(mv));
@@ -405,10 +506,12 @@
     const text = posText();
     const j = await post("/api/run", { mode, position: text, seconds, procs, lock: $("iLock").checked, client });
     if (!j.ok) { say(j.error); return; }
-    entryFor(j.run, text, mode, seconds);
+    if (mode === "prove") { if (cache.has(text)) cache.delete(text); lastFollow = null; }
+    else entryFor(j.run, text, mode, seconds);
     render();
   }
   $("bSolve").onclick = () => startRun("solve");
+  $("bProve").onclick = () => startRun("prove");
   $("bNow").onclick = () => run && post("/api/runnow", { run: run.id });
   $("bCancel").onclick = () => { if (!run) return; cancelling = true; renderRun(); post("/api/cancel", { run: run.id }); };
   $("bAll").onclick = () => startRun("all");
@@ -425,6 +528,13 @@
     const es = new EventSource("/api/events?client=" + client);
     es.addEventListener("state", e => {
       run = JSON.parse(e.data);
+      if (run.mode === "prove") {
+        if (run.prove && run.prove.n) proofs.set(run.position, Object.assign({ exists: true }, run.prove));
+        if (run.message && run.status === "error") say(run.message);
+        follow();
+        renderRun();
+        return;
+      }
       const c = entryFor(run.id, run.position, run.mode, run.seconds);
       {
         if (run.value !== null) c.value = run.value;
@@ -452,6 +562,7 @@
       info = await (await fetch("/api/info")).json();
       if (!$("iProcs").dataset.touched) $("iProcs").value = info.cpus;
       if (!info.solver_found) say("no solver at " + info.solver);
+      else if (!info.prover_found) say("no proof driver at " + info.prover);
       if (!info.lock) $("iLock").checked = false;
     } catch (e) { say("no server"); }
     renderRun(); renderTypical();

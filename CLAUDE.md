@@ -113,7 +113,10 @@ Update this section in the same change that freezes a version.
   `python tools/gui_check.py`; `tools/gui_test.py` exercises the server. A run from the page
   goes next in the lock's queue (a priority ticket) or, with "Run now", beside whatever
   runs; `work/gui/runs.log` records each run and whether it held the lock. Look there
-  before trusting a timing that the owner's solves may have overlapped.
+  before trusting a timing that the owner's solves may have overlapped. **Prove** runs
+  `frozen/prove-replay.exe` (`--prover`) on the position's replies, one root after another, and
+  keeps its proof in `work/gui/proofs/<position>/`; the position after `1:60` starts from a copy
+  of `work/long/ply1_results.txt` (74 of 172 refuted) and goes on from there.
 - **Found about the game:** after `1:60 4B:16,27,28,39` red wins with `4B:70,81,82,93` (LOG,
   "the position after two moves is a win for red"; three runs and two engine generations agree;
   the reference solver has not been asked).

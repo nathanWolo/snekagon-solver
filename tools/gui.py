@@ -1,10 +1,18 @@
 """The analysis board: a local web page that sets up Snekagon positions and runs the solver on them.
 
-    python tools/gui.py [--port 8765] [--solver frozen/climb-base.exe]
+    python tools/gui.py [--port 8765] [--solver frozen/climb-base.exe] [--prover frozen/prove-replay.exe]
 
 Open http://localhost:8765. The page (gui/) knows the rules itself (gui/rules.js, checked against the
 solver by tools/gui_check.py); this server runs the solver. Every solve is one `solve <position>` process
 per position, several at once, each killed when it reaches the time limit or the run is cancelled.
+
+Prove (mode prove) shows that the side to move at P loses: the proof driver (--prover, a build of branch
+climb/replay) refutes P's replies one after another, one reply for each class under P's symmetries, as the
+replies of one proof (`prove ROOTS --replay`, the measured top-of-proof configuration, PROVE_ARGS). Its store
+is work/gui/proofs/<P>/ (roots.txt, results.txt, meta.json); results.txt is the driver's results file and
+the proof's only state, so a cancelled or yielded run goes on from it. The position after 1:60 starts from a
+copy of the paused proof's work/long/ply1_results.txt (read, never written). A reply that is not refuted
+stops the run. GET /api/proof?position=P reads a store without a run.
 
 A run waits for the machine's run lock (the protocol of tools/lockfair.sh, done here in Python: a ticket
 in .git/run.queue, the lock directory .git/run.lock), one lock for the whole run, unless the page says
@@ -31,7 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 GUI_DIR = ROOT / "gui"
 LOG_PATH = ROOT / "work" / "gui" / "runs.log"
-YIELD_AFTER = 15 * 60  # seconds under the lock before giving it back to waiters
+YIELD_AFTER = float(os.environ.get("GUI_YIELD_AFTER", 15 * 60))  # seconds under the lock before giving it back to waiters
 OWNER_GONE = 4.0  # seconds without the page's event stream before its run is cancelled
 
 # Measured on this PC, 2026-11-15, frozen/climb-base.exe: 16 positions per ply from random play, one
@@ -196,9 +204,9 @@ LIVE = set()  # every solver process running now
 LIVE_LOCK = threading.Lock()
 
 
-def start_proc(args):
-    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
-                         creationflags=NO_WINDOW, cwd=str(ROOT))
+def start_proc(args, merge=False, cwd=None):
+    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT if merge else subprocess.PIPE,
+                         stdin=subprocess.DEVNULL, creationflags=NO_WINDOW, cwd=str(cwd or ROOT))
     JOB.add(p)
     with LIVE_LOCK:
         LIVE.add(p)
@@ -625,13 +633,531 @@ class Run:
             self.cv.notify_all()
 
 
+# ---------------------------------------------------------------- prove: the replies of a position, one by one
+# The twelve symmetries of the board, as in tools/certificate.py: a reflection (q, r) -> (r, q) for t >= 6,
+# then t % 6 turns (q, r) -> (-r, q + r).
+def _sym(t, q, r):
+    if t >= 6:
+        q, r = r, q
+    for _ in range(t % 6):
+        q, r = -r, q + r
+    return q, r
+
+
+SYM = []
+for _t in range(12):
+    _perm = [0] * GRID
+    for _c in CELLS:
+        _q, _r = _sym(_t, _c % W - R, _c // W - R)
+        _perm[_c] = (_r + R) * W + _q + R
+    SYM.append(_perm)
+
+
+def sym_mask(t, m):
+    perm, out = SYM[t], 0
+    while m:
+        low = m & -m
+        out |= 1 << perm[low.bit_length() - 1]
+        m ^= low
+    return out
+
+
+# The driver as the measured top-of-proof configuration runs it (LOG, "The top of the proof, fourth report").
+PROVE_ARGS = ["--job-threads", "1", "--depth", "2", "--tt", "27", "--upper-first", "--replay", "--win-turns"]
+# The position after the centre opening 1:60, and the results file of its paused proof (read, never written).
+OPENING = to_text({"cells": [1 << 60, 0], "left": [254, 254], "stm": 1, "ply": 1, "passes": 0})
+SEEDS = {OPENING: ROOT / "work" / "long" / "ply1_results.txt"}
+
+
+def read_results(path):
+    """A results file of `snek prove` -> (known, first): known maps a position text to [lo, hi, move that
+    proved lo >= 1, or None]; first maps it to the line number where its value was first decided."""
+    known, first = {}, {}
+    try:
+        text = Path(path).read_text(errors="replace")
+    except OSError:
+        return known, first
+    for n, line in enumerate(text.splitlines()):
+        f = line.split()
+        if len(f) < 6 or f[0].count("_") != 6:
+            continue
+        try:
+            lo, hi = int(f[1]), int(f[2])
+        except ValueError:
+            continue
+        if not -1 <= lo <= hi <= 1:
+            continue
+        k = known.setdefault(f[0], [-1, 1, None])
+        k[0], k[1] = max(k[0], lo), min(k[1], hi)
+        if lo >= 1 and k[2] is None:
+            k[2] = f[5]
+        if (k[0] >= 1 or k[1] <= 0) and f[0] not in first:
+            first[f[0]] = n
+    return known, first
+
+
+def plan_roots(solver, text, seed=None):
+    """P's children, one for each class under the symmetries that P has, in the order they are proved: those
+    the seed results file has decided, in the order it decided them; then the others in the solver's static
+    order (the driver prints no move list, so its own order of a node's moves is not known here)."""
+    p = parse_text(text)
+    kids = solver.children([text])[0]
+    stab = [t for t in range(12) if sym_mask(t, p["cells"][0]) == p["cells"][0] and sym_mask(t, p["cells"][1]) == p["cells"][1]]
+    known, first = read_results(seed) if seed else ({}, {})
+    classes = {}
+    for g, (m, c) in enumerate(kids):
+        f = c.split("_")
+        a, b = int(f[0], 16), int(f[1], 16)
+        key = (min((sym_mask(t, a), sym_mask(t, b)) for t in stab), f[2], f[3])
+        classes.setdefault(key, []).append((g, m, c))
+    reps = []
+    for members in classes.values():
+        decided = [x for x in members if x[2] in first]
+        if decided:
+            reps.append((0, first[decided[0][2]], 0, decided[0]))
+        else:
+            g, m, c = min(members, key=lambda x: (order_key(p, x[1]), x[0]))
+            reps.append((1, 0, order_key(p, m), (g, m, c)))
+    reps.sort(key=lambda x: (x[0], x[1], x[2], x[3][0]))
+    return [(m, c) for _, _, _, (g, m, c) in reps]
+
+
+class ProofStore:
+    """The proof that every reply of P loses: work/gui/proofs/<P>/ holds roots.txt (one representative a line,
+    as the driver reads it), results.txt (the driver's results file, the only state of the proof) and
+    meta.json (the moves, the seconds spent on each root, the order they were finished in)."""
+
+    def __init__(self, base, solver, text):
+        self.text = text
+        self.pos = parse_text(text)
+        self.dir = Path(base) / text
+        self.roots_path, self.results_path, self.meta_path = self.dir / "roots.txt", self.dir / "results.txt", self.dir / "meta.json"
+        self.seed = SEEDS.get(text)
+        if self.seed is not None and not self.seed.is_file():
+            self.seed = None
+        if self.meta_path.is_file():
+            self.meta = json.loads(self.meta_path.read_text())
+            self.roots = [tuple(x) for x in self.meta["roots"]]
+            self.exists = True
+        else:
+            self.exists = False
+            self.roots = plan_roots(solver, text, self.seed)
+            self.meta = {"position": text, "roots": [list(x) for x in self.roots], "seeded": str(self.seed) if self.seed else None,
+                         "created": now_iso(), "seconds": [0.0] * len(self.roots), "finished": [], "runs": 0}
+            if self.seed is not None:
+                self._seed_seconds()
+
+    def _seed_seconds(self):
+        """For roots decided in the seed: the seconds of their recorded tries (as tools/certificate.py counts them)."""
+        me = self.pos["stm"]
+        idx = {int(c.split("_")[me], 16): i for i, (m, c) in enumerate(self.roots)}
+        ply = self.pos["ply"] + 2
+        for line in self.seed.read_text(errors="replace").splitlines():
+            f = line.split()
+            t = f[0].split("_") if f else []
+            if len(f) >= 6 and len(t) == 7 and t[5] == str(ply):
+                i = idx.get(int(t[me], 16))
+                if i is not None and f[4].isdigit():
+                    self.meta["seconds"][i] += int(f[4]) / 1000
+        known, first = read_results(self.seed)
+        done = [i for i, (m, c) in enumerate(self.roots) if c in first]
+        self.meta["finished"] = sorted(done, key=lambda i: first[self.roots[i][1]])
+        self.meta["seconds"] = [round(s, 1) for s in self.meta["seconds"]]
+
+    def materialize(self):
+        if self.exists:
+            return
+        self.dir.mkdir(parents=True, exist_ok=True)
+        if self.seed is not None and not self.results_path.exists():
+            self.results_path.write_bytes(self.seed.read_bytes())
+        self.results_path.touch()
+        self.roots_path.write_text("".join("? %s\n" % c for m, c in self.roots))
+        self.save()
+        self.exists = True
+
+    def save(self):
+        tmp = self.meta_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.meta))
+        os.replace(tmp, self.meta_path)
+
+    def fix_tail(self):
+        """A driver stopped mid-line leaves a line without its end; the next run would glue onto it."""
+        try:
+            with open(self.results_path, "rb+") as f:
+                f.seek(0, 2)
+                if f.tell() > 0:
+                    f.seek(-1, 2)
+                    if f.read(1) != b"\n":
+                        f.write(b"\n")
+        except OSError:
+            pass
+
+    def rows(self):
+        """One row a root: its state (open, refuted, held), the answer that refutes it, the tries known."""
+        path = self.results_path if self.exists else self.seed
+        known, first = read_results(path) if path else ({}, {})
+        me = self.pos["stm"]
+        idx = {int(c.split("_")[me], 16): i for i, (m, c) in enumerate(self.roots)}
+        tries = [[0, 0] for _ in self.roots]
+        ply = str(self.pos["ply"] + 2)
+        for c, (lo, hi, mv) in known.items():
+            t = c.split("_")
+            if t[5] == ply:
+                i = idx.get(int(t[me], 16))
+                if i is not None:
+                    tries[i][0] += 1
+                    tries[i][1] += lo >= 0  # the try did not win: the side of P to move at least draws after it
+        finished = list(self.meta["finished"])
+        rows = []
+        for i, (m, c) in enumerate(self.roots):
+            k = known.get(c)
+            state, answer = "open", None
+            if k and k[0] >= 1:
+                state, answer = "refuted", k[2]
+            elif k and k[1] <= 0:
+                state = "held"
+            if state != "open" and i not in finished:
+                finished.append(i)
+            rows.append({"i": i, "move": m, "child": c, "state": state, "answer": answer, "tries": tries[i][0],
+                         "failed": tries[i][1], "jobs": None, "seconds": round(self.meta["seconds"][i], 1)})
+        for s, i in enumerate(finished):
+            rows[i]["seq"] = s
+        return rows
+
+
+def proof_summary(rows):
+    n = len(rows)
+    refuted = sum(r["state"] == "refuted" for r in rows)
+    held = [r["i"] for r in rows if r["state"] == "held"]
+    secs = [r["seconds"] for r in rows if r["state"] == "refuted" and r["seconds"]]
+    return {"n": n, "refuted": refuted, "held": held, "open": n - refuted - len(held),
+            "avg": round(sum(secs) / len(secs), 1) if secs else None}
+
+
+RE_ROOT = re.compile(r"^(\d+) (\d+) (\S+) (-?\d+) (\d+) (\d+) (\S+) (\d+) (\d+) (\d+) ([0-9.]+) (\S+)")
+RE_TRY = re.compile(r"root move (\d+) of (\d+)\s+(\S+)\s+value (-?\d+)")
+RE_GAVE = re.compile(r"window \((-?\d+),(-?\d+)\) gave (-?\d+): the value lies in \[(-?\d+), (-?\d+)\]")
+RE_JOBS = re.compile(r"window \((-?\d+),(-?\d+)\)\s+jobs (\d+)\s+stopped (\d+)")
+
+
+class ProveRun:
+    """Mode prove: the proof driver proves P's replies (the roots of its store) one after another, as the
+    replies of one proof (`prove --replay`), until every one is refuted, one is not, or the run is cancelled.
+    The results file is the only state: a later run goes on from it."""
+
+    def __init__(self, rid, app, pos_text, procs, use_lock, owner):
+        self.id, self.mode, self.pos_text = rid, "prove", pos_text
+        self.app, self.prover, self.solver = app, app.prover, app.solver
+        self.pos = parse_text(pos_text)
+        self.procs, self.use_lock, self.owner = procs, use_lock, owner
+        self.seconds = 0
+        self.status, self.message = "starting", ""
+        self.cv = threading.Condition()
+        self.events = []  # the page reads the rows from the state events
+        self.stopping = self.cancelled = self.run_now = False
+        self.lock = RunLock() if use_lock else None
+        self.held_lock = False
+        self.created, self.began, self.ended = time.time(), None, None
+        self.store = None
+        self.rows = []
+        self.drv = 0  # the root the driver is on
+        self.cur_t0 = None  # when it began on it
+        self.piece_secs = []  # seconds of each root before this piece of the driver
+        self.proc = None
+        self.worked = 0  # roots finished by search in this run
+        self.worked_secs = 0.0
+        self.nodes = 0
+        self.pieces = 0
+        self.last_save = 0.0
+
+    def cur(self):
+        if self.proc is not None and self.drv < len(self.rows) and self.rows[self.drv]["state"] in ("open", "work"):
+            return self.drv
+        return None
+
+    def snapshot(self, with_results=False):
+        with self.cv:
+            s = proof_summary(self.rows)
+            now = time.time()
+            c = self.cur()
+            rate = round(self.worked_secs / self.worked, 1) if self.worked else s["avg"]
+            s.update({"rows": [dict(r) for r in self.rows], "cur": c, "rate": rate,
+                      "cur_seconds": round(self.piece_secs[c] + now - self.cur_t0, 1) if c is not None and self.cur_t0 else None})
+            return {"id": self.id, "mode": "prove", "position": self.pos_text, "status": self.status, "message": self.message,
+                    "total": s["n"], "done": s["refuted"], "running": 1 if self.proc is not None else 0, "nodes": self.nodes,
+                    "ahead": getattr(self, "ahead", 0), "held_lock": self.held_lock,
+                    "value": -1 if s["refuted"] == s["n"] and s["n"] else None, "best": None, "procs": self.procs, "seconds": 0,
+                    "elapsed": round((self.ended or now) - (self.began or now), 1),
+                    "waited": round((self.began or self.ended or now) - self.created, 1), "prove": s}
+
+    def cancel(self, why="cancelled"):
+        with self.cv:
+            if self.status in ("done", "cancelled", "error"):
+                return
+            self.cancelled = self.stopping = True
+            self.message = why
+            self.cv.notify_all()
+        p = self.proc
+        if p is not None:
+            try:
+                p.kill()
+            except OSError:
+                pass
+
+    def set_status(self, s):
+        with self.cv:
+            self.status = s
+            self.cv.notify_all()
+
+    wait_lock = Run.wait_lock
+
+    def drive(self):
+        """One piece of the driver. Returns "end", "held", "cancel", "yield" or "error"."""
+        st = self.store
+        args = [self.prover, "prove", st.roots_path.name, "--threads", str(self.procs)] + PROVE_ARGS + ["--out", st.results_path.name]
+        lines = queue.Queue()
+        with self.cv:
+            self.piece_secs = [r["seconds"] for r in self.rows]
+            self.drv, self.cur_t0 = 0, time.time()
+            self.pieces += 1
+            for r in self.rows:
+                if r["state"] == "work":
+                    r["state"] = "open"
+            self.proc = start_proc(args, merge=True, cwd=st.dir)
+            self.mark_work()
+            self.cv.notify_all()
+        p = self.proc
+
+        def read():
+            for raw in p.stdout:
+                lines.put(raw.decode(errors="replace").rstrip("\r\n"))
+            lines.put(None)
+
+        reader = threading.Thread(target=read, daemon=True)
+        reader.start()
+        outcome, tail, last_refresh = None, [], time.time()
+        try:
+            while outcome is None:
+                try:
+                    line = lines.get(timeout=0.5)
+                except queue.Empty:
+                    line = ""
+                if line is None:
+                    p.wait()
+                    outcome = "cancel" if self.stopping else "end" if p.returncode == 0 else "error"
+                    if outcome == "error":
+                        with self.cv:
+                            self.message = "the driver stopped (exit %s): %s" % (p.returncode, " | ".join(tail[-3:]))
+                    break
+                if line:
+                    tail = (tail + [line])[-5:]
+                    outcome = self.on_line(line)
+                if self.stopping:
+                    outcome = "cancel"
+                if time.time() - last_refresh > 30 and self.lock:
+                    self.lock.refresh()
+                    last_refresh = time.time()
+                if (outcome is None and self.lock and self.lock.held and time.time() - self.lock.since > YIELD_AFTER
+                        and self.lock.others_waiting()):
+                    outcome = "yield"
+        finally:
+            if p.poll() is None:
+                p.kill()
+            try:
+                p.wait(10)
+            except subprocess.TimeoutExpired:
+                pass
+            reader.join(5)
+            with LIVE_LOCK:
+                LIVE.discard(p)
+            with self.cv:
+                c = self.cur()
+                if c is not None:  # the root cut off: its seconds so far count
+                    self.rows[c]["seconds"] = round(self.piece_secs[c] + time.time() - self.cur_t0, 1)
+                    self.rows[c]["state"] = "open"
+                self.proc = None
+                self.save_meta()
+                self.cv.notify_all()
+            st.fix_tail()
+        return outcome
+
+    def mark_work(self):
+        c = self.cur()
+        if c is not None:
+            r = self.rows[c]
+            r["state"], r["tries"], r["failed"], r["jobs"] = "work", 0, 0, 0
+
+    def save_meta(self):
+        self.last_save = time.time()
+        m = self.store.meta
+        m["seconds"] = [r["seconds"] for r in self.rows]
+        fin = list(m["finished"])
+        for r in sorted((r for r in self.rows if r["state"] in ("refuted", "held") and "seq" in r), key=lambda r: r["seq"]):
+            if r["i"] not in fin:
+                fin.append(r["i"])
+        m["finished"] = fin
+        self.store.save()
+
+    def on_line(self, line):
+        with self.cv:
+            try:
+                return self._on_line(line)
+            finally:
+                self.cv.notify_all()
+
+    def _on_line(self, line):
+        m = RE_ROOT.match(line)
+        if m:
+            i, v, nodes, us, jobs, stopped = int(m.group(1)), int(m.group(4)), int(m.group(5)), int(m.group(6)), int(m.group(8)), int(m.group(9))
+            if i >= len(self.rows):
+                return None
+            r = self.rows[i]
+            self.nodes += nodes
+            searched = jobs + stopped > 0
+            if searched:
+                r["seconds"] = round(self.piece_secs[i] + us / 1e6, 1)
+                self.worked += 1
+                self.worked_secs += us / 1e6
+                r["jobs"] = jobs
+            was = r["state"]
+            if v == 1:
+                r["state"], r["answer"] = "refuted", m.group(12)
+            else:
+                r["state"] = "held"
+            if was in ("open", "work"):
+                r["seq"] = max([x.get("seq", -1) for x in self.rows] + [-1]) + 1
+            self.drv, self.cur_t0 = i + 1, time.time()
+            self.mark_work()
+            if searched and time.time() - self.last_save > 2:  # the piece's end saves the rest
+                self.save_meta()
+            return "held" if v != 1 else None
+        c = self.cur()
+        m = RE_TRY.search(line)
+        if m:
+            if c is not None:
+                r = self.rows[c]
+                r["tries"] = int(m.group(1))
+                r["failed"] += int(m.group(4)) < 1
+                r["last"] = m.group(3)
+            return None
+        m = RE_GAVE.search(line)
+        if m:
+            if int(m.group(5)) <= 0 and self.drv < len(self.rows):  # not a win for the root's mover: stop here
+                r = self.rows[self.drv]
+                r["state"] = "held"
+                if c is not None:
+                    r["seconds"] = round(self.piece_secs[c] + time.time() - self.cur_t0, 1)
+                r["seq"] = max([x.get("seq", -1) for x in self.rows] + [-1]) + 1
+                self.save_meta()
+                return "held"
+            return None
+        m = RE_JOBS.search(line)
+        if m and c is not None:
+            self.rows[c]["jobs"] = int(m.group(3))
+        return None
+
+    def held_message(self):
+        h = [r for r in self.rows if r["state"] == "held"]
+        return "not refuted: %s" % h[0]["move"] if h else ""
+
+    def main(self):
+        outcome = None
+        try:
+            self.store = ProofStore(self.app.proofs, self.solver, self.pos_text)
+            self.store.materialize()
+            with self.cv:
+                self.rows = self.store.rows()
+            s = proof_summary(self.rows)
+            if s["held"]:
+                with self.cv:
+                    self.message = self.held_message()
+                self.finish("done")
+                return
+            if s["open"] == 0:
+                self.finish("done")
+                return
+            if not self.wait_lock():
+                self.finish("cancelled")
+                return
+            self.began = time.time()
+            self.set_status("running")
+            log_line({"time": now_iso(), "event": "start", "run": self.id, "mode": "prove",
+                      "lock": "held" if self.held_lock else "none", "procs": self.procs, "limit": 0,
+                      "positions": s["n"], "refuted": s["refuted"], "position": self.pos_text})
+            while True:
+                outcome = self.drive()
+                if outcome == "yield":
+                    self.lock.release()
+                    log_line({"time": now_iso(), "event": "lock-yield", "run": self.id})
+                    if not self.wait_lock():
+                        outcome = "cancel"
+                        break
+                    self.set_status("running")
+                    continue
+                break
+            if outcome == "held":
+                with self.cv:
+                    self.message = self.held_message()
+            self.finish("cancelled" if self.cancelled else "error" if outcome == "error" else "done")
+        except Exception as e:  # a failed run reports and logs, the server goes on
+            with self.cv:
+                self.message = str(e)
+            self.finish("error")
+        finally:
+            if self.proc is not None:
+                try:
+                    self.proc.kill()
+                except OSError:
+                    pass
+            if self.lock:
+                self.lock.release()
+            s = proof_summary(self.rows)
+            log_line({"time": now_iso(), "event": "end", "run": self.id, "mode": "prove", "status": self.status,
+                      "lock": "held" if self.held_lock else "none", "procs": self.procs, "pieces": self.pieces,
+                      "refuted": s["refuted"], "held": len(s["held"]), "open": s["open"], "searched": self.worked,
+                      "nodes": self.nodes, "waited": round((self.began or self.ended or time.time()) - self.created, 1),
+                      "began": datetime.fromtimestamp(self.began).isoformat(timespec="seconds") if self.began else "-",
+                      "seconds": round(self.ended - self.began, 1) if self.began and self.ended else 0})
+
+    def finish(self, status):
+        with self.cv:
+            self.stopping = True
+            self.ended = time.time()
+            self.status = status
+            self.cv.notify_all()
+
+
 class App:
-    def __init__(self, solver):
+    def __init__(self, solver, prover=None, proofs=None):
         self.solver = solver
+        self.prover = str(prover) if prover else ""
+        self.proofs = Path(proofs) if proofs else ROOT / "work" / "gui" / "proofs"
+        self.stores = {}  # position text -> a ProofStore planned but not written yet
         self.run = None
         self.ids = 0
         self.mu = threading.Lock()
         self.clients = {}  # client id -> time its event stream was last alive
+
+    def prover_found(self):
+        return bool(self.prover) and Path(self.prover).is_file()
+
+    def proof_state(self, text):
+        """The state of P's proof store without a run: None when there is none (and no seed for it)."""
+        r = self.run
+        if r is not None and r.mode == "prove" and r.pos_text == text and r.rows:
+            s = r.snapshot()["prove"]
+            return dict(s, exists=True, live=self.active())
+        if (self.proofs / text / "meta.json").is_file():
+            st = ProofStore(self.proofs, self.solver, text)
+        elif text in SEEDS:  # planned from its seed, written only when a run starts
+            st = self.stores.get(text) or ProofStore(self.proofs, self.solver, text)
+            self.stores[text] = st
+        else:
+            return None
+        if not st.exists and st.seed is None:
+            return None
+        rows = st.rows()
+        return dict(proof_summary(rows), rows=rows, cur=None, rate=None, cur_seconds=None, exists=st.exists, live=False)
 
     def active(self):
         return self.run is not None and self.run.status not in ("done", "cancelled", "error")
@@ -646,7 +1172,10 @@ class App:
             if self.active():
                 raise Conflict("a run is in progress (in this tab or another)")
             self.ids += 1
-            run = Run(self.ids, self.solver, mode, text, seconds, procs, use_lock, owner)
+            if mode == "prove":
+                run = ProveRun(self.ids, self, text, procs, use_lock, owner)
+            else:
+                run = Run(self.ids, self.solver, mode, text, seconds, procs, use_lock, owner)
             self.run = run
         threading.Thread(target=run.main, daemon=True).start()
         return run
@@ -745,12 +1274,22 @@ def make_handler(app):
                 self.wfile.write(b)
             elif u.path == "/api/info":
                 self.send_json({"solver": app.solver.path, "solver_found": app.solver.exists(),
+                                "prover": app.prover, "prover_found": app.prover_found(),
                                 "cpus": os.cpu_count() or 1, "typical": TYPICAL,
                                 "lock": RunLock().available()})
             elif u.path == "/api/status":
                 r = app.run
                 self.send_json({"run": r.snapshot(True) if r else None,
                                 "solver_pids": sorted(p.pid for p in list(LIVE))})
+            elif u.path == "/api/proof":
+                text = urllib.parse.parse_qs(u.query).get("position", [""])[0]
+                try:
+                    text = to_text(parse_text(text))
+                    self.send_json({"ok": True, "position": text, "proof": app.proof_state(text)})
+                except BadPosition as e:
+                    self.send_json({"ok": False, "error": str(e)}, 400)
+                except (RuntimeError, OSError, ValueError) as e:
+                    self.send_json({"ok": False, "error": str(e)}, 500)
             elif u.path == "/api/events":
                 self.events(urllib.parse.parse_qs(u.query).get("client", [""])[0])
             else:
@@ -810,8 +1349,10 @@ def make_handler(app):
                     if not app.solver.exists():
                         raise BadPosition("no solver at %s (start with --solver PATH)" % app.solver.path)
                     mode = b.get("mode")
-                    if mode not in ("solve", "all"):
-                        raise BadPosition("mode is solve or all")
+                    if mode not in ("solve", "all", "prove"):
+                        raise BadPosition("mode is solve, all or prove")
+                    if mode == "prove" and not app.prover_found():
+                        raise BadPosition("no proof driver at %s (start with --prover PATH)" % app.prover)
                     text = to_text(parse_text(str(b.get("position", ""))))
                     if is_over(parse_text(text)):
                         raise BadPosition("the game is over")
@@ -846,12 +1387,19 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--solver", default=str(Path("frozen") / "climb-base.exe"),
                     help="the solver executable, relative to the repository root or absolute")
+    ap.add_argument("--prover", default=str(Path("frozen") / "prove-replay.exe"),
+                    help="the proof driver for Prove (a build of branch climb/replay), relative to the root or absolute")
+    ap.add_argument("--proofs", default=str(Path("work") / "gui" / "proofs"),
+                    help="where the proof stores live, relative to the root or absolute")
     a = ap.parse_args()
     sp = Path(a.solver)
     solver = Solver(sp if sp.is_absolute() else ROOT / sp)
     if not solver.exists():
         print("warning: no solver at", solver.path, file=sys.stderr)
-    app = App(solver)
+    pp, pd = Path(a.prover), Path(a.proofs)
+    app = App(solver, pp if pp.is_absolute() else ROOT / pp, pd if pd.is_absolute() else ROOT / pd)
+    if not app.prover_found():
+        print("warning: no proof driver at", app.prover, file=sys.stderr)
     threading.Thread(target=app.watchdog, daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(app))
     srv.daemon_threads = True
