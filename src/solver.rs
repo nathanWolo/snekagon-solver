@@ -119,6 +119,9 @@ pub struct Config {
     /// E32: the answer bonus at those nodes (added to the score of each move that covers the reply
     /// that refuted the move before; the scores of the evaluation lie below 1 << 21).
     pub eval_bonus: u64,
+    /// The proof driver, for exact node counts: one worker thread that keeps this many solvers and
+    /// hands them the jobs in turn, with this many jobs out at once (`--emulate W`). 0 = off.
+    pub drv_emulate: u32,
 }
 
 /// A "cannot reach" answer: the player with the cells `own` and the pieces `left` cannot build
@@ -183,7 +186,7 @@ pub fn outside_bucket(n: u32) -> usize {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0, eval_level: 99, eval_w: crate::evalorder::WEIGHTS, eval_bonus: 1 << 21 }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0, eval_level: 99, eval_w: crate::evalorder::WEIGHTS, eval_bonus: 1 << 21, drv_emulate: 0 }
     }
 }
 
