@@ -3264,7 +3264,7 @@ through its own script under `tools/locked.sh` because the check build needs a f
   The node counts differ from the PC's run by under 1% because that page uses a table of 2^21
   entries, not 2^22. One run, one phone, model not noted.
 
-## 2026-11-16 A private page that plays red against the proof so far (15:45-16:20)
+## 2026-11-16 A private page that plays red against the proof so far (15:45-16:15)
 
 - Owner, asked "Should I build a private prototype now, on the replies already proved, or wait
   until the proof is done?": "Sure go ahead".
@@ -3315,6 +3315,14 @@ through its own script under `tools/locked.sh` because the check build needs a f
   games test the plumbing (symmetries, book, legality, the browser build's values), and the
   claim that red always wins rests on the solver's values, as the proof does. The 65 open
   replies cannot be played yet.
+- *To publish again* (in a checkout of `wasm`): `cd wasm && cargo build --release --target
+  wasm32-unknown-unknown --target-dir SHORTDIR`, copy `snekwasm.wasm` from its
+  `wasm32-unknown-unknown/release/` to `wasm/play/snek.wasm`; `python tools/mkbook.py
+  STORE wasm/play/book.json` with STORE the proof's folder in the main checkout's
+  `work/gui/proofs/`; publish `wasm/play/play.html` with `worker.js`, `book.json` and
+  `snek.wasm` (type `application/wasm`) as its files. To test first: serve `wasm/play/` on
+  localhost and open `selftest.html?games=2000&pairs=with&second=book` (the page itself needs
+  a wrapper with a doctype around `play.html`; `local.html` there is such a copy, not in git).
 - *When the proof ends:* export the book again and publish it to the same link. Solving the
   third moves of the first 74 replies would take about 67,000 jobs (74 replies at the 907 a
   reply of the other 33), a few hours of the PC: an estimate, and the owner's call.
