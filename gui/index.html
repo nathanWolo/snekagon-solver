@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snekagon board</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="layout">
+  <section id="boardwrap">
+    <svg id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+  </section>
+  <aside id="side">
+    <div id="status"></div>
+    <div class="player" id="p0"><span class="dot red"></span><span class="pname">Red</span><span class="len" title="longest snake"></span><span class="tray"></span></div>
+    <div class="player" id="p1"><span class="dot blue"></span><span class="pname">Blue</span><span class="len" title="longest snake"></span><span class="tray"></span></div>
+    <div class="row nav">
+      <button id="bStart" title="Start (Home)">&#x23EE;</button>
+      <button id="bUndo" title="Undo (Left)">&#x25C0;</button>
+      <button id="bRedo" title="Redo (Right)">&#x25B6;</button>
+      <button id="bEnd" title="Last move (End)">&#x23ED;</button>
+      <button id="bPass">Pass</button>
+      <button id="bReset" title="Empty board">Reset</button>
+    </div>
+    <ol id="moves"></ol>
+    <div class="row solver">
+      <button id="bSolve" class="primary">Solve</button>
+      <button id="bAll" class="primary">All moves</button>
+      <label title="time limit per position">limit <input id="iSec" type="number" min="1" step="1" value="30"> s</label>
+      <label title="solver processes at once">&times;<input id="iProcs" type="number" min="1" max="64" step="1" value="16"></label>
+      <label title="wait for the machine's run lock"><input id="iLock" type="checkbox" checked> lock</label>
+    </div>
+    <div class="row" id="typical"></div>
+    <div class="row" id="runstate" hidden><span id="runtext"></span><button id="bNow">Run now</button><button id="bCancel">Cancel</button></div>
+    <div id="verdict"></div>
+    <ol id="results"></ol>
+    <div class="row io">
+      <textarea id="io" rows="2" spellcheck="false" placeholder="position text or moves"></textarea>
+    </div>
+    <div class="row">
+      <button id="bLoad">Load</button>
+      <button id="bCopyPos">Copy position</button>
+      <button id="bCopyMoves">Copy moves</button>
+    </div>
+    <code id="postext"></code>
+    <div id="msg"></div>
+  </aside>
+</main>
+<script src="rules.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

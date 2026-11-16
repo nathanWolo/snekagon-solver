@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>rules check</title>
+<pre id="out">running</pre>
+<script src="rules.js"></script>
+<script>
+"use strict";
+function fnv(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, "0");
+}
+(async () => {
+  const out = document.getElementById("out");
+  try {
+    const data = await (await fetch("/check/data")).json();
+    const t0 = performance.now();
+    const res = { placements: SN.PLACEMENTS.length, perft1: SN.perft(SN.initial(), 1), perft2: SN.perft(SN.initial(), 2),
+      positions: [], games: [] };
+    for (const text of data.positions) {
+      const r = { text };
+      try {
+        const p = SN.fromText(text);
+        r.roundtrip = SN.text(p) === text;
+        const kids = SN.moves(p).map(m => SN.text(SN.play(p, m))).sort();
+        r.n = kids.length;
+        r.h = fnv(kids.join("\n"));
+        r.over = SN.isOver(p);
+        if (data.full && data.full.includes(text)) r.kids = kids;
+      } catch (e) { r.error = String(e.message || e); }
+      res.positions.push(r);
+    }
+    for (const g of data.games) {
+      try { res.games.push(SN.text(SN.parseInput(g).pos)); } catch (e) { res.games.push("error: " + e.message); }
+    }
+    res.bad = data.bad.map(s => { try { SN.parseInput(s); return null; } catch (e) { return e.message; } });
+    res.ms = Math.round(performance.now() - t0);
+    const body = JSON.stringify(res);
+    try { await fetch("/check/result", { method: "POST", body }); }
+    catch (e) { out.textContent = "posting failed: " + e; return; }
+    out.textContent = "done";
+  } catch (e) {
+    await fetch("/check/result", { method: "POST", body: JSON.stringify({ fatal: String(e.stack || e) }) });
+  }
+})();
+</script>

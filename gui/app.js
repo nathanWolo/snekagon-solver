@@ -1,0 +1,455 @@
+"use strict";
+(() => {
+  const $ = id => document.getElementById(id);
+  const svgNS = "http://www.w3.org/2000/svg";
+  const SIDE = ["Red", "Blue"];
+  const S3 = Math.sqrt(3);
+  const cx = c => S3 * (SN.cq(c) + SN.cr(c) / 2);
+  const cy = c => 1.5 * SN.cr(c);
+  const client = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  // ---------------------------------------------------------------- the line of play
+  const st = { base: SN.initial(), baseText: null, line: [], cur: 0, positions: [SN.initial()] };
+  let legal = [];       // legal placements in the shown position
+  let playable = new Set();
+  let drag = null;      // {cells: []}
+  let hint = null;      // cells to outline (hovered result)
+  let info = { cpus: 16, typical: {} };
+  let run = null;       // the last run snapshot from the server
+  const cache = new Map(); // position text -> {mode, results: Map(move -> result), value, best, status, seconds}
+
+  const pos = () => st.positions[st.cur];
+  const posText = () => SN.text(pos());
+
+  function setLine(base, baseText, line, cur) {
+    st.base = base; st.baseText = baseText; st.line = line;
+    st.positions = [base];
+    for (const m of line) st.positions.push(SN.play(st.positions[st.positions.length - 1], m));
+    st.cur = cur === undefined ? line.length : cur;
+    changed();
+  }
+  function playMove(pl) {
+    const next = st.line[st.cur];
+    if (st.cur < st.line.length && (next === pl || (next && pl && next.id === pl.id))) { st.cur++; changed(); return; }
+    st.line = st.line.slice(0, st.cur).concat([pl]);
+    st.positions = st.positions.slice(0, st.cur + 1);
+    st.positions.push(SN.play(pos(), pl));
+    st.cur++;
+    changed();
+  }
+  function go(k) { st.cur = Math.max(0, Math.min(st.line.length, k)); changed(); }
+
+  function changed() {
+    legal = SN.moves(pos());
+    playable = new Set();
+    for (const pl of legal) for (const c of pl.cells) playable.add(c);
+    drag = null; hint = null;
+    $("msg").textContent = "";
+    render();
+  }
+
+  // ---------------------------------------------------------------- board
+  const board = $("board");
+  let cellEls = [];
+  function buildBoard() {
+    const xs = SN.CELLS.map(cx), ys = SN.CELLS.map(cy);
+    const pad = 1.1;
+    const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+    board.setAttribute("viewBox", [x0, y0, Math.max(...xs) - x0 + pad, Math.max(...ys) - y0 + pad].join(" "));
+    const hex = [];
+    for (let k = 0; k < 6; k++) {
+      const a = Math.PI / 180 * (60 * k - 30);
+      hex.push((0.97 * Math.cos(a)).toFixed(3) + "," + (0.97 * Math.sin(a)).toFixed(3));
+    }
+    const cells = document.createElementNS(svgNS, "g");
+    cellEls = [];
+    for (const c of SN.CELLS) {
+      const g = document.createElementNS(svgNS, "g");
+      g.setAttribute("transform", `translate(${cx(c).toFixed(3)},${cy(c).toFixed(3)})`);
+      g.dataset.c = c;
+      const p = document.createElementNS(svgNS, "polygon");
+      p.setAttribute("points", hex.join(" "));
+      const t = document.createElementNS(svgNS, "text");
+      t.textContent = c;
+      g.append(p, t);
+      cells.append(g);
+      cellEls[c] = g;
+    }
+    const over = document.createElementNS(svgNS, "g");
+    over.id = "overlay";
+    board.replaceChildren(cells, over);
+  }
+
+  function resultsHere() {
+    const r = cache.get(posText());
+    return r && r.results ? r : null;
+  }
+  const VAL = { 1: "win", 0: "draw", "-1": "loss" };
+  const vclass = r => (r.status === "solved" ? "v-" + VAL[r.value] : "v-unk");
+
+  function renderBoard() {
+    const p = pos();
+    const sel = drag ? drag.cells : [];
+    const selKey = sel.slice().sort((a, b) => a - b).join(",");
+    const complete = drag && legal.some(pl => pl.cells.join(",") === selKey);
+    const nexts = new Set();
+    if (drag && sel.length) {
+      for (const pl of legal) {
+        if (!sel.every(c => pl.cells.includes(c))) continue;
+        for (const c of pl.cells) if (!sel.includes(c) && sel.some(s => SN.adjacent(s, c))) nexts.add(c);
+      }
+    }
+    const here = resultsHere();
+    const best = here && here.best && here.value >= 0 ? SN.BY_KEY.get(here.best) : null;
+    const lastPl = st.cur > 0 ? st.line[st.cur - 1] : null;
+    for (const c of SN.CELLS) {
+      const g = cellEls[c];
+      const v = p.board[c];
+      const cls = ["cell"];
+      if (v >= 0) cls.push("c" + v);
+      else {
+        if (!playable.has(c)) cls.push("dead");
+        if (sel.includes(c)) { cls.push("sel"); if (complete) cls.push("ok", "s" + p.stm); }
+        else if (nexts.has(c)) cls.push("next");
+        if (hint && hint.includes(c)) cls.push("hint");
+        if (best && best.cells.includes(c) && !drag) cls.push("best");
+      }
+      g.setAttribute("class", cls.join(" "));
+    }
+    // snakes, the last move, result marks
+    const over = $("overlay");
+    const parts = [];
+    for (let side = 0; side < 2; side++) {
+      const snakes = SN.snakes(p, side);
+      const top = Math.max(0, ...snakes.map(s => s.length));
+      for (const s of snakes) {
+        const long = s.length === top && top > 1 ? " long" : "";
+        for (const a of s) for (const b of SN.NB[a]) {
+          if (b > a && p.board[b] === side)
+            parts.push(`<line class="link l${side}${long}" x1="${cx(a)}" y1="${cy(a)}" x2="${cx(b)}" y2="${cy(b)}"/>`);
+        }
+      }
+    }
+    if (lastPl) for (const c of lastPl.cells) parts.push(`<circle class="lastmark" cx="${cx(c)}" cy="${cy(c)}" r="0.62"/>`);
+    if (here && !drag) {
+      const rank = { "v-win": 3, "v-draw": 2, "v-unk": 1, "v-loss": 0 };
+      const bestAt = new Map();
+      for (const [mv, r] of here.results) {
+        const pl = SN.BY_KEY.get(mv);
+        if (!pl) continue;
+        const k = vclass(r);
+        for (const c of pl.cells) if (!bestAt.has(c) || rank[k] > rank[bestAt.get(c)]) bestAt.set(c, k);
+      }
+      for (const [c, k] of bestAt) parts.push(`<circle class="mark ${k}" cx="${cx(c)}" cy="${cy(c) + 0.5}" r="0.13"/>`);
+    }
+    over.innerHTML = parts.join("");
+  }
+
+  function cellAt(e) {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const g = el && el.closest && el.closest("[data-c]");
+    return g ? +g.dataset.c : null;
+  }
+  function nope() { board.classList.remove("nope"); void board.getBoundingClientRect(); board.classList.add("nope"); }
+  board.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    const c = cellAt(e);
+    if (c === null || pos().board[c] !== -1) return;
+    if (!playable.has(c)) { nope(); return; }
+    drag = { cells: [c] };
+    board.setPointerCapture(e.pointerId);
+    renderBoard(); renderTray();
+    e.preventDefault();
+  });
+  board.addEventListener("pointermove", e => {
+    const c = cellAt(e);
+    if (!drag) {
+      for (const g of cellEls) if (g) g.classList.remove("hover");
+      if (c !== null && playable.has(c)) cellEls[c].classList.add("hover");
+      return;
+    }
+    if (c === null) return;
+    const sel = drag.cells;
+    if (sel.length >= 2 && c === sel[sel.length - 2]) { sel.pop(); renderBoard(); renderTray(); return; }
+    if (sel.includes(c) || pos().board[c] !== -1 || sel.length >= 4) return;
+    if (!sel.some(s => SN.adjacent(s, c))) return;
+    const want = sel.concat([c]);
+    if (!legal.some(pl => want.every(x => pl.cells.includes(x)))) return;
+    sel.push(c);
+    renderBoard(); renderTray();
+  });
+  function endDrag(commit) {
+    if (!drag) return;
+    const key = drag.cells.slice().sort((a, b) => a - b).join(",");
+    drag = null;
+    const pl = commit ? legal.find(x => x.cells.join(",") === key) : null;
+    if (pl) playMove(pl);
+    else { if (commit) nope(); renderBoard(); renderTray(); }
+  }
+  board.addEventListener("pointerup", () => endDrag(true));
+  board.addEventListener("pointercancel", () => endDrag(false));
+  board.addEventListener("pointerleave", () => { for (const g of cellEls) if (g) g.classList.remove("hover"); });
+  board.addEventListener("contextmenu", e => { if (drag) { e.preventDefault(); endDrag(false); } });
+
+  // ---------------------------------------------------------------- side panel
+  function pieceSvg(k, color, cls) {
+    const cells = SN.SHAPE[k].map(([q, r]) => [S3 * (q + r / 2), 1.5 * r]);
+    const xs = cells.map(c => c[0]), ys = cells.map(c => c[1]);
+    const x0 = Math.min(...xs) - 1, y0 = Math.min(...ys) - 1;
+    const w = Math.max(...xs) - x0 + 1, h = Math.max(...ys) - y0 + 1;
+    const hex = [];
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 180 * (60 * i - 30);
+      hex.push((0.95 * Math.cos(a)).toFixed(2) + "," + (0.95 * Math.sin(a)).toFixed(2));
+    }
+    const polys = cells.map(([x, y]) => `<polygon transform="translate(${x.toFixed(2)},${y.toFixed(2)})" points="${hex.join(" ")}" fill="${color}"/>`).join("");
+    const scale = 4.6;
+    return `<svg class="${cls}" viewBox="${x0} ${y0} ${w} ${h}" width="${(w * scale).toFixed(1)}" height="${(h * scale).toFixed(1)}"><title>${SN.PIECE_NAME[k]}</title>${polys}</svg>`;
+  }
+  function renderTray() {
+    const p = pos();
+    let matchPiece = -1;
+    if (drag) {
+      const key = drag.cells.slice().sort((a, b) => a - b).join(",");
+      const pl = legal.find(x => x.cells.join(",") === key);
+      if (pl) matchPiece = pl.piece;
+    }
+    for (let side = 0; side < 2; side++) {
+      const row = $("p" + side);
+      row.classList.toggle("tomove", p.stm === side && !SN.isOver(p));
+      row.querySelector(".len").textContent = SN.longest(p, side);
+      const color = side === 0 ? "var(--red)" : "var(--blue)";
+      let html = "";
+      for (let k = side === 0 ? 0 : 1; k < 8; k++) {
+        const has = (p.left[side] >> k) & 1;
+        html += pieceSvg(k, color, (has ? "" : "used") + (side === p.stm && k === matchPiece ? " match" : ""));
+      }
+      row.querySelector(".tray").innerHTML = html;
+    }
+  }
+  function renderStatus() {
+    const p = pos();
+    const s = $("status");
+    if (SN.isOver(p)) {
+      const a = SN.longest(p, 0), b = SN.longest(p, 1);
+      s.innerHTML = `Game over: ${a === b ? "draw" : (a > b ? "Red" : "Blue") + " wins"} <span class="ply">${a} : ${b} · ply ${p.ply}</span>`;
+    } else {
+      const mustPass = legal.length === 0;
+      s.innerHTML = `<span class="dot ${p.stm ? "blue" : "red"}"></span>${SIDE[p.stm]} to ${mustPass ? "pass" : "move"} <span class="ply">ply ${p.ply}${p.passes ? " · passes " + p.passes : ""} · ${legal.length} moves</span>`;
+    }
+    const mustPass = !SN.isOver(p) && legal.length === 0;
+    $("bPass").disabled = !mustPass;
+    $("bPass").classList.toggle("hot", mustPass);
+    $("bUndo").disabled = $("bStart").disabled = st.cur === 0;
+    $("bRedo").disabled = $("bEnd").disabled = st.cur === st.line.length;
+    $("postext").textContent = posText();
+  }
+  function renderMoves() {
+    const ol = $("moves");
+    const items = [`<li data-k="0" class="${st.cur === 0 ? "cur" : ""}">${st.baseText ? "loaded" : "start"}</li>`];
+    st.line.forEach((m, i) => {
+      const mover = st.positions[i].stm;
+      const cls = ["m" + mover];
+      if (i + 1 === st.cur) cls.push("cur");
+      if (i + 1 > st.cur) cls.push("future");
+      items.push(`<li data-k="${i + 1}" class="${cls.join(" ")}"><span class="n">${st.positions[i].ply + 1}</span>${SN.moveName(m)}</li>`);
+    });
+    ol.innerHTML = items.join("");
+    const cur = ol.querySelector(".cur");
+    if (cur) cur.scrollIntoView({ block: "nearest" });
+  }
+  $("moves").addEventListener("click", e => {
+    const li = e.target.closest("li");
+    if (li) go(+li.dataset.k);
+  });
+
+  const fmtT = s => (s >= 60 ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : s.toFixed(s < 10 ? 1 : 0) + " s");
+  const fmtN = n => (n >= 1e9 ? (n / 1e9).toFixed(2) + "G" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(0) + "k" : String(n));
+
+  function renderRun() {
+    const busy = run && (run.status === "waiting" || run.status === "running" || run.status === "starting");
+    const over = SN.isOver(pos());
+    $("bSolve").disabled = $("bAll").disabled = busy || over || !info.solver_found;
+    const waiting = busy && run.status !== "running";
+    let rh = "";
+    if (waiting) rh = `<span class="wait">waiting for the run lock</span> ${run.ahead} ahead · ${fmtT(run.waited)}`;
+    else if (busy) rh = `${run.mode === "solve" ? "solve" : "all moves"}: ${run.done}/${run.total} moves · ${fmtN(run.nodes)} nodes · ${fmtT(run.elapsed)} · ${run.running} running${run.held_lock ? "" : " · no lock"}`;
+    setHtml($("runtext"), rh);
+    $("runstate").hidden = !busy;
+    $("bNow").hidden = !waiting;
+    renderVerdict();
+  }
+  function renderVerdict() {
+    const v = $("verdict");
+    const p = pos();
+    const here = cache.get(posText());
+    const live = run && run.position === posText() && (run.status === "running" || run.status === "waiting");
+    let html = "";
+    if (SN.isOver(p)) html = "";
+    else if (here && here.value !== null && here.value !== undefined) {
+      const who = here.value === 1 ? SIDE[p.stm] + " wins" : here.value === 0 ? "Draw" : SIDE[p.stm ^ 1] + " wins";
+      html = `<span class="v-${VAL[here.value]}">${who}</span>`;
+      if (here.best && here.value >= 0) html += `<span>with</span><button id="bBest">${here.best}</button>`;
+      else if (here.value === 1 && !live) html += `<span class="v-unk">winning move not found within the limit</span>`;
+    } else if (here && !live && here.status) {
+      html = here.status === "cancelled" ? `<span class="v-unk">cancelled</span>` :
+        here.status === "error" ? `<span class="v-loss">error: ${esc(here.message || "")}</span>` :
+        `<span class="v-unk">not solved within ${here.seconds} s</span>`;
+    }
+    setHtml(v, html);
+    if ($("bBest")) {
+      $("bBest").onclick = () => { const pl = SN.BY_KEY.get(here.best) || (here.best === "pass" ? null : undefined); if (pl !== undefined) playMove(pl); };
+      $("bBest").onmouseenter = () => { const pl = SN.BY_KEY.get(here.best); hint = pl ? pl.cells : null; renderBoard(); };
+      $("bBest").onmouseleave = () => { hint = null; renderBoard(); };
+    }
+    renderResults();
+  }
+  function renderResults() {
+    const here = resultsHere();
+    const ol = $("results");
+    if (!here) { setHtml(ol, ""); return; }
+    const rows = [...here.results.entries()].map(([mv, r]) => ({ mv, r }));
+    const score = r => (r.status === "solved" ? r.value : -0.5);
+    rows.sort((a, b) => score(b.r) - score(a.r) || (a.r.seconds || 0) - (b.r.seconds || 0));
+    setHtml(ol, rows.map(({ mv, r }) => {
+      const label = r.status === "solved" ? VAL[r.value] : r.status === "limit" ? "not solved" : r.status;
+      const t = r.seconds !== null && r.seconds !== undefined ? r.seconds.toFixed(2) + " s" : "";
+      return `<li data-mv="${mv}"><span class="v ${vclass(r)}">${label}</span><span class="mv">${mv}</span><span class="t">${t}</span></li>`;
+    }).join(""));
+  }
+  $("results").addEventListener("click", e => {
+    const li = e.target.closest("li");
+    if (!li) return;
+    const mv = li.dataset.mv;
+    if (mv === "pass") playMove(null);
+    else if (SN.BY_KEY.get(mv)) playMove(SN.BY_KEY.get(mv));
+  });
+  $("results").addEventListener("mouseover", e => {
+    const li = e.target.closest("li");
+    const pl = li && SN.BY_KEY.get(li.dataset.mv);
+    const cells = pl ? pl.cells : null;
+    if (String(cells) !== String(hint)) { hint = cells; renderBoard(); }
+  });
+  $("results").addEventListener("mouseleave", () => { hint = null; renderBoard(); });
+
+  function renderTypical() {
+    const t = info.typical || {};
+    const p = pos();
+    const a = t[p.ply], b = t[p.ply + 1];
+    const bits = [];
+    if (a) bits.push(`typ. solve ${fmtT(a[0])}`);
+    if (b) bits.push(`${fmtT(b[0])} per move`);
+    $("typical").textContent = SN.isOver(p) ? "" : bits.join(" · ");
+  }
+  // replaces an element's content only when it changed, so a click in progress is not lost
+  function setHtml(el, html) { if (el._html !== html) { el.innerHTML = html; el._html = html; } }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  function render() {
+    renderBoard(); renderTray(); renderStatus(); renderMoves(); renderRun(); renderTypical();
+  }
+
+  // ---------------------------------------------------------------- controls
+  $("bStart").onclick = () => go(0);
+  $("bUndo").onclick = () => go(st.cur - 1);
+  $("bRedo").onclick = () => go(st.cur + 1);
+  $("bEnd").onclick = () => go(st.line.length);
+  $("bPass").onclick = () => { if (!SN.isOver(pos()) && legal.length === 0) playMove(null); };
+  $("bReset").onclick = () => setLine(SN.initial(), null, [], 0);
+  document.addEventListener("keydown", e => {
+    if (e.target.closest && e.target.closest("textarea, input")) return;
+    if (e.key === "ArrowLeft") go(st.cur - 1);
+    else if (e.key === "ArrowRight") go(st.cur + 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(st.line.length);
+    else if (e.key === "Escape") endDrag(false);
+    else return;
+    e.preventDefault();
+  });
+
+  function say(text, ok) { $("msg").textContent = text; $("msg").className = ok ? "ok" : ""; }
+  async function post(url, body) {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let j = {};
+    try { j = await r.json(); } catch (e) { j = { ok: false, error: "HTTP " + r.status }; }
+    return j;
+  }
+  $("bLoad").onclick = async () => {
+    const text = $("io").value.trim();
+    let got;
+    try { got = SN.parseInput(text); }
+    catch (e) { say(e.message); return; }
+    setLine(got.base, got.baseText, got.moves);
+    try {
+      const j = await post("/api/load", { text });
+      if (!j.ok) say("the solver refuses it: " + j.error);
+      else if (j.position !== posText()) say("the page and the solver read this differently: " + j.position);
+    } catch (e) { say("no server"); }
+  };
+  async function copy(text, what) {
+    try { await navigator.clipboard.writeText(text); say(what + " copied", true); }
+    catch (e) { $("io").value = text; $("io").select(); say("copy blocked; it is in the box", true); }
+  }
+  $("bCopyPos").onclick = () => copy(posText(), "position");
+  $("bCopyMoves").onclick = () => {
+    const moves = st.line.slice(0, st.cur).map(SN.moveName).join(" ");
+    copy(st.baseText ? (st.baseText + " " + moves).trim() : moves, "moves");
+  };
+
+  async function startRun(mode) {
+    const seconds = Math.max(1, +$("iSec").value || 30);
+    const procs = Math.max(1, Math.min(64, Math.floor(+$("iProcs").value || 1)));
+    const text = posText();
+    const j = await post("/api/run", { mode, position: text, seconds, procs, lock: $("iLock").checked, client });
+    if (!j.ok) { say(j.error); return; }
+    entryFor(j.run, text, mode, seconds);
+    render();
+  }
+  $("bSolve").onclick = () => startRun("solve");
+  $("bNow").onclick = () => run && post("/api/runnow", { run: run.id });
+  $("bCancel").onclick = () => run && post("/api/cancel", { run: run.id });
+  $("bAll").onclick = () => startRun("all");
+
+  // ---------------------------------------------------------------- server events
+  function entryFor(id, text, mode, seconds) {
+    const c = cache.get(text);
+    if (c && c.run === id) return c;
+    const e = { mode, results: new Map(), value: null, best: null, status: "running", seconds, run: id };
+    cache.set(text, e);
+    return e;
+  }
+  function connect() {
+    const es = new EventSource("/api/events?client=" + client);
+    es.addEventListener("state", e => {
+      run = JSON.parse(e.data);
+      const c = entryFor(run.id, run.position, run.mode, run.seconds);
+      {
+        if (run.value !== null) c.value = run.value;
+        if (run.best) c.best = run.best;
+        if (["done", "cancelled", "error"].includes(run.status)) { c.status = run.status; c.message = run.message; }
+      }
+      if (run.message && ["error"].includes(run.status)) say(run.message);
+      renderRun();
+      if (c && run.position === posText()) renderBoard();
+    });
+    es.addEventListener("result", e => {
+      const r = JSON.parse(e.data);
+      const c = entryFor(r.run, r.position, null, null);
+      if (r.move !== null) c.results.set(r.move, r);
+      if (r.position === posText()) { renderBoard(); renderVerdict(); }
+    });
+  }
+
+  async function init() {
+    buildBoard();
+    try {
+      info = await (await fetch("/api/info")).json();
+      $("iProcs").value = info.cpus;
+      if (!info.solver_found) say("no solver at " + info.solver);
+      if (!info.lock) $("iLock").checked = false;
+    } catch (e) { say("no server"); }
+    setLine(SN.initial(), null, [], 0);
+    connect();
+  }
+  init();
+})();
