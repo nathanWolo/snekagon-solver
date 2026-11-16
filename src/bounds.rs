@@ -33,6 +33,9 @@ pub static FROM_LONGEST: std::sync::atomic::AtomicBool = std::sync::atomic::Atom
 /// Three or more pieces, target above the cells in hand: the first piece must touch an old snake that
 /// can be the longest old snake of the final snake (`--reach-start3`).
 pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+/// With START3: after the first piece, the later pieces can only bring in snakes not yet joined and
+/// no longer than the longest snake the first piece joined (`--reach3-cap`).
+pub static CAP3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// A player's clusters: the growable cells of each and the longest final snake possible inside it.
 pub struct Clusters {
@@ -363,7 +366,67 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
                 start |= pos.snakes[player][j];
             }
         }
-        return start != 0 && reach_from(t, pos, player, target, start, ALL, work);
+        if start == 0 {
+            return false;
+        }
+        if !CAP3.load(std::sync::atomic::Ordering::Relaxed) {
+            return reach_from(t, pos, player, target, start, ALL, work);
+        }
+        // The first level of reach_from, with a tighter cut before the position after the first
+        // piece p is built. In the ordering that starts from the final snake's longest old snake S*,
+        // p touches S*, and S* is the longest snake p joins (p touches own cells only with its two
+        // ends, so it joins S* and at most one more, no longer than S*); every other old snake of the
+        // final snake is no longer than S*, and each later piece joins at most one more snake (one end
+        // touches what is built; touching it with both ends would close a loop). So in that branch the
+        // later pieces add at most their cells and the `later` longest snakes not yet joined that are no
+        // longer than the longest joined one: a branch where even that misses the target is not that
+        // branch, and some other branch (the one through S*) decides. The other branches are searched
+        // as before.
+        if *work == 0 {
+            return true;
+        }
+        *work -= 1;
+        let later = pieces as usize - 1;
+        return pos.find_move(t, player, left, start, |m| {
+            let p = &t.placements[m as usize];
+            let mut len = p.n as i32;
+            let mut top = 0i32;
+            let mut joined: u32 = 0;
+            for j in 0..ns {
+                if pos.snakes[player][j] & p.border != 0 {
+                    len += len_of[j];
+                    top = top.max(len_of[j]);
+                    joined |= 1 << j;
+                }
+            }
+            if len >= target {
+                return true;
+            }
+            let mut best = [0i32; 4]; // the longest snakes not joined and no longer than top
+            for j in 0..ns {
+                if joined >> j & 1 == 0 && len_of[j] <= top {
+                    let mut v = len_of[j];
+                    for k in 0..4 {
+                        if v > best[k] {
+                            std::mem::swap(&mut v, &mut best[k]);
+                        }
+                    }
+                }
+            }
+            let mut more = 0;
+            for k in 0..later.min(4) {
+                more += best[k];
+            }
+            if len + rem - p.n as i32 + more < target {
+                return false;
+            }
+            let mut child = *pos;
+            let built = child.place_for(t, player, m);
+            if later > 1 && upper_bound(t, &child, player) < target {
+                return false;
+            }
+            reach_from(t, &child, player, target, built, 0, work)
+        });
     }
     if pieces > 2 || !FROM_LONGEST.load(std::sync::atomic::Ordering::Relaxed) {
         return if target > rem {
