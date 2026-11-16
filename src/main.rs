@@ -181,6 +181,10 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                     let cap = bounds::CAP3.swap(true, std::sync::atomic::Ordering::Relaxed);
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test with the cap wrong for {} at {}", target, pos.to_text());
+                    let cap2 = bounds::CAP3B.swap(true, std::sync::atomic::Ordering::Relaxed);
+                    let mut work = u32::MAX;
+                    assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test with both caps wrong for {} at {}", target, pos.to_text());
+                    bounds::CAP3B.store(cap2, std::sync::atomic::Ordering::Relaxed);
                     bounds::CAP3.store(cap, std::sync::atomic::Ordering::Relaxed);
                     bounds::START3.store(saved, std::sync::atomic::Ordering::Relaxed);
                     reach_checks += 1;
@@ -291,6 +295,10 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-start3" => bounds::START3.store(true, std::sync::atomic::Ordering::Relaxed),
             "--no-reach-start3" => bounds::START3.store(false, std::sync::atomic::Ordering::Relaxed),
             "--reach3-cap" => bounds::CAP3.store(true, std::sync::atomic::Ordering::Relaxed),
+            "--reach3-cap2" => {
+                bounds::CAP3.store(true, std::sync::atomic::Ordering::Relaxed);
+                bounds::CAP3B.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
             "--model" => {

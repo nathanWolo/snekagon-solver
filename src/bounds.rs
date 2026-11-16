@@ -36,6 +36,9 @@ pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool
 /// With START3: after the first piece, the later pieces can only bring in snakes not yet joined and
 /// no longer than the longest snake the first piece joined (`--reach3-cap`).
 pub static CAP3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// With CAP3 and three pieces: the same cut for the second piece, and no later piece may join a snake
+/// longer than the longest one the first piece joined (`--reach3-cap2`).
+pub static CAP3B: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// A player's clusters: the growable cells of each and the longest final snake possible inside it.
 pub struct Clusters {
@@ -425,6 +428,9 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
             if later > 1 && upper_bound(t, &child, player) < target {
                 return false;
             }
+            if later == 2 && CAP3B.load(std::sync::atomic::Ordering::Relaxed) {
+                return reach2_cap(t, &child, player, target, built, top, work);
+            }
             reach_from(t, &child, player, target, built, 0, work)
         });
     }
@@ -614,6 +620,76 @@ pub fn near_cells(own: BB, rem: i32) -> BB {
         n |= neighbours(n);
     }
     n
+}
+
+/// The last two pieces of a three-piece reach test with the cap (`CAP3B`): reach_from on the position
+/// after the first piece, with the snake `snake` being built, and two more cuts. In the ordering from
+/// the final snake's longest old snake S*, `top` = len(S*) and no old snake of the final snake is
+/// longer, so a piece that joins an old snake longer than `top` is not on that branch; and the last
+/// piece adds at most its cells and one more snake not yet joined, no longer than `top`. The work is
+/// counted where reach_from counts it.
+fn reach2_cap(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, top: i32, work: &mut u32) -> bool {
+    if *work == 0 {
+        return true;
+    }
+    *work -= 1;
+    let left = pos.left[player];
+    let ns = pos.nsnakes[player] as usize;
+    let mut len_of = [0i32; MAX_SNAKES];
+    for j in 0..ns {
+        len_of[j] = count(pos.snakes[player][j]) as i32;
+    }
+    let rem = hand_cells(left);
+    pos.find_move(t, player, left, snake, |m| {
+        let p = &t.placements[m as usize];
+        let mut len = p.n as i32;
+        let mut joined: u32 = 0;
+        let mut joined_cells: BB = 0;
+        for j in 0..ns {
+            if pos.snakes[player][j] & p.border != 0 {
+                if pos.snakes[player][j] & snake == 0 && len_of[j] > top {
+                    return false;
+                }
+                len += len_of[j];
+                joined |= 1 << j;
+                joined_cells |= pos.snakes[player][j];
+            }
+        }
+        if len >= target {
+            return true;
+        }
+        let last = rem - p.n as i32;
+        let mut b1 = 0;
+        for j in 0..ns {
+            if joined >> j & 1 == 0 && len_of[j] <= top && len_of[j] > b1 {
+                b1 = len_of[j];
+            }
+        }
+        if len + last + b1 < target {
+            return false;
+        }
+        if *work == 0 {
+            return true;
+        }
+        *work -= 1;
+        let built = p.cells | joined_cells;
+        let own2 = pos.cells[player] | p.cells;
+        let occ2 = pos.occupied() | p.cells;
+        let left2 = left & !(1u8 << p.piece);
+        find_grow(t, own2, occ2, left2, built, |m2| {
+            let p2 = &t.placements[m2 as usize];
+            let mut len2 = p2.n as i32 + len;
+            for j in 0..ns {
+                if joined >> j & 1 == 0 && pos.snakes[player][j] & p2.border != 0 {
+                    if len_of[j] > top {
+                        return false;
+                    }
+                    len2 += len_of[j];
+                }
+            }
+            len2 >= target
+        })
+    })
 }
 
 /// `snake`: the snake being built (0 before the first piece); `good`: where the first piece may go.
