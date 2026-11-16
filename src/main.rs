@@ -86,6 +86,44 @@ fn verify(t: &Tables, games: usize, seed: u64) {
             assert_eq!(fresh.nsnakes, pos.nsnakes);
             let round = Pos::from_text(&pos.to_text()).unwrap();
             assert_eq!(round.hash, pos.hash);
+            // what reach threats rely on: if the opponent could play b now, our one-player optimum
+            // after b is no lower than after any move of ours that neither covers nor touches b,
+            // followed by b (which stays legal)
+            {
+                let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
+                let k = pos.left[me].count_ones();
+                if !moves.is_empty() && pos.left[opp] != 0 && k >= 2 && (k == 2 || (k == 3 && rng.below(20) == 0)) {
+                    for _ in 0..40 {
+                        let b = &t.placements[rng.below(t.placements.len())];
+                        if pos.left[opp] >> b.piece & 1 == 0 || !pos.legal_placement(t, opp, b) {
+                            continue;
+                        }
+                        let bi = t.placements.iter().position(|q| std::ptr::eq(q, b)).unwrap() as u16;
+                        let mut after_b = pos;
+                        after_b.place_for(t, opp, bi);
+                        let opt_b = bounds::one_player_optimum(t, &after_b, me);
+                        for _ in 0..4 {
+                            let m = moves[rng.below(moves.len())];
+                            if m == PASS || t.placements[m as usize].cells & b.cells != 0 {
+                                continue;
+                            }
+                            let pm = &t.placements[m as usize];
+                            let both_grow = pm.border & pos.cells[me] != 0 && b.border & pos.cells[opp] != 0;
+                            if pm.cells & b.border != 0 && !both_grow {
+                                continue;
+                            }
+                            let mut child = pos;
+                            child.play(t, m);
+                            assert!(child.legal_placement(t, opp, b), "reach threat no longer playable at {}", pos.to_text());
+                            child.place_for(t, opp, bi);
+                            let opt_mb = bounds::one_player_optimum(t, &child, me);
+                            assert!(opt_mb <= opt_b, "one-player optimum rose after our own move at {}", pos.to_text());
+                            threat_checks += 1;
+                        }
+                        break;
+                    }
+                }
+            }
             // what the threat zones rely on: if the opponent could play b now, our upper bound after b
             // is no lower than after any move of ours that leaves b playable, followed by b
             let (me, opp) = (pos.stm as usize, pos.stm as usize ^ 1);
@@ -119,11 +157,28 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                     continue;
                 }
                 let optimum = bounds::one_player_optimum(t, &pos, player);
+                // what the cache of "cannot reach" answers relies on: above the cells in hand, only
+                // the opponent's cells near ours matter, and fewer of them can only help
+                {
+                    let rem = bounds::hand_cells(pos.left[player]);
+                    let near = bounds::near_cells(pos.cells[player], rem);
+                    let mut fewer = pos;
+                    fewer.cells[player ^ 1] &= near;
+                    fewer.recompute();
+                    let opt2 = bounds::one_player_optimum(t, &fewer, player);
+                    assert!(opt2 >= optimum, "fewer opponent cells lowered the optimum at {}", pos.to_text());
+                    assert_eq!(opt2.max(rem), optimum.max(rem), "opponent cells far away changed the optimum at {}", pos.to_text());
+                    reach_checks += 1;
+                }
                 for target in pos.longest[player] as i32 + 1..=optimum + 2 {
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_alone(t, &pos, player, target, &mut work), target <= optimum, "reach test wrong for {} at {}", target, pos.to_text());
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "touching reach test wrong for {} at {}", target, pos.to_text());
+                    let saved = bounds::START3.swap(true, std::sync::atomic::Ordering::Relaxed);
+                    let mut work = u32::MAX;
+                    assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test from the longest snake wrong for {} at {}", target, pos.to_text());
+                    bounds::START3.store(saved, std::sync::atomic::Ordering::Relaxed);
                     reach_checks += 1;
                 }
             }
@@ -204,8 +259,33 @@ fn parse_opts(args: &[String]) -> Opts {
             "--hc-level" => o.cfg.hc_level = val().parse().unwrap(),
             "--hc-staged" => o.cfg.hc_staged = true,
             "--hc-min" => o.cfg.hc_min = val().parse().unwrap(),
+            "--reach-threat" => o.cfg.reach_threat = true,
+            "--no-reach-threat" => o.cfg.reach_threat = false,
+            "--reach-threat-min" => o.cfg.reach_threat_min = val().parse().unwrap(),
+            "--reach-threat-max" => o.cfg.reach_threat_max = val().parse().unwrap(),
+            "--reach-threat-work" => o.cfg.reach_threat_work = val().parse().unwrap(),
+            "--no-reach-threat-grow" => o.cfg.reach_threat_grow = false,
+            "--reach-threat-after" => o.cfg.reach_threat_after = val().parse().unwrap(),
+            "--reach-threat-start" => o.cfg.reach_threat_start = val().parse().unwrap(),
+            "--rt-study" => o.cfg.rt_study = true,
+            "--rt-effort5" => o.cfg.rt_effort[5] = val().parse().unwrap(),
+            "--rt-effort6" => o.cfg.rt_effort[6] = val().parse().unwrap(),
+            "--rt-effort7" => o.cfg.rt_effort[7] = val().parse().unwrap(),
+            "--rt-effort" => {
+                let v: u64 = val().parse().unwrap();
+                for l in 5..8 {
+                    o.cfg.rt_effort[l] = v;
+                }
+            }
+            "--rt-margin-lo" => o.cfg.rt_margin_lo = val().parse().unwrap(),
+            "--rt-margin-hi" => o.cfg.rt_margin_hi = val().parse().unwrap(),
+            "--rt-refuter" => o.cfg.rt_refuter = val().parse().unwrap(),
+            "--reach-threat-cache" => o.cfg.reach_threat_cache = true,
+            "--no-reach-threat-cache" => o.cfg.reach_threat_cache = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
+            "--reach-start3" => bounds::START3.store(true, std::sync::atomic::Ordering::Relaxed),
+            "--no-reach-start3" => bounds::START3.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
             "--model" => {
@@ -369,6 +449,41 @@ fn bench(t: &Tables, o: &Opts) {
         writeln!(out, "# mover tests by pieces left [tests, decided]: {:?}", &solver.reach_by[0][..8]).unwrap();
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
         writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
+        writeln!(out, "# reach-threat tests, answered by a witness, threats: {:?}", solver.rt_stats).unwrap();
+    }
+    if o.cfg.rt_study {
+        let r = &solver.rts;
+        writeln!(out, "# rt-study by pieces left | none: tests positions cycles/test | threat: tests positions cycles/test | skipped moves, est nodes, nodes w/ skips, moves searched there, nodes under them").unwrap();
+        for l in 2..12 {
+            let (a, b) = (r.by_ans[l][0], r.by_ans[l][1]);
+            if a[0] + b[0] == 0 {
+                continue;
+            }
+            writeln!(out, "# {:2}: {:8} {:10} {:7} | {:8} {:10} {:7} | {:?}", l, a[0], a[1], a[2] / a[0].max(1), b[0], b[1], b[2] / b[0].max(1), r.skip[l]).unwrap();
+        }
+        writeln!(out, "# rt-study margin (exact bound after R minus R's length, 0..7+), by level and hand: [tests, threats, positions]").unwrap();
+        for l in 2..12 {
+            for h in 0..4 {
+                if r.margin[l][h].iter().all(|x| x[0] == 0) {
+                    continue;
+                }
+                writeln!(out, "# L{} hand {}: {:?}", l, h, r.margin[l][h]).unwrap();
+            }
+        }
+        writeln!(out, "# rt-study effort at the test (nodes spent at the node: <16 <64 <256 <1024 <4096 more): [tests, threats, cycles, skipped moves, est nodes under them]").unwrap();
+        for l in 2..12 {
+            if r.eff[l].iter().all(|x| x[0] == 0) {
+                continue;
+            }
+            writeln!(out, "# E{}: {:?}", l, r.eff[l]).unwrap();
+        }
+        writeln!(out, "# rt-study moves left outside the zone (0,1-2,3-5,6-10,11-20,21-40,41+): [tests, threats, positions]").unwrap();
+        for l in 2..12 {
+            if r.outside[l].iter().all(|x| x[0] == 0) {
+                continue;
+            }
+            writeln!(out, "# L{}: {:?}", l, r.outside[l]).unwrap();
+        }
     }
     if o.cfg.cost_stats || o.cfg.oracle_level > 0 {
         cost_report(&mut out, &solver);
