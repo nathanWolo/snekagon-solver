@@ -185,11 +185,21 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-prefetch" => o.cfg.prefetch = false,
             "--no-witness" => o.cfg.witness = false,
             "--cost-stats" => o.cfg.cost_stats = true,
+            "--no-cost-order" => {
+                // E30 off: the killers and the order of v9
+                o.cfg.kc_order = 0;
+                o.cfg.kc_mode = 0;
+                o.cfg.kc_evict = false;
+                o.cfg.hc_k = 0;
+                o.cfg.hc_staged = false;
+            }
             "--oracle" => o.cfg.oracle_level = val().parse().unwrap(),
             "--kc-order" => o.cfg.kc_order = val().parse().unwrap(),
             "--kc-level" => o.cfg.kc_level = val().parse().unwrap(),
             "--kc-mode" => o.cfg.kc_mode = val().parse().unwrap(),
             "--kc-evict" => o.cfg.kc_evict = true,
+            "--no-kc-evict" => o.cfg.kc_evict = false,
+            "--no-hc-staged" => o.cfg.hc_staged = false,
             "--hc" => o.cfg.hc_k = val().parse().unwrap(),
             "--hc-level" => o.cfg.hc_level = val().parse().unwrap(),
             "--hc-staged" => o.cfg.hc_staged = true,

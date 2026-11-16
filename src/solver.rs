@@ -82,7 +82,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 0, kc_level: 0, kc_mode: 0, kc_evict: false, hc_k: 0, hc_level: 7, hc_min: 1, hc_staged: false }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true }
     }
 }
 
@@ -279,6 +279,8 @@ pub struct Solver {
     pub cs: Box<CostStats>,
     /// E30 idea 2: by side to move, pieces left and move: [wins, nodes of those wins].
     hist: Vec<[u64; 2]>,
+    /// The entries of `hist` written since the last `clear()`, so that clearing costs what was used.
+    hist_used: Vec<u32>,
     bufs: Vec<Vec<u64>>,
     defer_bufs: Vec<Vec<u16>>,
     replies: Vec<(u32, BB)>,
@@ -345,6 +347,7 @@ impl Solver {
             kcost: [[0; 2]; MAX_PLY],
             cs: Box::new(CostStats::new()),
             hist: if cfg.hc_k > 0 { vec![[0; 2]; 2 * 16 * tables().placements.len()] } else { Vec::new() },
+            hist_used: Vec::new(),
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
             defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
             replies: Vec::with_capacity(1024),
@@ -356,9 +359,10 @@ impl Solver {
         self.gen = self.tt.next_generation();
         self.killers = [[PASS; 2]; MAX_PLY];
         self.kcost = [[0; 2]; MAX_PLY];
-        for h in self.hist.iter_mut() {
-            *h = [0; 2];
+        for &i in &self.hist_used {
+            self.hist[i as usize] = [0; 2];
         }
+        self.hist_used.clear();
     }
 
     /// For a thread of a parallel solve: take up the table's present generation.
@@ -854,7 +858,11 @@ impl Solver {
             }
         }
         if !self.hist.is_empty() && (m as usize) < self.t.placements.len() {
-            let h = &mut self.hist[(pos.stm as usize * 16 + level) * self.t.placements.len() + m as usize];
+            let i = (pos.stm as usize * 16 + level) * self.t.placements.len() + m as usize;
+            if self.hist[i][0] == 0 {
+                self.hist_used.push(i as u32);
+            }
+            let h = &mut self.hist[i];
             h[0] += 1;
             h[1] += win;
         }
