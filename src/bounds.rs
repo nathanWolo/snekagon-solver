@@ -32,6 +32,9 @@ pub const MAX_CLUSTERS: usize = 24;
 pub static FROM_LONGEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 /// Three or more pieces, target above the cells in hand: the first piece must touch an old snake that
 /// can be the longest old snake of the final snake (`--reach-start3`).
+/// In reach_from, the cut on the upper bound after a piece asks only whether the bound is below the
+/// target: the flood stops as soon as it is not (`--reach-ub-upto`).
+pub static UB_UPTO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 /// With START3: after the first piece, the later pieces can only bring in snakes not yet joined and
 /// no longer than the longest snake the first piece joined (`--reach3-cap`).
@@ -786,7 +789,17 @@ fn reach_from(t: &Tables, pos: &Pos, player: usize, target: i32, snake: BB, good
         }
         let mut child = *pos;
         let joined = child.place_for(t, player, m);
-        if later > 1 && upper_bound(t, &child, player) < target {
+        // later > 1: the player still holds pieces after this one, so upper_bound(child) is
+        // upper_bound_cells on its growable cells, and upper_bound_cells_upto with the limit
+        // target - 1 gives the same answer to 'is it below the target': the exact bound when the
+        // bound is at most target - 1, otherwise a number above target - 1.
+        if later > 1
+            && (if UB_UPTO.load(std::sync::atomic::Ordering::Relaxed) {
+                upper_bound_cells_upto(t, &BoundCtx::new(&child, player), growable(&child, player), target - 1)
+            } else {
+                upper_bound(t, &child, player)
+            }) < target
+        {
             return false;
         }
         reach_from(t, &child, player, target, joined, 0, work)

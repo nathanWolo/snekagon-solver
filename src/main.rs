@@ -78,6 +78,18 @@ fn verify(t: &Tables, games: usize, seed: u64, hand3: usize, threat3: usize) {
                 assert_eq!(total, count(pos.cells[player]));
                 let upper = bounds::upper_bound(t, &pos, player);
                 assert_eq!(upper, bounds::upper_bound_reference(t, &pos, player), "upper bound differs at {}", pos.to_text());
+                if pos.left[player] != 0 {
+                    // the early-stopping flood: exact up to its limit, above the limit otherwise
+                    let ctx = bounds::BoundCtx::new(&pos, player);
+                    for lim in [upper - 2, upper - 1, upper, upper + 1] {
+                        let u = bounds::upper_bound_cells_upto(t, &ctx, bounds::growable(&pos, player), lim);
+                        if upper <= lim {
+                            assert_eq!(u, upper, "early-stopping bound differs at {}", pos.to_text());
+                        } else {
+                            assert!(u > lim, "early-stopping bound at or below its limit at {}", pos.to_text());
+                        }
+                    }
+                }
                 assert!(upper <= prev_upper[player], "upper bound rose at {}", pos.to_text());
                 assert!(upper >= pos.longest[player] as i32);
                 prev_upper[player] = upper;
@@ -180,6 +192,10 @@ fn verify(t: &Tables, games: usize, seed: u64, hand3: usize, threat3: usize) {
                     let saved = bounds::START3.swap(true, std::sync::atomic::Ordering::Relaxed);
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test from the longest snake wrong for {} at {}", target, pos.to_text());
+                    let ub = bounds::UB_UPTO.swap(true, std::sync::atomic::Ordering::Relaxed);
+                    let mut work = u32::MAX;
+                    assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test with the bound up to the target wrong for {} at {}", target, pos.to_text());
+                    bounds::UB_UPTO.store(ub, std::sync::atomic::Ordering::Relaxed);
                     let cap = bounds::CAP3.swap(true, std::sync::atomic::Ordering::Relaxed);
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test with the cap wrong for {} at {}", target, pos.to_text());
@@ -297,6 +313,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--reach-start3" => bounds::START3.store(true, std::sync::atomic::Ordering::Relaxed),
             "--no-reach-start3" => bounds::START3.store(false, std::sync::atomic::Ordering::Relaxed),
             "--reach3-cap" => bounds::CAP3.store(true, std::sync::atomic::Ordering::Relaxed),
+            "--reach-ub-upto" => bounds::UB_UPTO.store(true, std::sync::atomic::Ordering::Relaxed),
             "--reach3-cap2" => {
                 bounds::CAP3.store(true, std::sync::atomic::Ordering::Relaxed);
                 bounds::CAP3B.store(true, std::sync::atomic::Ordering::Relaxed);
