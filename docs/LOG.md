@@ -1654,3 +1654,39 @@ base's.
   15% more nodes. The table is not the scarce resource on these positions.
 - **Where it would count:** a written-out proof tree for an independent checker would be about
   0.56x the size (a pruned move is justified by one reach test the checker can repeat).
+
+## 2026-11-15 E29, second report: reach threats at 4 pieces left or fewer, about 0.96x
+
+Branch `climb/threats`, commits `19d4dad` (the setting), `e75f776` (counters), `09807d5` (a
+cache, off). The rule is now on by default on the branch, at nodes with at most 4 pieces left,
+and the killer replies are also tested as threats when such a node starts.
+`--no-reach-threat` gives the base's node counts.
+
+- **Plain builds, three rounds, arms interleaved** (total time, min / median):
+  positions 0-23 0.93x / 0.94x (65,005,807 nodes against 75,382,224); positions 24-47
+  0.95x / 0.96x (91,751,245 against 103,032,394).
+- **Profiled pair** (base `229cf3e`, candidate `19d4dad`, each with its own profile):
+  0-23 0.93x / 0.95x; 24-47 0.975x / 0.98x. So the expectation for a gate on profiled builds
+  is about 0.96x, less than the plain builds say (as with E28, the profile finds part of it).
+- **Labels:** all right with the final defaults; `verify 100` passes.
+- **Why 5-6 pieces left does not pay** (counters, proof position 0 only): the cost is in the
+  tests that *find* a threat (23 to 40 thousand cycles each) and not in the ones that answer
+  "can reach" (5 to 9 thousand). The cluster bound's margin over the reply's length predicts
+  the answer: at 5 left a margin of 1 is a threat 82% of the time, 7 or more 31%; at 4 left a
+  margin of 7 or more is a threat 2% of the time. A cache of "cannot reach" answers hits
+  0.25% (left off). Filters on the margin are not tried yet.
+- **All levels:** nodes 0.56x, time about 1.00x, as before.
+- **Not done:** an independent check of the rule's exactness (a second agent, started now);
+  the margin filters.
+
+## 2026-11-15 Order of the next two gates: E30 first, then E29 on top
+
+- The cost-aware ordering agent (E30, `climb/cost`) reported screens far larger than E29's:
+  nodes 0.70x / 0.64x / 0.58x on proof positions 0-23 / 24-47 / 48-87 for its best variant,
+  and a first timing round of 50.4 s against 62.6 s (0.80x). It is ordering only (the set of
+  moves searched at a node is unchanged), so it cannot change a value.
+- Both change which nodes are searched, so the two reads will not add. E30 is gated first
+  against the frozen base; E29 is then gated against the base with E30 in it, after the
+  verifier has cleared the rule.
+- The agent was sent back to finish its timing rounds and to commit one variant on by default
+  (the profile is collected with the defaults), with one option that switches all of it off.
