@@ -1,0 +1,14 @@
+round 1 train cost 4908182 weights 40,40,8,-8,40,-40,8,0,24,-40
+round 2 train cost 4301322 weights 32,16,40,0,80,-32,48,0,16,0
+round 3 train cost 4081890 weights 40,24,40,0,120,-72,40,0,16,-32
+round 4 train cost 4076672 weights 40,56,40,0,120,-72,40,0,16,-32
+train: 400 nodes, 99853 moves; cheapest win total 982,174
+  static   total      5,183,580 geo      6,555 first wins 98.5%
+  start    total      5,938,028 geo      7,788 first wins 60.5%
+  fitted   total      4,076,672 geo      4,707 first wins 83.2%
+test: 397 nodes, 86262 moves; cheapest win total 360,271
+  static   total      1,549,546 geo      2,380 first wins 98.7%
+  start    total      1,622,320 geo      2,402 first wins 88.2%
+  fitted   total      1,591,081 geo      2,334 first wins 88.2%
+features est,ub,long,terr,hand,ends,short,fresh,model,st
+weights 40,56,40,0,120,-72,40,0,16,-32

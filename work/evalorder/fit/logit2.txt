@@ -1,0 +1,5 @@
+features ['est', 'ub', 'long', 'terr', 'hand', 'ends', 'short', 'fresh', 'snakes', 'terrb']
+raw bias -0.9139 est -0.0288 ub +0.3265 long +0.3373 terr +0.0685 hand -0.3734 ends +0.0409 short +0.0211 fresh -0.0109 snakes -0.3725 terrb -0.0031
+int x64: -2,21,22,4,-24,3,1,-1,-24,0
+log loss train 0.6004 test 0.6536 (base rate test 0.654)
+test nodes 397 top move wins 0.955

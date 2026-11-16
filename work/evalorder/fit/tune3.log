@@ -1,0 +1,19 @@
+probe [64, 0, 0, 64, 0, 0, 0, 0, 0, 0, 8, 0] mean log 0.3114 total 1.6987
+probe [64, 0, 0, 0, 0, 0, 0, 0, 0, 64, 8, 0] mean log 0.1084 total 1.3379
+probe [64, 0, 0, 64, 0, 0, 0, 0, 0, 64, 8, 0] mean log 0.3457 total 1.4416
+probe [0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 8, 0] mean log 0.4495 total 1.7579
+probe [0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 8, 0] mean log 0.2673 total 1.3193
+probe [64, 64, 0, 64, -128, 0, 0, 0, -128, 64, 8, 0] mean log 0.1153 total 1.2144
+probe [64, 0, 0, 96, 0, 0, 0, 0, 0, 0, 64, 0] mean log -0.2132 total 0.8896
+probe [128, 0, 0, 64, 0, 0, 0, 0, 0, 0, 8, 0] mean log 0.3420 total 1.7553
+probe [64, 64, 0, 64, 0, 0, 0, 0, 0, 0, 8, 0] mean log 0.2876 total 1.6988
+probe [64, 0, 0, 64, -64, 0, 0, 0, 0, 0, 8, 0] mean log -0.0405 total 1.1333
+probe [64, 0, 0, 64, 0, 0, 0, 0, -64, 0, 8, 0] mean log 0.1882 total 1.5362
+probe [64, 0, 0, 64, 0, 0, 0, 0, 0, 0, 8, 64] mean log -0.1119 total 1.0621
+step 64 round 0: best [64, 0, 0, 96, 0, 0, 0, 64, 0, 0, 64, 0] mean log -0.2679 total 0.8417; improving moves 5
+step 64 round 1: best [64, 0, 0, 96, 0, 0, 0, 128, 0, 0, 64, 0] mean log -0.3004 total 0.8807; improving moves 3
+step 64 round 2: best [0, 0, 0, 96, 0, 0, 0, 128, 0, 0, 64, 0] mean log -0.3169 total 0.8125; improving moves 4
+step 64 round 3: best [0, 0, 0, 96, 0, 64, 64, 128, 0, 0, 64, -64] mean log -0.3376 total 0.7890; improving moves 6
+step 24 round 0: best [-64, 0, 64, 96, 0, 64, 64, 128, 0, 0, 64, 64] mean log -0.3943 total 0.7764; improving moves 2
+step 24 round 1: best [-40, 0, 64, 96, 0, 64, 64, 128, 0, 0, 64, 64] mean log -0.4252 total 0.7778; improving moves 4
+step 24 round 2: best [-40, 0, 64, 96, 0, 64, 40, 128, 0, -24, 64, 64] mean log -0.4405 total 0.7687; improving moves 1

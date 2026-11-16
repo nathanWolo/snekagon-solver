@@ -1,0 +1,2 @@
+start [64, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0] mean log -0.0646 total 0.9610
+step 32 round 0: best [64, 0, 0, 32, 0, 0, 0, 0, 0, 64, 0] mean log -0.1595 total 0.9579

@@ -1,0 +1,17 @@
+lgA 48 41031261 wrong 0
+lgB 48 35711540 wrong 0
+lgA9 48 40588378 wrong 0
+      0 [main] sh 577768 dofork: child -1 - forked process 5144 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+      0 [main] sh 577774 dofork: child -1 - forked process 32416 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+<scratchpad>\eo\fit/t23476_lane11.sh: fork: retry: Resource temporarily unavailable
+      0 [main] sh 577769 dofork: child -1 - forked process 9132 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+<scratchpad>\eo\fit/t23476_lane10.sh: fork: retry: Resource temporarily unavailable
+      0 [main] sh 577755 dofork: child -1 - forked process 13420 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+      0 [main] sh 577498 dofork: child -1 - forked process 18852 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+<scratchpad>\eo\fit/t23476_lane14.sh: fork: retry: Resource temporarily unavailable
+<scratchpad>\eo\fit/t23476_lane5.sh: fork: retry: Resource temporarily unavailable
+      0 [main] sh 577759 dofork: child -1 - forked process 15264 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+<scratchpad>\eo\fit/t23476_lane15.sh: fork: retry: Resource temporarily unavailable
+      0 [main] sh 577773 dofork: child -1 - forked process 23632 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+<scratchpad>\eo\fit/t23476_lane7.sh: fork: retry: Resource temporarily unavailable
+<scratchpad>\eo\fit/t23476_lane9.sh: fork: retry: Resource temporarily unavailable
