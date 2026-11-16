@@ -554,6 +554,10 @@ fn main() {
             let o = parse_opts(&args[2..]);
             study::root_moves(t, &o.rest[0], o.from, o.to, o.cfg, o.nodes);
         }
+        "evalmoves" => {
+            let o = parse_opts(&args[2..]);
+            study::eval_moves(t, &o.rest[0], o.from, o.to, o.cfg, o.nodes);
+        }
         "bench" => {
             let o = parse_opts(&args[2..]);
             bench(t, &o);

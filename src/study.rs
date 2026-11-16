@@ -111,3 +111,52 @@ pub fn root_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, c
         }
     }
 }
+
+/// E32 fit data: for every legal move of each position in a file, the terms of the evaluation of
+/// the position after it (`evalorder.rs`), the static score, and (unless `cap` is 1) whether the
+/// move wins for the mover and the nodes that takes when the child is solved alone with a fresh
+/// table. One CSV line a move.
+pub fn eval_moves(t: &Tables, path: &str, from: usize, to: usize, cfg: Config, cap: u64) {
+    let text = std::fs::read_to_string(path).expect("cannot read the position file");
+    let mut solver = Solver::new(cfg);
+    let names: Vec<String> = crate::evalorder::NAMES.iter().map(|s| s.to_string()).collect();
+    println!("pos,move,{},static,win,nodes", names.join(","));
+    let mut list = Vec::new();
+    for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
+        if i < from || i >= to {
+            continue;
+        }
+        let (_, rest) = line.trim().split_once(char::is_whitespace).expect("line needs an expected value and a position");
+        let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
+        let me = pos.stm as usize;
+        let opp = me ^ 1;
+        let own = pos.cells[me];
+        let theirs = pos.cells[opp];
+        let front = neighbours(shape_of(theirs).ends) & pos.empty();
+        pos.moves(t, &mut list);
+        for &m in list.iter() {
+            let p = &t.placements[m as usize];
+            let mut score = p.n as u64 * 64;
+            if p.border & own != 0 {
+                score += 256;
+            }
+            if p.cells & front != 0 {
+                score += 128;
+            } else if p.border & theirs != 0 {
+                score += 32;
+            }
+            let mut child = pos;
+            child.play(t, m);
+            let f = crate::evalorder::features(t, &child);
+            let fs: Vec<String> = f.iter().map(|x| x.to_string()).collect();
+            let (win, nodes) = if cap == 1 {
+                ("?", 0)
+            } else {
+                solver.clear();
+                let v = solver.solve(&child, -1, 0, cap);
+                (if v == UNKNOWN { "?" } else if v <= -1 { "1" } else { "0" }, solver.nodes)
+            };
+            println!("{},{},{},{},{},{}", i, m, fs.join(","), score, win, nodes);
+        }
+    }
+}
