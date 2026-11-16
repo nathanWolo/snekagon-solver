@@ -2994,3 +2994,68 @@ and not yet checked by the coordinator.
   the first known winner among red's moves and the number of known failures ranked before it.
   *Against it:* 25 replies are few; untried moves have no label; the 49 other refuted replies
   stay unused for a gate. If no order ranks the winners earlier than today's, the line stops.
+
+## 2026-11-16 Paused again at 10:37 (owner's request: the board has the machine)
+
+- Owner, 10:36: "and lets pause the climbing agents for now im just gonna play with the gui
+  for a bit". Before that: "for the limit setting on the gui, is it possible to set it to
+  unlimited?" Done in `719ffd7`: a limit of 0 means no limit (the page sends 0 as typed, the
+  server accepts it; an empty box is still 30 s). Checked on the restarted server: a ply-8
+  position and a `proof4` position solved right with limit 0 (`work/gui/runs.log`, runs 1-2
+  of server 14916).
+- The board ran 16 solver processes beside the lock from 10:23:55 to 10:32:10 and from
+  10:32:41 to 10:35:41 (`lock=none` in `work/gui/runs.log`). Timings in those windows are
+  void. Only E34 had any: pieces 3 and 4 of its `--hold 10` replay, now kept apart in
+  `work/failtry/hold10_void/`; `hold10/` is back at the end of piece 2 (roots 0-5).
+- The three agents stopped, committed and updated their `HANDOVER.md`. What the 15 minutes
+  gave (interim, not checked by the coordinator):
+
+**E32 (`climb/evalorder`, `9a382fa`): our own evaluation as the order in the search is stopped.**
+- The logistic weights out of sample, 48 validation roots, node counts: lgA 1.050x in total
+  (mean log +0.040 +-0.263), lgB 1.093x (+0.071 +-0.285), no wrong value. The 0.656x on the fit
+  roots was an overfit, like the tuned weights before. What would reopen it: labels at the root
+  level, or many more fit roots than 48.
+- The study at the top of the proof (hypothesis in "Resumed after the restart"): the labels
+  from the three recorded arms agree with them (145, 70 and 42 failed tries; 59 known winners;
+  no contradiction). **The model's own first move is a known winner in 15 of the 25 replies**
+  (a known failure in 3, no label in 7), where the base arm won at the first try in 7. For
+  the other orders the first move is a known winner in 2 to 5 replies and has no label in 17
+  to 21, so the table cannot rank them: every arm that made the labels ran a model-based
+  order. The hypothesis as stated (an evaluation ranks the winner earlier) has no support.
+- What it found instead: **what pushes red's winner back at a root is the image bonus and the
+  killers handed down from earlier roots, not the model.** A one-move-at-a-time simulation of
+  the driver's order gives 97 failed tries plus 20 without a label against the recorded 145
+  (the driver also opens tries beside the winner once a root has two failures).
+- How the driver orders red's tries today (`src/prove.rs`, `new_node`): the static score plus
+  the model's, with the hint and the killers first (under `--replay` the killers are the last
+  two root winners); images of every earlier root winner get +2^24 (`--win-cap`,
+  `--win-recent`, `--win-turns` change that); after a failed try the answer rule adds 1024 to
+  moves that cover the refuting reply, more than the model's whole range (22 to 158).
+  `--eval-order` does not reach this node.
+- Next, when the climb goes on: label the model's 7 unlabelled first moves
+  (`work/evalorder/top/unl_model.txt` on the branch; 50-230 s each on 16 threads), then a
+  driver option that keeps the model's first move ahead of the images and the handed-down
+  killers at a root. It belongs with `--win-turns` (IDEAS 0b), read on the replay.
+
+**E33 (`climb/tightq`, `b1ba8c4`).** `cargo test` passes on the current source (3 tests); the
+executables `tq-v3.exe` and `tqchk-v3.exe` are the current source (a rebuild gave the same
+hashes); the argument why the rule is exact is written in its `HANDOVER.md`, with the weakest
+step named (the generation of our blocking moves inside `sure_next_length`: one missed legal
+move would make the bound too high). `verify` on that branch takes only games and seed. Not
+done: option-off identity on the current source, the check-build runs, `verify`, the margin-3
+node count, the wider screen (job files `e33/jobs6.txt`, `e33/jobs7.txt` are ready). It built
+through its own script under `tools/locked.sh` because the check build needs a feature flag.
+
+**E34 (`climb/failtry`, `450dfa5`).** Nothing new that counts: `--hold 10` stands at roots 0-5
+(0.89x, no read), `--hold 30` was not started, no variant was built.
+
+- *Leftovers after the stop, for the next time:* stopping an agent's background task did not
+  stop the `tools/replay.sh` loop under it: the loop and a lock waiter for the next piece were
+  still alive two minutes later, and would have started a 16-thread piece once the lock came
+  free. The coordinator stopped them (and an idle wait loop) at 10:40. A killed holder had
+  also left the lock directory and a dead ticket behind; with no solver of ours running and the
+  owner's board solve waiting behind them, the coordinator removed both at 10:40. After any
+  stop: `ps -ef` for replay loops and waiters, then `.git/run.lock` and `.git/run.queue`.
+- *State:* no agent is running. The board's server runs on port 8770. The owner started a
+  no-limit solve of the position after `1:60` from the board at 10:40 (14 processes under the
+  lock: one cold `solve` for each of blue's 1,932 replies).

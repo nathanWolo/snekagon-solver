@@ -20,13 +20,15 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 
 Update this section in the same change that freezes a version.
 
-- **Resumed on 2026-11-16 at 10:25 after a restart of the PC** (paused at 10:03 at the
-  owner's request; the restart lost nothing). The three lines in work each keep a `HANDOVER.md`
-  on their branch (`git show BRANCH:HANDOVER.md`), kept current so that a stop loses nothing:
-  `climb/failtry` (E34), `climb/tightq` (E33), `climb/evalorder` (E32). Copies of the candidate
-  executables are in `work/exes/`. The owner uses the analysis board (port 8770): its solves
-  queue on the run lock, so keep lock holds short. LOG, "Paused for a restart of the PC" and
-  "Resumed after the restart".
+- **Paused on 2026-11-16 at 10:37 at the owner's request ("lets pause the climbing agents
+  for now im just gonna play with the gui for a bit"). No agent is running; do not restart the
+  climb without the owner's word.** The three lines each have a current `HANDOVER.md` on their
+  branch (`git show BRANCH:HANDOVER.md`): `climb/failtry` (E34, `450dfa5`), `climb/tightq`
+  (E33, `b1ba8c4`), `climb/evalorder` (E32, `9a382fa`). Copies of the candidate executables
+  are in `work/exes/`. While the owner uses the board (port 8770) no timing counts: look at
+  `work/gui/runs.log`. After stopping agents, look at `ps -ef` for replay loops and lock
+  waiters that outlived them, then at `.git/run.lock` and `.git/run.queue`. LOG, "Paused
+  again at 10:37".
 
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
@@ -60,12 +62,17 @@ Update this section in the same change that freezes a version.
     bounds cut nodes and cost time. **The port of its evaluation (`--ref-eval L`) is a
     yardstick only: its repository has no licence, so its code and weights do not enter the
     base without the owner's word.**
-  - Our own child evaluation as the order at the top levels (branch `climb/evalorder`): no
-    setting worth a gate yet. The port reads 0.69x cold on proof4b and 1.02x on failing jobs;
-    our fitted weights overfit 48 roots.
+  - Our own child evaluation as the order in the search (branch `climb/evalorder`): stopped.
+    The port reads 0.69x cold on proof4b and 1.02x on failing jobs; every weight set of ours
+    fitted on 48 roots read 1.04-1.09x out of sample. Its study of the top of the proof found
+    that the model's own first move is a known winner in 15 of 25 tune replies where the base
+    replay won first try in 7: the image bonus and the handed-down killers push the winner
+    back. Next there: label the model's 7 unlabelled first moves, then a driver option that
+    keeps the model's first move ahead of them (IDEAS 0b).
   - The one tight question, made cheap (branch `climb/tightq`): a change inside a pruning
     rule. It pays only asked at exactly 6 pieces left (0.873x nodes, about 0.89x time, single
-    reads). Not verified: no check build, no `verify`, no independent judge yet.
+    reads). `cargo test` passes and the exactness argument is written in its `HANDOVER.md`.
+    Not verified: no check build, no `verify`, no independent judge yet.
   - Extra killer slots (E31, branch `climb/xk`, `381560f`): 0.845x nodes on cold single
     positions, 1.003x inside the driver. **Held, not gated** (LOG, "Ordering, round three").
   - Spent: mechanical cuts inside the reach test (branch `climb/threats`, five options, all off,

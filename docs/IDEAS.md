@@ -35,6 +35,13 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    the tune replies were images). Built behind options on `climb/replay`: the two orders in
    turn, a cap, recent winners only. Oracle 0.788x of the top's time. To do: the baseline replay
    of `tests/replay/tune25.txt`, then `--win-turns` on it. LOG, "The top of the proof".
+   2026-11-16: the baseline replay is done (373 s a reply) and `--win-turns` read 0.771x on
+   one run (held, too noisy for 49 replies). New lead from the E32 study: the model's own first
+   move is a known winner in 15 of the 25 tune replies, where the base replay won at the first
+   try in 7; the image bonus (+2^24) and the killers handed down from earlier roots go ahead of
+   it. To do: label the model's 7 unlabelled first moves, then an option that keeps the
+   model's first move ahead of images and handed-down killers at a root; read on the replay.
+   LOG, "Paused again at 10:37".
 
 0b2. **End a failed try sooner (E34, 2026-11-16).** At the top of the proof failed red tries take
    63-72% of the wall-clock: each ends only when one single-thread refuting job of about a
@@ -48,7 +55,10 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    0.78-0.86x nodes and 0.83-0.92x time on proof4 0-47, 0.44-0.52x nodes on the blue-win
    files, +7% on ublock; single positions 0.08x to 2.37x, so it needs many positions. Ours is
    to be written from scratch and fitted on our own solved positions (`climb/evalorder`).
-   Also untried: the same evaluation on red's tries at the top of the proof.
+   2026-11-16: stopped. Twelve terms fitted on 48 roots three ways (in-tree search, logistic on
+   level-9 labels with and without the model) all read 1.04-1.09x nodes out of sample. Reopen
+   with labels at the root level or many more fit roots. On red's tries at the top the
+   recorded labels cannot rank an evaluation against the model (see 0b).
 
 0d. **The tight question at 5 or fewer pieces left (field study).** "Can the mover still beat
    the opponent's best next placement that no single move of ours blocks?" 0.81x nodes on
