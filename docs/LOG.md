@@ -2644,3 +2644,93 @@ figures are those of 00:10-00:40 (`work/ref/`).
 - **Nodes: 53.2 M against its 59.7 M**, below the reference for the first time. It is still
   ahead on three files (1.55x, 1.60x and 1.30x fewer nodes than base 4), which is what the
   field study is sizing.
+
+## 2026-11-16 The field study: the reference's lead is move order near the root; its tight bounds cut nodes and cost time
+
+Agent's report (the field study, `climb/field` at `5e73da7`, worktree `wt/f`, outputs in
+`work/field/`). Its numbers, plain builds, most timings one read each under the lock. Study
+options, all off by default: `--ref-eval L` (the reference's learned child evaluation orders
+the moves where L or more pieces are left), `--tight N` with `--tight-mode` and `--tight-min`
+(its bounds at N pieces or fewer), `--root-oracle` (the winning root move first). With the
+options off its builds give the base's counts (26,095,441; 4,174,807; 6,839,041).
+
+**Technique table, where one side is stronger.**
+
+| Technique | Theirs | Ours | Stronger |
+| --- | --- | --- | --- |
+| Order at 7 or more pieces left | learned evaluation of every child (territory, "who gets where first"), after the table move or killer failed | linear model of move features | theirs |
+| Tight bounds at 5 or fewer left | the mover must beat the opponent's unblockable next-move length, asked of the one-player optimum | reach tests against the lengths now | theirs in nodes, not in time |
+| Rest bounds at 6 left | tight bounds over the remaining moves after the first fails | none | theirs, not measured |
+| One-player optimum | every hand, 20,000-node budget, memo per cluster | hand of 2 or fewer, work 200, witnesses, lazy | theirs in scope, ours in cost |
+| Threats | killers, one scan; exact only at tight nodes | killers, one scan, reach threats at every level, grow zones | ours |
+| Killers | 2, plain replacement | 2 with cost order and history (E30) | ours |
+| Answer bonus | none | moves covering the refuter go first | ours (worth about 25% of nodes under their order too) |
+| Symmetric hash, ETC, table of last pieces | present (ETC off) | absent | negligible at ply 5 |
+
+**Per position, ours over theirs** (one position a run): blue_wins 1.553 in total (geomean
+1.267, ours worse on 17 of 24); holdout 1.603 (1.755, 18 of 24); random_units 1.299 (1.356,
+13 of 24); other_openings 0.615 (0.452); ublock 0.718 (0.714). Single ratios run from 0.03 to
+22.6. The ten worst all start `1:60 4B:16,27,28,39`, blue to move and winning: six are
+root-order misses (the winner first rescues them), four are misses below the root; their
+evaluation repairs nine of the ten. Failed first moves at the root cost 2,644,672 of
+blue_wins' 6,839,041 nodes and 2,973,146 of other_openings' 4,585,644, so a file's ratio is
+mostly the luck of the root order.
+
+**The pots, counted in our solver.**
+
+| File | Base 4 nodes (s) | Root oracle | `--ref-eval 7` nodes (s) |
+| --- | --- | --- | --- |
+| blue_wins | 6,839,041 (6.86) | 4,720,151 | 3,025,433 (4.61) |
+| blue_wins_holdout | 6,914,527 (6.80) | 4,886,090 | 3,553,807 (5.31) |
+| random_units | 8,005,501 (6.37) | 3,080,135 | 1,785,431 (2.58) |
+| other_openings | 4,585,644 (3.28) | 1,433,493 | 4,987,855 (4.09) |
+| ublock_refutations | 26,849,229 (29.75) | | 28,762,201 (35.67) |
+
+All 126: 53.19 M to 43.11 M nodes, time 53.06 s to 52.26 s. Tight bounds on blue_wins
+(base 6,839,041 nodes, 7.5 s): their setting 4,028,340 nodes in 10.63 s; the one question
+"can the mover still beat the opponent's best next placement that no single move of ours
+blocks" alone (mode 1) 4,214,434 in 10.36 s. That question decides 513,751 of 677,852 asked
+nodes at 5 left and costs 1.4x a node.
+
+**On what the prover runs** (proof4 0-47, `--window 0,1`; base 62,297,503 nodes, 82.8 s):
+
+| Variant | Nodes 0-23 | Nodes 24-47 | Nodes | Time |
+| --- | --- | --- | --- | --- |
+| ref-eval 7 | 27,657,133 | 20,852,372 | 0.779x | 0.917x |
+| ref-eval 8 | 29,553,730 | 23,804,995 | 0.857x | 0.890x |
+| ref-eval 9 | 28,164,972 | 25,070,967 | 0.855x | 0.849x |
+| ref-eval 11 | 31,904,889 | 20,401,752 | 0.840x | 0.833x |
+| ref-eval 7, no answer bonus | 39,128,470 | 24,638,476 | 1.024x | 1.09x |
+| tight 5, mode 1, work 200 | 21,526,173 | 28,598,554 | 0.805x | 1.25x |
+| tight 5, their setting | 22,777,707 | 30,872,844 | 0.861x | 1.44x |
+
+Every evaluation variant loses on 0-23 (1.06-1.22x) and wins on 24-47 (0.56-0.69x); single
+positions run from 0.08x to 2.37x. Screens, not reads: 48 positions decide nothing at that
+spread.
+
+**Its ranking.** 1. The child evaluation as the order at the top levels. 2. The tight
+question at 5 or fewer left, if a tight node can be made to cost no more than about 1.2x.
+3. Root order alone is covered by 1. Not worth building: ETC, symmetric hashing, dropping
+the answer bonus, their threat machinery.
+
+**Its doubts and slips.** The port may differ from theirs where our cluster bound differs.
+Whole-file runs carry state between positions. `--tight` is checked by labels only (0
+wrong), which my rule says is no check of a pruning rule. A stray `cat`, a `sed` that
+touched a line in `last_pieces` (reverted before any measured build), one batch that held
+the lock about 100 s.
+
+**Decisions.**
+
+- **The reference's repository carries no licence file.** The study port copies its
+  evaluation and its weight table (`eval.hpp`, `eval_weights.hpp`). It stays on
+  `climb/field` as a yardstick and is not merged: whether its code may enter our base is the
+  owner's call. The candidate is **our own evaluation of the same idea** (who reaches which
+  free cells first, turned into an estimate of each side's final longest snake), written
+  from scratch and fitted on our own solved positions, measured against the port.
+- **Two lines of work, one change each, on separate branches from base 4:**
+  `climb/evalorder` (the order) and `climb/tightq` (the one tight question, made cheap). The
+  second is a change inside a pruning rule: judged in place by an agent who did not write
+  it, never by labels.
+- The evaluation is also the first thing to try on **red's tries at the top of the proof**
+  (the replay tool), where a failed try costs the most. After the two replays that are
+  running.

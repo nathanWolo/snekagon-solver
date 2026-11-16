@@ -36,6 +36,19 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    turn, a cap, recent winners only. Oracle 0.788x of the top's time. To do: the baseline replay
    of `tests/replay/tune25.txt`, then `--win-turns` on it. LOG, "The top of the proof".
 
+0c. **A child evaluation as the move order at the top levels (field study, 2026-11-16).** The
+   reference orders every child by a learned territory evaluation where 7 or more pieces are
+   left. Its port (`--ref-eval L` on `climb/field`, a yardstick, not ours to merge) reads
+   0.78-0.86x nodes and 0.83-0.92x time on proof4 0-47, 0.44-0.52x nodes on the blue-win
+   files, +7% on ublock; single positions 0.08x to 2.37x, so it needs many positions. Ours is
+   to be written from scratch and fitted on our own solved positions (`climb/evalorder`).
+   Also untried: the same evaluation on red's tries at the top of the proof.
+
+0d. **The tight question at 5 or fewer pieces left (field study).** "Can the mover still beat
+   the opponent's best next placement that no single move of ours blocks?" 0.81x nodes on
+   proof4 0-47 and 0.62x on blue_wins, but 1.25-1.4x time as ported. Pays only if a tight
+   node costs no more than about 1.2x (`climb/tightq`). A pruning rule: judged in place.
+
 1. **More from what the search already knows.** E14 (cover the reply that refuted the last move)
    was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Six follow-ups of the
    same kind failed on node counts (E15-E17, E19-E21, below), a history table among them, and

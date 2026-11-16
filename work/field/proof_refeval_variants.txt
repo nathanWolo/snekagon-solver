@@ -1,0 +1,10 @@
+--ref-eval 9 [0,24) # positions 24 nodes 28164972 seconds 35.301 wrong 0 unknown 0
+--ref-eval 9 [24,48) # positions 24 nodes 25070967 seconds 35.030 wrong 0 unknown 0
+--ref-eval 11 [0,24) # positions 24 nodes 31904889 seconds 38.983 wrong 0 unknown 0
+--ref-eval 11 [24,48) # positions 24 nodes 20401752 seconds 30.014 wrong 0 unknown 0
+--ref-eval 7 --ref-eval-nobonus [0,24) # positions 24 nodes 39128470 seconds 52.177 wrong 0 unknown 0
+--ref-eval 7 --ref-eval-nobonus [24,48) # positions 24 nodes 24638476 seconds 38.095 wrong 0 unknown 0
+--ref-eval 8 [0,24) # positions 24 nodes 29553730 seconds 36.567 wrong 0 unknown 0
+--ref-eval 8 [24,48) # positions 24 nodes 23804995 seconds 37.115 wrong 0 unknown 0
+
+[exited with code 0]

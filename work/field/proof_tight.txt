@@ -1,0 +1,6 @@
+--tight 5 --tight-mode 1 --tight-work 200 [0,24) # positions 24 nodes 21526173 seconds 42.767 wrong 0 unknown 0
+--tight 5 --tight-mode 1 --tight-work 200 [24,48) # positions 24 nodes 28598554 seconds 60.853 wrong 0 unknown 0
+--tight 5 [0,24) # positions 24 nodes 22777707 seconds 49.087 wrong 0 unknown 0
+--tight 5 [24,48) # positions 24 nodes 30872844 seconds 70.019 wrong 0 unknown 0
+
+[exited with code 0]

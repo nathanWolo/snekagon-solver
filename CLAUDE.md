@@ -39,8 +39,14 @@ Update this section in the same change that freezes a version.
     proof's order (`sh tools/replay.sh EXE FILE DIR`, `tests/replay/tune25.txt`); orders of red's
     tries behind options (`--win-turns`, `--win-cap N`, `--win-recent K`), none run on the 25
     tune replies yet. The other 49 refuted replies are kept for a gate.
-  - The field study (branch `climb/field`): why the reference solver needs fewer nodes than
-    this base on two of its five benchmark files. Its source is read, not run.
+  - The field study is done (branch `climb/field`, `5e73da7`; LOG, "The field study"). The
+    reference's lead is its move order near the root (a learned child evaluation); its tight
+    bounds cut nodes and cost time. **The port of its evaluation (`--ref-eval L`) is a
+    yardstick only: its repository has no licence, so its code and weights do not enter the
+    base without the owner's word.**
+  - Our own child evaluation as the order at the top levels (branch `climb/evalorder`).
+  - The one tight question at 5 or fewer pieces left, made cheap (branch `climb/tightq`): a
+    change inside a pruning rule.
   - Extra killer slots (E31, branch `climb/xk`, `381560f`): 0.845x nodes on cold single
     positions, 1.003x inside the driver. **Held, not gated** (LOG, "Ordering, round three").
   - Spent: mechanical cuts inside the reach test (branch `climb/threats`, five options, all off,
