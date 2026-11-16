@@ -1866,3 +1866,28 @@ counterexample and gives an argument for every variant.
     nodes and time disagree; the screen on time chose.
   - A gate on 30 units sufficed because the effect was six times the test's gap. The cap is
     for the case where it is not.
+
+## 2026-11-15 E29 on the new base: 0.966x in the screen; the gate is put off until the rule is larger
+
+- **Candidate:** branch `climb/both`, commit `6057bd7` (the merge of `climb/threats` into E30),
+  profiled build `f8417c7b1b1f`. With `--no-reach-threat` it gives the base's counts (ply 7
+  0-589: 6,404,487); with the rule 5,255,948. Plain build: each rule alone gives its own
+  branch's node counts, both off the old base's, and with both on every label is right (ply
+  6, 7, 8, proof 0-47, the five ply-5 files, 16 threads; `verify 100` ok).
+- **Screen `E29-S`** (`proof4b` tune units 20-49, 60 positions, against the frozen base with
+  E30, `--window 0,1`): total time 124.3 s against 128.8 s (**0.966x**), nodes 0.880x; log
+  ratio 0.042 +/- 0.059; sd 0.164 a unit. Two units went the wrong way in nodes (1.32x and
+  1.16x; time 1.54x and 1.35x): the rule changes which moves feed the order's records.
+- **Plan** (`hc.py plan`): `SPRT[0, 0.05]` needs about 58 units at either hypothesis and 94
+  halfway. That is affordable (325 units left), but the truth is probably 3-4%, inside the
+  test's gap: there the test passes a real gain only 64-88% of the time, and a fail would
+  close the idea at this setting.
+- **Decision:** no gate now. The rule has more in it than this setting uses (all levels:
+  nodes 0.56x before E30, time unchanged), so its agent goes a third round on the merged
+  base before the one gate: trigger the test at 5 pieces left and more by the effort the
+  node has already cost (a found threat costs 4-6 nodes' time; it pays where the pruned
+  moves are dear), the margin filter, the settings at 4 and fewer re-tuned for the new tree,
+  and the two units that got worse. Target: 0.93x or better on profiled builds on every
+  block. If round three ends at 0.96x, the choice is a gate with that risk or leaving it.
+- **Not a change of the bar:** the bounds stay `[0, 0.05]`. What is declined is a gate whose
+  likely outcome depends on luck.
