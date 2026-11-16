@@ -42,7 +42,6 @@ Update this section in the same change that freezes a version.
     positions, 1.003x inside the driver. **Held, not gated** (LOG, "Ordering, round three").
   - The ordering agent (`climb/cost`): what is left for move order inside the driver, and
     `--emulate W` on a branch of its own (`climb/emulate`): a driver run with exact node counts.
-  - The analysis board (branch `gui`: `tools/gui.py`, `gui/`), no change to `src/`.
   Kept apart: the driver's `--split` and `--hint` (`climb/driver`), the ordering study
   (`climb/order`). Shadow builds that re-search what a rule pruned: `climb/verify`,
   `climb/verify-rt` (`--features shadow`).
@@ -60,6 +59,13 @@ Update this section in the same change that freezes a version.
   `parallel` (built from v4) onto v9. Exact; 3.4x wall-clock on 8 threads; on v4 the plumbing cost
   about 2% with one thread, which is why it is not merged. A built copy is `frozen/par-v9.exe`.
   Merging is the owner's call (asked 2026-11-15).
+- **The analysis board (owner's request, 2026-11-15):** `python tools/gui.py`, then
+  `http://localhost:8765`: set up a position and run the frozen solver on it (`gui/`, no
+  change to `src/`). Its rules live in `gui/rules.js` and are checked against the solver by
+  `python tools/gui_check.py`; `tools/gui_test.py` exercises the server. A run from the page
+  goes next in the lock's queue (a priority ticket) or, with "Run now", beside whatever
+  runs; `work/gui/runs.log` records each run and whether it held the lock. Look there
+  before trusting a timing that the owner's solves may have overlapped.
 - **Found about the game:** after `1:60 4B:16,27,28,39` red wins with `4B:70,81,82,93` (LOG,
   "the position after two moves is a win for red"; three runs and two engine generations agree;
   the reference solver has not been asked).
@@ -169,4 +175,5 @@ The contract is `docs/TESTING.md`. In short:
 | The backlog | `docs/IDEAS.md` |
 | Every frozen version | `docs/SHIPLOG.md`, `frozen/` |
 | Code | `src/` (`geom`, `pieces`, `pos`, `bounds`, `solver`, `pns`, `study`, `naive`, `main`; `par` on branch `parallel`) |
+| The analysis board | `tools/gui.py`, `gui/`, `tools/gui_check.py`, `tools/gui_test.py` |
 | What predicts a good move | `tools/rootstudy.py`, `tools/rootfit.py`, `tools/rootcost.py` on the output of `snek rootmoves` |

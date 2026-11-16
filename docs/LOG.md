@@ -2105,3 +2105,42 @@ not win, and four replies hold 133 of those 232 tries. That is a pot at the top 
 proof that no test position sees: red's choice of move against a reply, and what a failed
 try costs. First a profile with today's base on replies already refuted (fresh output files;
 the paused proof itself is not touched), then the pot by simulation on the recorded tries.
+
+## 2026-11-15 The analysis board (owner's request), and the build script's test
+
+Owner, 2026-11-15: "Can you make me like an interactive gui, with an analysis board? where I
+can set up a position and run the solver on it?" Built by an Opus agent on branch `gui`
+(`ab9ce31`, `9a6b6bb`, `b531c89`), merged as `35d81c7`. No change to `src/`.
+
+- **What it is:** `python tools/gui.py` serves one page (`gui/`) on `http://localhost:8765`
+  (`--port`, `--solver PATH`; default `frozen/climb-base.exe`, so it follows every freeze).
+  Standard library only, nothing fetched from the internet, bound to 127.0.0.1.
+- **The page:** the board, each side's pieces and longest snake; pieces are placed by
+  dragging across cells (red's first by a click); undo, redo, a move list to jump in; load
+  and copy a position text or a move list. "Solve" runs the position and its children in
+  parallel and stops at the first winning move; "All moves" gives every move's value. A time
+  limit per position, a process count, Cancel; "not solved within the limit" is a result.
+- **The rules are in the page** (`gui/rules.js`) and are checked against the solver by
+  `python tools/gui_check.py` (agent's run: perft 1 and 2 agree, 91 and 194,388; 4,503
+  positions from random games at plies 0-17, 1,419,535 children compared as position texts,
+  472 of them after a forced pass, 300 ended games; 0 disagreements). `tools/gui_test.py`
+  exercises the server (agent's run: 0 failures).
+- **The lock:** a run from the page takes a priority ticket (`0-<ns>-<pid>`, which sorts
+  before every other ticket in `tools/lockfair.sh`'s queue), so it waits only for the command
+  that holds the lock now; "Run now" starts without the lock. Every run is appended to
+  `work/gui/runs.log` with whether it held the lock.
+- **My own click-through** (the merged version, from the main checkout): placing by click and
+  drag; loading a position eight moves in, "All moves": "Red wins with 4C:42,43,54,64" (the
+  set's label is a red win); a proof position four moves in, "Solve" with the lock: waited
+  20 s for the run in progress, then "Red wins with 4I:46,47,48,49" in 1.9 s on 16
+  processes (label: red win); playing that move, undo, redo. Not tried by me: the limit
+  being hit, copy, Cancel during a run, a run of more than 15 minutes.
+- **Breaches, by the agent's account:** 16 solver processes outside the lock for 56 s
+  (23:25:54 to 23:26:50, a race at page load in its own test, since fixed); one check held
+  the lock for ten minutes doing nothing (a headless browser that never answered; the wait
+  is now two minutes). No timed run of mine was under way then (the `E31-S` screen had not
+  started); the reach-threat agent was told the window.
+
+**`tools/build.sh`, the test of the fix** (`work/buildfix_test.txt`): a good build, then the
+same tree with a compile error while the earlier exe is still in the build directory. The
+script printed cargo's errors and "the build failed", returned 1, and copied no exe out.
