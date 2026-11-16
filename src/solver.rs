@@ -68,11 +68,13 @@ pub struct Config {
     /// A reach threat that grows an opponent snake also prunes the moves that touch it without
     /// covering it, when they grow one of the mover's snakes (the two then commute).
     pub reach_threat_grow: bool,
+    /// Test reach threats only once this many moves have failed at the node.
+    pub reach_threat_after: u64,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: false, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, reach_threat: false, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1 }
     }
 }
 
@@ -1355,7 +1357,7 @@ impl Solver {
                 // first move has failed this is probably a node where every move must be refuted, so
                 // look for all of the opponent's threats.
                 if threats_on && first_pass && i + 1 < n {
-                    self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, self.cfg.reach_threat, &mut th);
+                    self.try_threat(pos, ply, self.killers[ply + 1][0], alpha, self.cfg.reach_threat && searched >= self.cfg.reach_threat_after, &mut th);
                     if !scanned {
                         scanned = true;
                         self.prof[level][7] += 1;
