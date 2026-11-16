@@ -300,6 +300,16 @@ fn prove_cmd(t: &Tables, o: &Opts) {
     }
     println!("# positions {} nodes {} seconds {:.3} wrong {} unknown 0", n, total_nodes, total_us as f64 / 1e6, wrong);
     println!("# jobs {} stopped {} thread-seconds {:.1}", jobs, stopped, thread_s);
+    if o.cfg.cost_stats {
+        let g = prover.stats.lock().unwrap();
+        let out = std::io::stdout();
+        let mut out = out.lock();
+        cost_report(&mut out, &g.0);
+        writeln!(out, "#P left | table cuts, bound cuts, searched nodes, moves searched, first-move cuts, no cut, unsearched, scans").unwrap();
+        for l in 2..13 {
+            writeln!(out, "#P {:2} | {:?}", l, g.1[l]).unwrap();
+        }
+    }
     if wrong > 0 {
         std::process::exit(1);
     }
@@ -380,7 +390,11 @@ fn bench(t: &Tables, o: &Opts) {
         writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
     }
     if o.cfg.cost_stats || o.cfg.oracle_level > 0 {
-        cost_report(&mut out, &solver);
+        cost_report(&mut out, &solver.cs);
+        writeln!(out, "#P left | table cuts, bound cuts, searched nodes, moves searched, first-move cuts, no cut, unsearched, scans").unwrap();
+        for l in 2..13 {
+            writeln!(out, "#P {:2} | {:?}", l, solver.prof[l]).unwrap();
+        }
     }
     if wrong > 0 {
         std::process::exit(1);
@@ -461,16 +475,15 @@ fn main() {
 }
 
 /// E30: the cost counters of a bench run.
-fn cost_report(out: &mut impl Write, s: &Solver) {
-    let cs = &s.cs;
-    writeln!(out, "#C side level | cuts win_nodes fail_nodes | by source [tt, newer killer, older killer, list]: cuts/win_nodes | by tries before [0,1,2,3+]: cuts/win_nodes/fail_nodes").unwrap();
+fn cost_report(out: &mut impl Write, cs: &solver::CostStats) {
+    writeln!(out, "#C side level | cuts win_nodes fail_nodes | by source [tt, handed-down killer, own killer, extra slot, list]: cuts/win_nodes | by tries before [0,1,2,3+]: cuts/win_nodes/fail_nodes").unwrap();
     for side in 0..2 {
         for l in 2..13 {
             let c = &cs.cut[side][l];
             let mut tot = [0u64; 3];
-            let mut src = [[0u64; 2]; 4];
+            let mut src = [[0u64; 2]; 5];
             let mut idx = [[0u64; 3]; 4];
-            for a in 0..4 {
+            for a in 0..5 {
                 for b in 0..4 {
                     for k in 0..3 {
                         tot[k] += c[a][b][k];

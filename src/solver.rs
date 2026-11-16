@@ -301,6 +301,8 @@ pub struct Solver {
     pub(crate) killers: [[u16; 2]; MAX_PLY],
     /// E30: the nodes of the subtree with which each killer last cut (0 = not known).
     kcost: [[u64; 2]; MAX_PLY],
+    /// Study: whether each killer slot still holds the move the job was handed (driver).
+    kfrom: [[bool; 2]; MAX_PLY],
     /// E30b: the extra killer slots and their costs.
     xk: [[u16; 2]; MAX_PLY],
     xkc: [[u64; 2]; MAX_PLY],
@@ -323,7 +325,7 @@ pub struct CostStats {
     /// By side (0 the root's mover, "red"), pieces left, where the winning move came from (0 the
     /// table move, 1 the newer killer, 2 the older killer, 3 the list) and how many moves were searched
     /// before it (0, 1, 2, 3 or more): [cut nodes, nodes under the winning move, nodes under failed moves].
-    pub cut: [[[[[u64; 3]; 4]; 4]; 16]; 2],
+    pub cut: [[[[[u64; 3]; 4]; 5]; 16]; 2],
     /// A killer that cuts again: log2 of its recorded cost (x) against log2 of this cut's cost (y), by
     /// side and pieces left: [n, sx, sy, sxx, syy, sxy].
     pub stab: [[[f64; 6]; 16]; 2],
@@ -335,8 +337,27 @@ pub struct CostStats {
 }
 
 impl CostStats {
-    fn new() -> CostStats {
-        CostStats { cut: [[[[[0; 3]; 4]; 4]; 16]; 2], stab: [[[0.0; 6]; 16]; 2], stab_b: [[[0; 6]; 16]; 2], oracle: Vec::new() }
+    /// Adds another solver's counters (the driver's workers).
+    pub fn add(&mut self, o: &CostStats) {
+        for a in 0..2 {
+            for l in 0..16 {
+                for x in 0..5 {
+                    for y in 0..4 {
+                        for z in 0..3 {
+                            self.cut[a][l][x][y][z] += o.cut[a][l][x][y][z];
+                        }
+                    }
+                }
+                for k in 0..6 {
+                    self.stab[a][l][k] += o.stab[a][l][k];
+                    self.stab_b[a][l][k] += o.stab_b[a][l][k];
+                }
+            }
+        }
+    }
+
+    pub fn new() -> CostStats {
+        CostStats { cut: [[[[[0; 3]; 4]; 5]; 16]; 2], stab: [[[0.0; 6]; 16]; 2], stab_b: [[[0; 6]; 16]; 2], oracle: Vec::new() }
     }
 }
 
@@ -392,6 +413,7 @@ impl Solver {
             unwind_to: NO_UNWIND,
             killers: [[PASS; 2]; MAX_PLY],
             kcost: [[0; 2]; MAX_PLY],
+            kfrom: [[false; 2]; MAX_PLY],
             xk: [[PASS; 2]; MAX_PLY],
             xkc: [[0; 2]; MAX_PLY],
             cs: Box::new(CostStats::new()),
@@ -542,6 +564,9 @@ impl Solver {
         } else {
             self.kcost = [[0; 2]; MAX_PLY];
             self.xk = [[PASS; 2]; MAX_PLY];
+        }
+        for ply in 0..MAX_PLY {
+            self.kfrom[ply] = [killers[ply][0] != PASS, killers[ply][1] != PASS];
         }
         self.killers = *killers;
         match self.cfg.hc_job {
@@ -985,7 +1010,18 @@ impl Solver {
         let c = self.kcost[ply];
         if self.cfg.cost_stats {
             let side = (ply - self.root_ply.min(ply)) & 1;
-            let src = if m == tt_move { 0 } else if m == k[0] { 1 } else if m == k[1] { 2 } else { 3 };
+            let f = self.kfrom[ply];
+            let src = if m == tt_move {
+                0
+            } else if m == k[0] {
+                if f[0] { 1 } else { 2 }
+            } else if m == k[1] {
+                if f[1] { 1 } else { 2 }
+            } else if self.cfg.xk > 0 && self.xk[ply].contains(&m) {
+                3
+            } else {
+                4
+            };
             let e = &mut self.cs.cut[side][level][src][(tried as usize).min(3)];
             e[0] += 1;
             e[1] += win;
@@ -1036,18 +1072,22 @@ impl Solver {
                 }
             }
         };
+        let f = self.kfrom[ply];
         if k[0] == m {
             self.kcost[ply][0] = merged(c[0]);
         } else if k[1] == m {
             self.killers[ply] = [m, k[0]];
             self.kcost[ply] = [merged(c[1]), c[0]];
+            self.kfrom[ply] = [f[1], f[0]];
         } else if self.cfg.kc_evict && c[1] > 0 && c[0] > c[1] {
             // the newer killer is the dearer: it goes, the older stays
             self.killers[ply][0] = m;
             self.kcost[ply][0] = win;
+            self.kfrom[ply][0] = false;
         } else {
             self.killers[ply] = [m, k[0]];
             self.kcost[ply] = [win, c[0]];
+            self.kfrom[ply] = [false, f[0]];
         }
     }
 

@@ -78,6 +78,8 @@ pub struct Prover {
     table: Arc<Table>,
     known: HashMap<u64, Known>,
     log: Option<std::fs::File>,
+    /// Study (`--cost-stats`): the workers' cost counters and node profiles, summed.
+    pub stats: Mutex<(Box<CostStats>, [[u64; 8]; 16])>,
 }
 
 const NONE: usize = usize::MAX;
@@ -691,7 +693,7 @@ impl Prover {
         }
         let log = c.out.as_deref().map(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).expect("cannot open the results file"));
         let table = Arc::new(Table::new(c.cfg.tt_bits));
-        Prover { c, table, known, log }
+        Prover { c, table, known, log, stats: Mutex::new((Box::new(CostStats::new()), [[0; 8]; 16])) }
     }
 
     /// The exact value of `root` for the side to move. Two questions, each a search with a window of
@@ -720,6 +722,7 @@ impl Prover {
             res: ProveResult { value: UNKNOWN, best: PASS, jobs: 0, stopped: 0, reused: 0, nodes: 0, thread_seconds: 0.0, seconds: 0.0 },
         };
         let table = &self.table;
+        let stats = &self.stats;
         let shared = Mutex::new(if c.cfg.drv_share { SharedHist::new() } else { SharedHist::empty() });
         let (mut lo, mut hi) = (-1, 1);
         let mut best = PASS;
@@ -733,7 +736,7 @@ impl Prover {
                 let nsolvers = if emulate > 0 { emulate } else { c.job_threads.max(1) };
                 let mut solvers: Vec<Solver> = (0..nsolvers).map(|_| Solver::with_table(c.cfg, table.clone())).collect();
                 let mut turn = 0usize;
-                scope.spawn(move || loop {
+                scope.spawn(move || { loop {
                     let job = {
                         let mut g = queue.jobs.lock().unwrap();
                         loop {
@@ -802,6 +805,18 @@ impl Prover {
                     if tx.send(Done { id: job.id, value, best, killers: job.killers, nodes, micros: t0.elapsed().as_micros() }).is_err() {
                         break;
                     }
+                }
+                if c.cfg.cost_stats {
+                    let mut g = stats.lock().unwrap();
+                    for s in &solvers {
+                        g.0.add(&s.cs);
+                        for l in 0..16 {
+                            for j in 0..8 {
+                                g.1[l][j] += s.prof[l][j];
+                            }
+                        }
+                    }
+                }
                 });
             }
             drop(tx);
