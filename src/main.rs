@@ -184,6 +184,26 @@ fn parse_opts(args: &[String]) -> Opts {
             "--prefetch" => o.cfg.prefetch = true,
             "--no-prefetch" => o.cfg.prefetch = false,
             "--no-witness" => o.cfg.witness = false,
+            "--cost-stats" => o.cfg.cost_stats = true,
+            "--no-cost-order" => {
+                // E30 off: the killers and the order of v9
+                o.cfg.kc_order = 0;
+                o.cfg.kc_mode = 0;
+                o.cfg.kc_evict = false;
+                o.cfg.hc_k = 0;
+                o.cfg.hc_staged = false;
+            }
+            "--oracle" => o.cfg.oracle_level = val().parse().unwrap(),
+            "--kc-order" => o.cfg.kc_order = val().parse().unwrap(),
+            "--kc-level" => o.cfg.kc_level = val().parse().unwrap(),
+            "--kc-mode" => o.cfg.kc_mode = val().parse().unwrap(),
+            "--kc-evict" => o.cfg.kc_evict = true,
+            "--no-kc-evict" => o.cfg.kc_evict = false,
+            "--no-hc-staged" => o.cfg.hc_staged = false,
+            "--hc" => o.cfg.hc_k = val().parse().unwrap(),
+            "--hc-level" => o.cfg.hc_level = val().parse().unwrap(),
+            "--hc-staged" => o.cfg.hc_staged = true,
+            "--hc-min" => o.cfg.hc_min = val().parse().unwrap(),
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
@@ -350,6 +370,9 @@ fn bench(t: &Tables, o: &Opts) {
         writeln!(out, "# opponent tests by pieces left [tests, decided]: {:?}", &solver.reach_by[1][..8]).unwrap();
         writeln!(out, "# reach tests answered by a witness: {}", solver.reach_reused).unwrap();
     }
+    if o.cfg.cost_stats || o.cfg.oracle_level > 0 {
+        cost_report(&mut out, &solver);
+    }
     if wrong > 0 {
         std::process::exit(1);
     }
@@ -425,5 +448,53 @@ fn main() {
             println!("commands: info | perft <depth> | verify <games> <seed> | solve [opts] <position> | bench [opts] <file>");
             println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-mul N --pn-ab LEVEL --pn-unit NODES --pn-width N --pn-model --pn-probe --pn-killers --pn-tt BITS --no-prefetch --no-witness --tt-skip LEVEL --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
+    }
+}
+
+/// E30: the cost counters of a bench run.
+fn cost_report(out: &mut impl Write, s: &Solver) {
+    let cs = &s.cs;
+    writeln!(out, "#C side level | cuts win_nodes fail_nodes | by source [tt, newer killer, older killer, list]: cuts/win_nodes | by tries before [0,1,2,3+]: cuts/win_nodes/fail_nodes").unwrap();
+    for side in 0..2 {
+        for l in 2..13 {
+            let c = &cs.cut[side][l];
+            let mut tot = [0u64; 3];
+            let mut src = [[0u64; 2]; 4];
+            let mut idx = [[0u64; 3]; 4];
+            for a in 0..4 {
+                for b in 0..4 {
+                    for k in 0..3 {
+                        tot[k] += c[a][b][k];
+                        idx[b][k] += c[a][b][k];
+                    }
+                    src[a][0] += c[a][b][0];
+                    src[a][1] += c[a][b][1];
+                }
+            }
+            if tot[0] == 0 {
+                continue;
+            }
+            writeln!(out, "#C {} {:2} | {} {} {} | {:?} | {:?}", side, l, tot[0], tot[1], tot[2], src, idx).unwrap();
+        }
+    }
+    writeln!(out, "#S side level | n corr(log2 recorded, log2 here) mean(log2 here/recorded) sd | buckets <1/4 <1/2 <1 <2 <4 >=4").unwrap();
+    for side in 0..2 {
+        for l in 2..13 {
+            let t = &cs.stab[side][l];
+            if t[0] < 2.0 {
+                continue;
+            }
+            let n = t[0];
+            let (mx, my) = (t[1] / n, t[2] / n);
+            let vx = t[3] / n - mx * mx;
+            let vy = t[4] / n - my * my;
+            let cxy = t[5] / n - mx * my;
+            let corr = cxy / (vx * vy).sqrt();
+            let vd = vx + vy - 2.0 * cxy;
+            writeln!(out, "#S {} {:2} | {} {:.3} {:.3} {:.3} | {:?}", side, l, n, corr, my - mx, vd.max(0.0).sqrt(), cs.stab_b[side][l]).unwrap();
+        }
+    }
+    for r in &cs.oracle {
+        writeln!(out, "#O {:?}", r).unwrap();
     }
 }

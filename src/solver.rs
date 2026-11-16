@@ -56,11 +56,33 @@ pub struct Config {
     /// Answer a reach test from a sequence an earlier test found (this node's or the parent's), when
     /// it still applies.
     pub witness: bool,
+    /// E30, a study: count what the winning move of each cut node cost (`--cost-stats`).
+    pub cost_stats: bool,
+    /// E30: at a cut node with this many pieces left, where the first move is a killer and the other
+    /// killer is a candidate too, search both and record their costs (a study; changes the tree). 0 = off.
+    pub oracle_level: u32,
+    /// E30 idea 1: try the second killer first when its recorded cost times this is below the first's
+    /// (0 = off), at nodes with at least `kc_level` pieces left.
+    pub kc_order: u64,
+    pub kc_level: u32,
+    /// E30 idea 1: how a killer's recorded cost is kept when it cuts again: 0 the last, 1 a running
+    /// mean, 2 the minimum.
+    pub kc_mode: u8,
+    /// E30 idea 1: a new killer replaces the dearer of the two (not the older).
+    pub kc_evict: bool,
+    /// E30 idea 2: among the first `hc_k` listed candidates (after the table move) at nodes with at
+    /// least `hc_level` pieces left, the move with the lowest mean cost of its recorded wins goes first
+    /// (0 = off). Needs at least `hc_min` wins recorded.
+    pub hc_k: u32,
+    pub hc_level: u32,
+    pub hc_min: u32,
+    /// E30 idea 2: keep the staged first move (table move, then the killer that the history prefers).
+    pub hc_staged: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true }
     }
 }
 
@@ -251,9 +273,39 @@ pub struct Solver {
     path: Vec<(u64, i32, i32)>,
     unwind_to: usize,
     pub(crate) killers: [[u16; 2]; MAX_PLY],
+    /// E30: the nodes of the subtree with which each killer last cut (0 = not known).
+    kcost: [[u64; 2]; MAX_PLY],
+    /// E30: the study's counters.
+    pub cs: Box<CostStats>,
+    /// E30 idea 2: by side to move, pieces left and move: [wins, nodes of those wins].
+    hist: Vec<[u64; 2]>,
+    /// The entries of `hist` written since the last `clear()`, so that clearing costs what was used.
+    hist_used: Vec<u32>,
     bufs: Vec<Vec<u64>>,
     defer_bufs: Vec<Vec<u16>>,
     replies: Vec<(u32, BB)>,
+}
+
+/// E30: what the winning moves of cut nodes cost, measured in the tree.
+pub struct CostStats {
+    /// By side (0 the root's mover, "red"), pieces left, where the winning move came from (0 the
+    /// table move, 1 the newer killer, 2 the older killer, 3 the list) and how many moves were searched
+    /// before it (0, 1, 2, 3 or more): [cut nodes, nodes under the winning move, nodes under failed moves].
+    pub cut: [[[[[u64; 3]; 4]; 4]; 16]; 2],
+    /// A killer that cuts again: log2 of its recorded cost (x) against log2 of this cut's cost (y), by
+    /// side and pieces left: [n, sx, sy, sxx, syy, sxy].
+    pub stab: [[[f64; 6]; 16]; 2],
+    /// The same, cost here over cost recorded, in buckets: below 1/4, 1/2, 1, 2, 4, and above.
+    pub stab_b: [[[u64; 6]; 16]; 2],
+    /// The oracle: [pieces left, recorded cost of the first killer, of the other, cost of the first,
+    /// of the other, first wins, other wins, other searched first, first is the newer killer].
+    pub oracle: Vec<[u64; 9]>,
+}
+
+impl CostStats {
+    fn new() -> CostStats {
+        CostStats { cut: [[[[[0; 3]; 4]; 4]; 16]; 2], stab: [[[0.0; 6]; 16]; 2], stab_b: [[[0; 6]; 16]; 2], oracle: Vec::new() }
+    }
 }
 
 /// The result of a finished game for the side to move.
@@ -292,6 +344,10 @@ impl Solver {
             path: vec![(0, 0, 0); MAX_PLY + 2],
             unwind_to: NO_UNWIND,
             killers: [[PASS; 2]; MAX_PLY],
+            kcost: [[0; 2]; MAX_PLY],
+            cs: Box::new(CostStats::new()),
+            hist: if cfg.hc_k > 0 { vec![[0; 2]; 2 * 16 * tables().placements.len()] } else { Vec::new() },
+            hist_used: Vec::new(),
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
             defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
             replies: Vec::with_capacity(1024),
@@ -302,12 +358,18 @@ impl Solver {
     pub fn clear(&mut self) {
         self.gen = self.tt.next_generation();
         self.killers = [[PASS; 2]; MAX_PLY];
+        self.kcost = [[0; 2]; MAX_PLY];
+        for &i in &self.hist_used {
+            self.hist[i as usize] = [0; 2];
+        }
+        self.hist_used.clear();
     }
 
     /// For a thread of a parallel solve: take up the table's present generation.
     pub fn sync(&mut self) {
         self.gen = self.tt.generation();
         self.killers = [[PASS; 2]; MAX_PLY];
+        self.kcost = [[0; 2]; MAX_PLY];
     }
 
     /// The value within the window (alpha, beta): exact inside it, a bound outside. UNKNOWN when the
@@ -337,6 +399,7 @@ impl Solver {
         self.root_ply = (pos.ply as usize).min(MAX_PLY - 2);
         self.unwind_to = NO_UNWIND;
         self.killers = *killers;
+        self.kcost = [[0; 2]; MAX_PLY];
         let v = self.search::<true>(pos, alpha, beta);
         *killers = self.killers;
         if self.aborted {
@@ -765,6 +828,89 @@ impl Solver {
     /// The value of a position within the window (alpha, beta): exact inside it, a bound outside.
     /// Compiled twice: PAR = false is the plain search, PAR = true adds what a parallel solve needs,
     /// so that one thread pays nothing for it.
+    /// E30: the move `m` cut at this node after `tried` other moves; its subtree took `win` nodes, the
+    /// node's whole subtree `total`. Keeps the killers (as before, or by cost) and the counters.
+    #[inline]
+    fn cut_by(&mut self, pos: &Pos, ply: usize, level: usize, m: u16, tt_move: u16, tried: u64, win: u64, total: u64) {
+        let k = self.killers[ply];
+        let c = self.kcost[ply];
+        if self.cfg.cost_stats {
+            let side = (ply - self.root_ply.min(ply)) & 1;
+            let src = if m == tt_move { 0 } else if m == k[0] { 1 } else if m == k[1] { 2 } else { 3 };
+            let e = &mut self.cs.cut[side][level][src][(tried as usize).min(3)];
+            e[0] += 1;
+            e[1] += win;
+            e[2] += total.saturating_sub(1 + win);
+            let j = if m == k[0] { 0 } else if m == k[1] { 1 } else { 2 };
+            if j < 2 && c[j] > 0 {
+                let x = (c[j] as f64).log2();
+                let y = (win as f64).log2();
+                let s = &mut self.cs.stab[side][level];
+                s[0] += 1.0;
+                s[1] += x;
+                s[2] += y;
+                s[3] += x * x;
+                s[4] += y * y;
+                s[5] += x * y;
+                let r = y - x;
+                let b = if r < -2.0 { 0 } else if r < -1.0 { 1 } else if r < 0.0 { 2 } else if r < 1.0 { 3 } else if r < 2.0 { 4 } else { 5 };
+                self.cs.stab_b[side][level][b] += 1;
+            }
+        }
+        if !self.hist.is_empty() && (m as usize) < self.t.placements.len() {
+            let i = (pos.stm as usize * 16 + level) * self.t.placements.len() + m as usize;
+            if self.hist[i][0] == 0 {
+                self.hist_used.push(i as u32);
+            }
+            let h = &mut self.hist[i];
+            h[0] += 1;
+            h[1] += win;
+        }
+        let merged = |old: u64| match self.cfg.kc_mode {
+            0 => win,
+            1 => {
+                if old == 0 {
+                    win
+                } else {
+                    (old + win) / 2
+                }
+            }
+            _ => {
+                if old == 0 {
+                    win
+                } else {
+                    old.min(win)
+                }
+            }
+        };
+        if k[0] == m {
+            self.kcost[ply][0] = merged(c[0]);
+        } else if k[1] == m {
+            self.killers[ply] = [m, k[0]];
+            self.kcost[ply] = [merged(c[1]), c[0]];
+        } else if self.cfg.kc_evict && c[1] > 0 && c[0] > c[1] {
+            // the newer killer is the dearer: it goes, the older stays
+            self.killers[ply][0] = m;
+            self.kcost[ply][0] = win;
+        } else {
+            self.killers[ply] = [m, k[0]];
+            self.kcost[ply] = [win, c[0]];
+        }
+    }
+
+    /// Whether `m` may be searched first here: in hand, legal, and not ruled out by a threat.
+    #[inline]
+    fn candidate(&self, pos: &Pos, m: u16, th: &Threats, alpha: i32) -> bool {
+        if m == PASS {
+            return false;
+        }
+        let p = &self.t.placements[m as usize];
+        if pos.pieces_now() >> p.piece & 1 == 0 || !pos.legal_placement(self.t, pos.stm as usize, p) {
+            return false;
+        }
+        !(th.n > 0 && th.bound_for(p.cells) <= alpha)
+    }
+
     fn search<const PAR: bool>(&mut self, pos: &Pos, mut alpha: i32, mut beta: i32) -> i32 {
         self.nodes += 1;
         if self.nodes > self.node_limit {
@@ -997,7 +1143,16 @@ impl Solver {
         // 4a. The first move of the order is the table move, else a killer, when one of them is
         // legal here and no threat rules it out. Three in four nodes cut on it, so it is searched
         // before the list is built.
-        let (k1, k2) = (self.killers[ply][0], self.killers[ply][1]);
+        let (mut k1, mut k2) = (self.killers[ply][0], self.killers[ply][1]);
+        if self.cfg.kc_order > 0 && level as u32 >= self.cfg.kc_level {
+            // E30 idea 1: the killer whose last win was cheaper goes first
+            let c = self.kcost[ply];
+            if c[0] > 0 && c[1] > 0 && c[1] * self.cfg.kc_order < c[0] {
+                std::mem::swap(&mut k1, &mut k2);
+            }
+        }
+        // E30 idea 2: at these nodes the killers are left to the list, where the history chooses
+        let hc_on = self.cfg.hc_k > 0 && level as u32 >= self.cfg.hc_level;
         let mut pre: Option<(u16, i32)> = None;
         // In a parallel solve: a move another thread is searching is set aside and taken up again
         // after the others, when its answer is probably in the table.
@@ -1010,7 +1165,18 @@ impl Solver {
         if self.cfg.staged {
             let now = pos.pieces_now();
             let mut first = PASS;
-            for cand in [tt_move, k1, k2] {
+            if hc_on && self.cfg.hc_staged && k1 != PASS && k2 != PASS {
+                let np = t.placements.len();
+                let base = (me * 16 + level) * np;
+                let key = |m: u16, s: &Solver| {
+                    let h = if (m as usize) < np { s.hist[base + m as usize] } else { [0, 0] };
+                    if h[0] >= s.cfg.hc_min as u64 { h[1] / h[0] } else { u64::MAX }
+                };
+                if key(k2, self) < key(k1, self) {
+                    std::mem::swap(&mut k1, &mut k2);
+                }
+            }
+            for cand in if hc_on && !self.cfg.hc_staged { [tt_move, PASS, PASS] } else { [tt_move, k1, k2] } {
                 if cand == PASS {
                     continue;
                 }
@@ -1029,12 +1195,50 @@ impl Solver {
                 if !busy.is_null() {
                     unsafe { &*busy }.start(move_key);
                 }
+                let other = if first == k1 { k2 } else { k1 };
+                let oracle = self.cfg.oracle_level as usize == level
+                    && (ply - self.root_ply.min(ply)) & 1 == 0
+                    && first != tt_move
+                    && other != PASS
+                    && other != tt_move
+                    && self.candidate(pos, other, &th, alpha);
                 let mut child = *pos;
                 child.play(t, first);
                 if self.cfg.prefetch {
                     self.prefetch(child.hash);
                 }
-                let v = -self.search::<PAR>(&child, -beta, -alpha);
+                let before = self.nodes;
+                let v;
+                let mut ow = 0;
+                if oracle {
+                    // E30 study: search the other killer too, before or after this one by turns
+                    let other_first = self.cs.oracle.len() & 1 == 1;
+                    let mut oc = *pos;
+                    oc.play(t, other);
+                    let (mut cf, mut co, mut vo) = (0, 0, 0);
+                    let mut vf = 0;
+                    for step in 0..2 {
+                        let b = self.nodes;
+                        if (step == 0) == other_first {
+                            vo = -self.search::<PAR>(&oc, -beta, -alpha);
+                            co = self.nodes - b;
+                        } else {
+                            vf = -self.search::<PAR>(&child, -beta, -alpha);
+                            cf = self.nodes - b;
+                        }
+                        if self.aborted {
+                            return self.after_abort::<PAR>(pos, ply, alpha_in, beta_in);
+                        }
+                    }
+                    let slot = |m: u16, s: &Solver| if m == s.killers[ply][0] { 0 } else { 1 };
+                    let (sf, so) = (slot(first, self), slot(other, self));
+                    self.cs.oracle.push([level as u64, self.kcost[ply][sf], self.kcost[ply][so], cf, co, (vf >= beta) as u64, (vo >= beta) as u64, other_first as u64, (sf == 0) as u64]);
+                    v = vf;
+                    ow = cf;
+                } else {
+                    v = -self.search::<PAR>(&child, -beta, -alpha);
+                }
+                let win = if oracle { ow } else { self.nodes - before };
                 if !busy.is_null() {
                     unsafe { &*busy }.finish(move_key);
                 }
@@ -1042,10 +1246,7 @@ impl Solver {
                     return self.after_abort::<PAR>(pos, ply, alpha_in, beta_in);
                 }
                 if v >= beta {
-                    if self.killers[ply][0] != first {
-                        self.killers[ply][1] = self.killers[ply][0];
-                        self.killers[ply][0] = first;
-                    }
+                    self.cut_by(pos, ply, level, first, tt_move, 0, win, self.nodes - nodes_at_start + 1);
                     self.prof[level][2] += 1;
                     self.prof[level][3] += 1;
                     self.prof[level][4] += 1;
@@ -1128,6 +1329,32 @@ impl Solver {
             });
         }
 
+        // E30 idea 2: among the first few candidates after the table move, the one whose wins at this
+        // level cost least goes first (the scores of those places are handed out again in that order)
+        if hc_on && buf.len() > 1 {
+            buf.sort_unstable_by(|a, b| b.cmp(a));
+            let s = if pre.is_some() { 1 } else { 0 };
+            let e = (s + self.cfg.hc_k as usize).min(buf.len());
+            if e > s + 1 {
+                let np = t.placements.len();
+                let base = (me * 16 + level) * np;
+                let mut w: Vec<(u64, usize, u64)> = buf[s..e]
+                    .iter()
+                    .enumerate()
+                    .map(|(j, &x)| {
+                        let m = (x & 0xFFFF) as usize;
+                        let h = if m < np { self.hist[base + m] } else { [0, 0] };
+                        let key = if h[0] >= self.cfg.hc_min as u64 { h[1] / h[0] } else { u64::MAX };
+                        (key, j, x & 0xFFFF)
+                    })
+                    .collect();
+                w.sort_by_key(|&(k, j, _)| (k, j));
+                for (j, &(_, _, m)) in w.iter().enumerate() {
+                    buf[s + j] = (buf[s + j] & !0xFFFF) | m;
+                }
+            }
+        }
+
         // 5. search them, best-scored first
         self.prof[level][2] += 1;
         let mut searched = 0u64;
@@ -1166,6 +1393,7 @@ impl Solver {
                     break;
                 };
                 let v;
+                let mut win = 0;
                 if let (1, true, Some((first, value))) = (i, first_pass, pre) {
                     // searched before the list was built
                     assert!(m == first, "the placement check and the generator disagree");
@@ -1205,7 +1433,9 @@ impl Solver {
                         }
                     }
                     searched += 1;
+                    let before = self.nodes;
                     v = -self.search::<PAR>(&child, -beta, -alpha);
+                    win = self.nodes - before;
                     if !busy.is_null() {
                         unsafe { &*busy }.finish(move_key);
                     }
@@ -1221,10 +1451,7 @@ impl Solver {
                     alpha = v;
                 }
                 if alpha >= beta {
-                    if self.killers[ply][0] != m {
-                        self.killers[ply][1] = self.killers[ply][0];
-                        self.killers[ply][0] = m;
-                    }
+                    self.cut_by(pos, ply, level, m, tt_move, searched - 1, win, self.nodes - nodes_at_start + 1);
                     if searched == 1 {
                         self.prof[level][4] += 1;
                     }
