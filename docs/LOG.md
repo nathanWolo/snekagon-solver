@@ -3225,3 +3225,34 @@ through its own script under `tools/locked.sh` because the check build needs a f
   each of the 172 lines), or a second run with other Zobrist numbers, or a wider check in
   the entry (a second hash word; costs table space). Not acted on: the climb is paused and
   this is the owner's call. Written into `docs/LESSONS.md`, "Open questions for the owner".
+
+## 2026-11-16 A page to play against the proof: the plan, and the solver in a browser (about 15:00-15:40)
+
+- Owner: "Would it be realistic to make like a blog post where embedded in the blog post someone
+  could "play against" the proof?" and, after the answer, "Yeah makes sense. The reference solver
+  is created by the games publisher. I would probably reach out to him and maybe make a PR to his
+  repo once we have a proof for the game". I read the first words as a yes to the timing step I
+  had offered (my reading). The outreach and a public page are the owner's, after the proof.
+- *What the proof's file can play:* red's second move against every reply (the certificate), and
+  red's third move from the job lines four moves in (49,936 such lines at 15:10, none without a
+  move). The 74 replies of the first run have no such lines. Deeper, the trees are not kept: the
+  page needs the solver.
+- *Built:* branch `wasm` (off `parallel-v9`): a crate `wasm/` of its own (a `cdylib` that takes
+  `../src` by path, no dependencies, the main build untouched), and in `src/solver.rs` the cycle
+  counter of the study counters behind a `cfg` (it was x86 only). 215,130 bytes. New on this PC:
+  `rustup target add wasm32-unknown-unknown` (`rustup target remove wasm32-unknown-unknown`
+  undoes it). Not merged; before a merge, show the native node counts unchanged.
+- *Measured* (the app's browser pane on this PC, one worker thread, an empty table for each
+  position, 2^22 entries, the question "does red win", while the proof used all 16 threads; one
+  run; `wasm/test/`):
+  - 11 red-win jobs four moves in, at the 10% to 99% points by nodes: all value 1; 0.9 to
+    16.7 s; 2.26 to 3.30 microseconds a node, 2.80 over all, against 1.61 recorded by the driver
+    over all its jobs: about 1.7x.
+  - six moves in (after the recorded red move, every eighth blue reply of three of those jobs,
+    132 positions): all value 1; medians 0.4, 5.1 and 25.9 ms; the slowest 104 ms.
+- *Reading:* behind a book for red's second and third moves the solver answers in well under a
+  tenth of a second on a desktop. Without the book red's third move takes 1 to 17 s for 99% of
+  the positions and minutes for the rest (the dearest job in the file has 163 M nodes).
+- *Not known:* a phone; whether a Claude artifact lets WebAssembly run (a private timing page
+  with no game on it was published for the owner to open; the browser pane is not signed in, so
+  I could not look). The dearest 1% of the jobs were not timed.

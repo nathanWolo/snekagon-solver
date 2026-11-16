@@ -51,6 +51,11 @@ Update this section in the same change that freezes a version.
   http://127.0.0.1:8781`). Never put the board's own port on a tunnel: it has no login and
   starts solver processes for whoever asks. The owner asked for this on 2026-11-16; stop both
   when the owner no longer needs them. LOG, "The board from the owner's phone".
+- **A page to play against the proof** (owner's idea, 2026-11-16): a book from the results file
+  for red's second and third moves, then the solver compiled to WebAssembly (branch `wasm`,
+  crate `wasm/`, timed in a browser). The reference solver's author is the game's publisher;
+  the owner will write to him once the proof is done, and a public page waits for his OK.
+  LOG, "A page to play against the proof".
 
 - **Base for new work:** `frozen/base.exe` = v9 (alpha-beta with a table, the last pieces in closed
   form, threat zones, exact reach tests asked before the cluster bounds, model ordering, the first
