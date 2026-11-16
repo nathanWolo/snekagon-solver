@@ -122,8 +122,9 @@ The contract is `docs/TESTING.md`. In short:
 - **One machine, one run lock.** Every timed run and anything that uses a processor for more
   than about 15 seconds goes through `sh tools/locked.sh <command>` (one lock for all worktrees;
   at most 15 minutes a command). `tools/build.sh` takes the lock for its compile by itself (do
-  not wrap it). Quick checks do not need it. The lock is not fair: a waiter behind a gate
-  usually waits until the gate ends.
+  not wrap it). Quick checks do not need it. The lock is first come first served
+  (`tools/lockfair.sh` in the main checkout; `tools/locked.sh` in every checkout is a stub that
+  calls it): a script that chains locked commands goes to the back of the queue after each one.
 - **Never kill the script that holds the lock.** Stop the solver it runs (the child process):
   the script then ends and gives the lock back. A lock left behind blocks everyone for 20
   minutes (it happened on 2026-11-15).
