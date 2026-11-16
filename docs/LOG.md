@@ -3256,3 +3256,10 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - *Not known:* a phone; whether a Claude artifact lets WebAssembly run (a private timing page
   with no game on it was published for the owner to open; the browser pane is not signed in, so
   I could not look). The dearest 1% of the jobs were not timed.
+- *Both answered by the owner's screenshot of that page on a phone (about 16:00):* the artifact
+  runs the solver (WebAssembly in a worker, its files fetched beside the page), and the phone
+  is faster than the PC's browser was under the proof's load. The first five jobs (the 10% to
+  60% points): 0.53, 0.67, 0.62, 1.69, 3.83 s, 1.33 to 1.92 microseconds a node (the PC's
+  browser: 0.9, 1.0, 0.9, 2.8, 7.0 s). Six moves in, 43 positions: median 3 ms, slowest 29 ms.
+  The node counts differ from the PC's run by under 1% because that page uses a table of 2^21
+  entries, not 2^22. One run, one phone, model not noted.
