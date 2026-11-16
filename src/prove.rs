@@ -57,6 +57,14 @@ pub struct ProveCfg {
     /// image bonus, the root's killers (as a parent hands them to its next child) and the workers'
     /// solvers (their history). The known results are kept in any case.
     pub replay: bool,
+    /// The order of a node's moves where the image bonus applies (E33, all off by default):
+    /// `win_turns`: the model's order (no bonus) and the image order in turn, the model's first;
+    /// `win_cap` N > 0: only the N images that the most winners map onto keep the bonus;
+    /// `win_recent` K > 0: only the K most recent winners of the ply count (a winner that cuts again
+    /// becomes the most recent).
+    pub win_turns: bool,
+    pub win_cap: usize,
+    pub win_recent: usize,
 }
 
 pub struct ProveResult {
@@ -285,9 +293,7 @@ impl<'a> Driver<'a> {
                             ks[1] = ks[0];
                             ks[0] = k.mv;
                         }
-                        if !self.winners[ply].contains(&k.mv) {
-                            self.winners[ply].push(k.mv);
-                        }
+                        self.add_winner(ply, k.mv);
                     }
                 }
                 hint = k.mv;
@@ -303,18 +309,63 @@ impl<'a> Driver<'a> {
                     n.th = th;
                     let ply = (pos.ply as usize).min(MAX_PLY - 1);
                     if !self.winners[ply].is_empty() {
-                        let mut images = std::collections::HashSet::new();
-                        for &w in &self.winners[ply] {
-                            for s in 0..NSYM {
-                                images.insert(self.t.sym_placement[w as usize][s]);
+                        let c = self.c;
+                        let all = &self.winners[ply];
+                        // E33: the winners that count (all, or the most recent K)
+                        let ws = if c.win_recent > 0 && all.len() > c.win_recent { &all[all.len() - c.win_recent..] } else { &all[..] };
+                        // each image with the number of winners that map onto it
+                        let mut images: std::collections::HashMap<u16, u32> = std::collections::HashMap::new();
+                        for &w in ws {
+                            let mut orbit: Vec<u16> = (0..NSYM).map(|s| self.t.sym_placement[w as usize][s]).collect();
+                            orbit.sort_unstable();
+                            orbit.dedup();
+                            for m in orbit {
+                                *images.entry(m).or_insert(0) += 1;
                             }
                         }
+                        if c.win_cap > 0 {
+                            // only the N images with the highest count (ties: the model's score)
+                            let mut cand: Vec<(u32, u64, u16)> = n.moves.iter().filter_map(|&e| {
+                                let m = (e & 0xFFFF) as u16;
+                                images.get(&m).map(|&k| (k, e >> 16, m))
+                            }).collect();
+                            cand.sort_unstable_by(|a, b| (b.0, b.1).cmp(&(a.0, a.1)));
+                            let keep: std::collections::HashSet<u16> = cand.iter().take(c.win_cap).map(|x| x.2).collect();
+                            images.retain(|m, _| keep.contains(m));
+                        }
+                        let model = if c.win_turns { Some(n.moves.clone()) } else { None };
                         for e in n.moves.iter_mut() {
-                            if *e >> 16 < WINNER_BONUS && images.contains(&((*e & 0xFFFF) as u16)) {
+                            if *e >> 16 < WINNER_BONUS && images.contains_key(&((*e & 0xFFFF) as u16)) {
                                 *e += WINNER_BONUS << 16;
                             }
                         }
                         n.moves.sort_unstable_by(|a, b| b.cmp(a));
+                        if let Some(mut model) = model {
+                            // E33: the model's order and the image order in turn, the model's first
+                            // (the hint and the killers lead both). Scores become ranks, so that the
+                            // answer rule after a failed try still lifts the moves that cover the reply.
+                            model.sort_unstable_by(|a, b| b.cmp(a));
+                            let len = n.moves.len();
+                            let mut taken = std::collections::HashSet::new();
+                            let mut out = Vec::with_capacity(len);
+                            let (mut i, mut j) = (0, 0);
+                            let mut turn_model = true;
+                            while out.len() < len {
+                                let src = if turn_model { &model } else { &n.moves };
+                                let k = if turn_model { &mut i } else { &mut j };
+                                while *k < len && taken.contains(&(src[*k] & 0xFFFF)) {
+                                    *k += 1;
+                                }
+                                if *k < len {
+                                    let m = src[*k] & 0xFFFF;
+                                    taken.insert(m);
+                                    out.push(m);
+                                }
+                                turn_model = !turn_model;
+                            }
+                            let top = WINNER_BONUS + len as u64;
+                            n.moves = out.iter().enumerate().map(|(r, &m)| (top - r as u64) << 16 | m).collect();
+                        }
                     }
                     // Moves whose result is already known come first, a cut among them before the
                     // rest: they cost nothing, and after a restart they bring the proof back to
@@ -539,8 +590,8 @@ impl<'a> Driver<'a> {
             );
         }
         if cut {
-            if via != PASS && !self.winners[ply].contains(&via) {
-                self.winners[ply].push(via);
+            if via != PASS {
+                self.add_winner(ply, via);
             }
             let ks = &mut self.nodes[p].killers[ply];
             if via != PASS && ks[0] != via {
@@ -576,6 +627,20 @@ impl<'a> Driver<'a> {
 }
 
 impl<'a> Driver<'a> {
+    /// A move that cut at a coordinator node of this ply. With `win_recent` a winner that cuts
+    /// again becomes the most recent; otherwise it keeps its place (as before).
+    fn add_winner(&mut self, ply: usize, m: u16) {
+        let w = &mut self.winners[ply];
+        if let Some(i) = w.iter().position(|&x| x == m) {
+            if self.c.win_recent > 0 {
+                w.remove(i);
+                w.push(m);
+            }
+        } else {
+            w.push(m);
+        }
+    }
+
     /// A job has come back.
     fn take(&mut self, done: Done) {
         self.busy -= 1;

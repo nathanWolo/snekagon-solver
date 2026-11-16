@@ -157,6 +157,10 @@ struct Opts {
     wide: bool,
     /// `prove --replay`: the roots as the replies of one proof (see `prove::ProveCfg::replay`).
     replay: bool,
+    /// `prove --win-turns`, `--win-cap N`, `--win-recent K` (see `prove::ProveCfg`).
+    win_turns: bool,
+    win_cap: usize,
+    win_recent: usize,
     /// `prove --deadline S`: no new root is started after S seconds (the replay's pieces).
     deadline: f64,
     no_symmetry: bool,
@@ -168,7 +172,7 @@ struct Opts {
 }
 
 fn parse_opts(args: &[String]) -> Opts {
-    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, replay: false, deadline: f64::INFINITY, no_symmetry: false, window: (-1, 1), only: None, rest: Vec::new() };
+    let mut o = Opts { cfg: Config::default(), nodes: u64::MAX, from: 0, to: usize::MAX, quiet: false, profile: false, pn: false, threads: 1, pn_cfg: PnConfig::default(), depth: 3, job_threads: 1, out: None, plain: false, upper_first: false, wide: false, replay: false, win_turns: false, win_cap: 0, win_recent: 0, deadline: f64::INFINITY, no_symmetry: false, window: (-1, 1), only: None, rest: Vec::new() };
     let mut i = 0;
     while i < args.len() {
         let a = args[i].as_str();
@@ -229,6 +233,9 @@ fn parse_opts(args: &[String]) -> Opts {
             "--upper-first" => o.upper_first = true,
             "--wide" => o.wide = true,
             "--replay" => o.replay = true,
+            "--win-turns" => o.win_turns = true,
+            "--win-cap" => o.win_cap = val().parse().unwrap(),
+            "--win-recent" => o.win_recent = val().parse().unwrap(),
             "--deadline" => o.deadline = val().parse().unwrap(),
             "--no-symmetry" => o.no_symmetry = true,
             "--window" => {
@@ -269,21 +276,25 @@ fn parse_opts(args: &[String]) -> Opts {
 fn prove_cmd(t: &Tables, o: &Opts) {
     let path = &o.rest[0];
     let text = std::fs::read_to_string(path).expect("cannot read the position file");
-    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first, wide: o.wide, no_symmetry: o.no_symmetry, replay: o.replay });
+    let mut prover = prove::Prover::new(prove::ProveCfg { cfg: o.cfg, threads: o.threads.max(1), job_threads: o.job_threads.max(1), depth: o.depth, out: o.out.clone(), quiet: o.quiet, plain: o.plain, upper_first: o.upper_first, wide: o.wide, no_symmetry: o.no_symmetry, replay: o.replay, win_turns: o.win_turns, win_cap: o.win_cap, win_recent: o.win_recent });
     let (mut total_nodes, mut total_us, mut wrong, mut n) = (0u64, 0u128, 0u32, 0u32);
     let (mut jobs, mut stopped, mut thread_s) = (0u64, 0u64, 0f64);
     let began = Instant::now();
+    let mut worked = false;
     for (i, line) in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).enumerate() {
         if i < o.from || i >= o.to {
             continue;
         }
         let (expected, rest) = line.trim().split_once(char::is_whitespace).expect("line needs an expected value and a position");
         let pos = Pos::parse(t, rest).unwrap_or_else(|| panic!("bad position on line {}", i));
-        if began.elapsed().as_secs_f64() > o.deadline {
+        // a piece always proves at least one root that needs work (one decided by the results file
+        // needs none), so that a short deadline still makes progress
+        if worked && began.elapsed().as_secs_f64() > o.deadline {
             println!("# deadline: stopped before root {}", i);
             break;
         }
         let r = prover.prove(&pos);
+        worked |= r.jobs > 0 || r.stopped > 0;
         let us = (r.seconds * 1e6) as u128;
         let ok = if expected == "?" || expected.parse::<i32>().ok() == Some(r.value) {
             "ok"
