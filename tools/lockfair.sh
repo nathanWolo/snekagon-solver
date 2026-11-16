@@ -20,7 +20,10 @@ LOCK="$COMMON/run.lock"
 QUEUE="$COMMON/run.queue"
 mkdir -p "$QUEUE"
 ME=$$
-NAME="$(date +%s%N)-$ME"
+# RUN_LOCK_FIRST=1 puts this caller ahead of the queue (it still waits for the command that holds
+# the lock): for something the owner is waiting for at the keyboard, as the analysis board's own
+# runs do. Not for routine work.
+NAME="${RUN_LOCK_FIRST:+0-}$(date +%s%N)-$ME"
 TICKET="$QUEUE/$NAME"
 : > "$TICKET"
 trap 'rm -f "$TICKET"' EXIT
