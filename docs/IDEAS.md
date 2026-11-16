@@ -21,19 +21,21 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
    red's moves (hours); a wide window there, and a better guess of the first red move, are the
    next things to build.
 
-0a. **Reach threats (E29).** *Round three (2026-11-15):* at every level, tested at node start
-   too, with a cheaper three-piece reach test (`--reach-start3`): nodes 0.46-0.57x, time
-   0.81-0.92x (agent's reads, `f24a2d2`). start3 is a new pruning inside the reach test and
-   waits for the independent verifier; no gate before that. Time per node is up 1.8x, so the
-   next pot is the cost of the tests (round four). *Before:* at 4 pieces
-   left or fewer with the test at node start: about 0.96x on profiled builds (screen `E29-S`
-   0.966x; gate put off). At 5-6 left the
-   tests that find a threat cost 23-40 thousand cycles; the margin filter and an effort
-   trigger were tried in round three and do not help. Found by the study agent on 2026-11-15: the reply that
-   refuted a move is a threat when the mover can no longer reach its length even alone; exact;
-   nodes 0.51-0.57x on proof positions, 0.64-0.67x at plies 6-7; no time gain until the
-   three-piece reach test behind it is cheaper. Branch `climb/threats`. LOG, "The study
-   agent's report".
+0a. **Fewer or cheaper reach tests (after E29 round three, passed 2026-11-16).** The tests are
+   about 27% of the base's time; "cannot reach" with a three-piece hand at 6 left is two thirds
+   of that (about 34 thousand cycles a test, most proofs visit 8-127 positions). Spent: five
+   mechanical cuts (two caps, the early-stopping flood, the child's bound from the parent's, a
+   cache: all under 3%; LOG, "E29, fifth report" and "sixth report"). Open: a cheap sufficient
+   condition that answers "cannot" before the search; and the order effect the extra prunes
+   cause on some positions (screen unit 55: 1.39x the nodes; proof position 23), which is E30's
+   cost history fed by different subtrees.
+
+0b. **The order of red's tries at the top of the proof.** "Images of earlier winners first"
+   costs more often than it pays (3.8x on one reply, 0.5x on another; 36 of 42 failed tries on
+   the tune replies were images). Built behind options on `climb/replay`: the two orders in
+   turn, a cap, recent winners only. Oracle 0.788x of the top's time. To do: the baseline replay
+   of `tests/replay/tune25.txt`, then `--win-turns` on it. LOG, "The top of the proof".
+
 1. **More from what the search already knows.** E14 (cover the reply that refuted the last move)
    was worth 0.77x at ply 7 and 0.59x on 30 ply-5 positions for twenty lines. Six follow-ups of the
    same kind failed on node counts (E15-E17, E19-E21, below), a history table among them, and
@@ -112,6 +114,8 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 - **E11 a scan recomputes only the covered clusters** (gate `E11-P7`, ply 7): same nodes, time 0.954x. v7.
 - **E12 the reach test starts from the longest snake** (gate `E12`, ply 7): same nodes, time 0.800x. v8.
 - **E14 after a failed move, cover the refuting reply first** (gate `E14`, ply 7): nodes 0.77x on tune. v9.
+- **E29 reach threats at every level** (gate `E29R3`, proof positions): nodes 0.533x, time 0.856x; 0.844x on four
+  whole proof jobs. Climb base 4.
 
 The sizes to quote are the ladder's (LOG, "Confirmation"), not the gates'.
 

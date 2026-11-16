@@ -2547,3 +2547,75 @@ units; driver jobs a-d), then the freeze with the test commit `64d2bf4`. On a fa
 the cap undecided: no freeze, no second gate; the cost of the reach test (round six) and
 the order effect seen at unit 55 are then the things to work on, and what comes back is a
 new change on new units.
+
+## 2026-11-16 E29 round three: the gate passes (0.856x); frozen as climb base 4
+
+- **Gate `E29R3`** (`proof4b` gate units 118-147, 60 fresh positions, profiled builds, one
+  thread, `--window 0,1`; base `03e5963b7ba5`, candidate `440dfbb757aa`): SPRT[0, 0.05]
+  accepted H1 at unit 30 of the cap's 266, LLR +5.91. Per unit the log ratio is +0.140 +/-
+  0.061 (sd 0.171 a unit); **total time 128.31 s against 109.83 s, 0.856x; nodes 0.533x.** A
+  size read where a sequential test stops leans high: quote 0.86x as the gate's, 0.915x as
+  the screen's, and expect between.
+- **Guards.** `E29R3-UP` (ply 5, full window, the set's 3 tune units): 0.774x time, nodes
+  0.470x. `E29R3-DRV` (whole proof jobs, 16 single-thread workers, depth 1, one run an arm):
+
+  | Job | Base, s | Candidate, s | Ratio |
+  | --- | --- | --- | --- |
+  | a | 24.9 | 21.2 | 0.849 |
+  | b | 42.3 | 36.8 | 0.868 |
+  | c | 42.7 | 35.4 | 0.829 |
+  | d | 59.1 | 49.4 | 0.836 |
+  | Total | 169.1 | 142.8 | **0.844** |
+
+  Log ratio 0.168 +/- 0.020 over the four jobs. The gain is in the prover at the size it has
+  on single positions (unlike E31). No run from the analysis board started solvers without
+  the lock after 23:58 the evening before (one at 00:05 was cancelled before any started).
+- **Freeze.** `climb/threats-tests` (`f24a2d2` + the unit test `64d2bf4`) merged into
+  `parallel-v9` as `6d08294`; the merge's source equals the test commit's; a plain build of
+  the merge (`ab6e9bb8f5d9`) gives 26,095,441 on proof 0-23 narrow and 4,174,807 on ply07
+  0-589; `cargo test` passes (the test of the k term). `frozen/climb-base.exe` is now the
+  gated executable `440dfbb757aa` (kept as `frozen/E29R3-440dfbb757aa.exe`);
+  `frozen/climb-base-plain.exe` is my plain build `b630a2fab0bf` of `f24a2d2`. Back:
+  `cp frozen/E30-03e5963b7ba5.exe frozen/climb-base.exe` and revert the merge `6d08294`.
+- **The new base's counts** (one thread): proof 0-23 narrow 26,095,441; 24-47 36,202,062;
+  proof 0-11 full window 19,741,708; ply07 0-589 4,174,807; ply06 0-199 3,669,218; ply08
+  4,223,127; the five ply-5 files 6,839,041 / 6,914,528 / 8,005,501 / 4,585,644 /
+  26,853,486. With `--no-reach-threat` it gives the previous base's counts; with
+  `--reach-threat-max 4 --reach-threat-start 4 --no-reach-start3` those of `6057bd7`.
+- **Gate units left:** `proof4b` 148-442 (295), `proof4` 164-220 (57).
+- **What the gate did not cover** stays as the verifier listed it: hands of 5 to 7 in start3's
+  domain, and the k term, which stands on its argument and the unit test.
+- **Known cost:** on some positions the extra prunes give a worse order (screen unit 55: 2.68x
+  time with 1.39x the nodes; proof position 23 in the verifier's analysis). The mean pays for
+  them; they are a pot of their own.
+
+## 2026-11-16 E29, sixth report: the child's bound from the parent's is exact and worth 1-2%; not a candidate
+
+Agent's report (the reach agent's round six), `climb/threats` at `9bf07c4`, off by default.
+
+- **`--reach-ub-inc`:** in the three-piece reach test the parent's clusters are recorded once
+  and the prune "is the child's bound below the target" is decided from them, cheapest part
+  first, flooding only the placed piece's own cluster. Only the decision is used.
+- **In-place check** (`--features ubcheck`, not in the release path): 35.7 M decisions and
+  values compared against the full bound (proof 0-23 16,028,321; 24-47 18,999,177; ply07
+  711,226; ply08 914,471; `verify 100 1 8 8` 2,105): 0 differences. Node counts identical
+  with the option on and off on all five label sets.
+- **Time, plain builds, three rounds:** 0.986x and 0.976x on medians, 1.004x and 1.019x on
+  minima. Below the 3% bar; no profiled pair. The child bound falls from 13.0 G to 9.2 G
+  cycles but recording the parent's clusters costs 2.1 G, and the piece's own cluster is
+  usually the big one.
+- **The rest of the three-piece test** (proof 0-23, 36.4 G inclusive over 2.95 M calls): child
+  bound 13.0 G; the two-piece level 16.5 G (its own setup and loop 10.3 G, the last piece
+  6.25 G); first-piece generation and setup 5.6 G; copies 1.24 G. The one cut left is
+  mechanical and worth 1-2%.
+- **Its hand-over note** (for whoever touches the reach test next): running out of work
+  answers "can", so any change in the positions visited can change node counts; labels
+  cannot see a wrong "cannot" (judge by the `ubcheck` pattern, `verify` against brute force
+  and `cargo test`); `verify 100 1 8 8` for three-piece hands; the global switches
+  (`START3`, `CAP3`, `UB_UPTO`, `UB_INC`) are toggled by tests, which must stay
+  single-threaded; a bench run carries state across positions.
+
+**Decision.** The mechanical cuts inside the reach test are spent: five options, none above
+3%. The reach agent's line of work ends here. The pots that remain are of another kind:
+fewer tests asked (a cheaper sufficient condition before the search), the order effect the
+prunes cause on some positions, the top of the proof, and what the field study finds.

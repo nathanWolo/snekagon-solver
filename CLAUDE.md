@@ -28,29 +28,37 @@ Update this section in the same change that freezes a version.
   (E27: the MSVC toolchain +4.9% over the GNU build, the profile +6.3% on top) of v9 plus the
   search agent's same-node speed changes (E28, 0.916x) with table prefetch on by default (E25,
   0.949x), and a cost-aware move order (E30, 0.796x: killers and a history prefer the move
-  whose wins were cheap at neighbouring nodes; `--no-cost-order` switches it off). All gated
+  whose wins were cheap at neighbouring nodes; `--no-cost-order` switches it off), and reach threats at
+  every level (E29 round three, 0.856x with 0.53x the nodes; exact, cleared by an independent
+  verifier; `--no-reach-threat` switches it off). All gated
   on proof positions. Build it and every candidate with `sh tools/build.sh [--pgo] OUT.exe`
   (the compile takes the run lock); a deciding read compares two `--pgo` builds.
   `frozen/climb-base-plain.exe` is the same source without the profile, for screens.
 - **In work (sub-agents, Opus):**
-  - Reach threats at every level (E29, branch `climb/threats`, `f24a2d2`): nodes 0.46-0.57x,
-    time 0.81-0.92x in the agent's reads, through a cheaper three-piece reach test
-    (`--reach-start3`). **Not gated until the independent verifier clears start3** (branch
-    `climb/verify-rt3`; the first check on `climb/verify-rt` covered the older code). Its agent
-    is on the cost per node (same nodes, less time).
+  - The top of the proof (branch `climb/replay`): `prove --replay` proves a file of replies in the
+    proof's order (`sh tools/replay.sh EXE FILE DIR`, `tests/replay/tune25.txt`); orders of red's
+    tries behind options (`--win-turns`, `--win-cap N`, `--win-recent K`), none run on the 25
+    tune replies yet. The other 49 refuted replies are kept for a gate.
+  - The field study (branch `climb/field`): why the reference solver needs fewer nodes than
+    this base on two of its five benchmark files. Its source is read, not run.
   - Extra killer slots (E31, branch `climb/xk`, `381560f`): 0.845x nodes on cold single
     positions, 1.003x inside the driver. **Held, not gated** (LOG, "Ordering, round three").
-  - The ordering agent (`climb/cost`): what is left for move order inside the driver, and
-    `--emulate W` on a branch of its own (`climb/emulate`): a driver run with exact node counts.
+  - Spent: mechanical cuts inside the reach test (branch `climb/threats`, five options, all off,
+    none above 3%; LOG, "E29, sixth report", which also holds the hand-over note for that code).
+    `--emulate W` (a driver run with exact node counts) is on `climb/emulate` and in `climb/replay`.
   Kept apart: the driver's `--split` and `--hint` (`climb/driver`), the ordering study
   (`climb/order`). Shadow builds that re-search what a rule pruned: `climb/verify`,
-  `climb/verify-rt` (`--features shadow`).
+  `climb/verify-rt`, `climb/verify-rt3` (`--features shadow`).
+- **A change inside a pruning rule is judged in place, never by labels.** A planted fault in the
+  reach test gave 0 wrong labels and fewer nodes on the proof positions. Compare every answer
+  with the unchanged computation in a check build (`--features ubcheck`, the shadow builds),
+  run `verify 100 1 8 8`, and give it to an agent who did not write it.
 - **An ordering change needs a driver read before its gate.** `tests/proof4` positions are
   the driver's jobs solved cold (no killers handed down, no history from sibling jobs, an
   empty table). E30 gained on both; E31 only cold. Read it with `prove --emulate 16` (exact
   nodes) on the tune jobs `work/e24/a.pos` to `f.pos`; jobs g to r are for driver gates.
 - **Gate units:** `tests/proof4` has 57 unused gate units (164-220); `tests/proof4b` (1,184
-  positions, none shared) has 325 (118-442). A learned order is gated only on positions whose
+  positions, none shared) has 295 (148-442). A learned order is gated only on positions whose
   parents were kept out of its training.
 - **Absolute times drift with the machine:** with agents at work the same executable ran a
   third slower than the night before. Only paired reads count; a long proof wants the machine
