@@ -175,6 +175,10 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                     assert_eq!(bounds::can_reach_alone(t, &pos, player, target, &mut work), target <= optimum, "reach test wrong for {} at {}", target, pos.to_text());
                     let mut work = u32::MAX;
                     assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "touching reach test wrong for {} at {}", target, pos.to_text());
+                    let saved = bounds::START3.swap(true, std::sync::atomic::Ordering::Relaxed);
+                    let mut work = u32::MAX;
+                    assert_eq!(bounds::can_reach_touching(t, &pos, player, target, &mut work), target <= optimum, "reach test from the longest snake wrong for {} at {}", target, pos.to_text());
+                    bounds::START3.store(saved, std::sync::atomic::Ordering::Relaxed);
                     reach_checks += 1;
                 }
             }
@@ -280,6 +284,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-reach-threat-cache" => o.cfg.reach_threat_cache = false,
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
             "--no-longest" => bounds::FROM_LONGEST.store(false, std::sync::atomic::Ordering::Relaxed),
+            "--reach-start3" => bounds::START3.store(true, std::sync::atomic::Ordering::Relaxed),
             "--no-model" => o.cfg.model_level = 99,
             "--model-level" => o.cfg.model_level = val().parse().unwrap(),
             "--model" => {

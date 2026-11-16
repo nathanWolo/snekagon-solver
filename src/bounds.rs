@@ -30,6 +30,9 @@ pub const MAX_CLUSTERS: usize = 24;
 
 /// E12: the reach test starts from the longest snake of the target snake (`--no-longest` turns it off).
 pub static FROM_LONGEST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+/// Three or more pieces, target above the cells in hand: the first piece must touch an old snake that
+/// can be the longest old snake of the final snake (`--reach-start3`).
+pub static START3: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// A player's clusters: the growable cells of each and the longest final snake possible inside it.
 pub struct Clusters {
@@ -327,6 +330,40 @@ pub fn can_reach_touching_w(t: &Tables, pos: &Pos, player: usize, target: i32, w
     let pieces = left.count_ones();
     if pieces == 0 {
         return false;
+    }
+    if pieces > 2 && target > rem && START3.load(std::sync::atomic::Ordering::Relaxed) {
+        // The final snake holds old snakes; built outward from its longest old snake S, the first
+        // piece touches S, every other old snake in it is no longer than S, and each piece brings in
+        // at most one more snake (a piece touches own cells only with its two ends): so S can only
+        // be a snake whose length, the cells in hand and the `pieces` longest other snakes no
+        // longer than it reach the target.
+        let ns = pos.nsnakes[player] as usize;
+        let mut len_of = [0i32; MAX_SNAKES];
+        for j in 0..ns {
+            len_of[j] = count(pos.snakes[player][j]) as i32;
+        }
+        let mut start: BB = 0;
+        for j in 0..ns {
+            let mut top = [0i32; 4]; // the longest other snakes no longer than j, longest first
+            for i in 0..ns {
+                if i != j && len_of[i] <= len_of[j] {
+                    let mut v = len_of[i];
+                    for k in 0..4 {
+                        if v > top[k] {
+                            std::mem::swap(&mut v, &mut top[k]);
+                        }
+                    }
+                }
+            }
+            let mut others = 0;
+            for k in 0..(pieces as usize).min(4) {
+                others += top[k];
+            }
+            if len_of[j] + rem + others >= target {
+                start |= pos.snakes[player][j];
+            }
+        }
+        return start != 0 && reach_from(t, pos, player, target, start, ALL, work);
     }
     if pieces > 2 || !FROM_LONGEST.load(std::sync::atomic::Ordering::Relaxed) {
         return if target > rem {
