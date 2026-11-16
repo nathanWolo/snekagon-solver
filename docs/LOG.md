@@ -1891,3 +1891,66 @@ counterexample and gives an argument for every variant.
   block. If round three ends at 0.96x, the choice is a gate with that risk or leaving it.
 - **Not a change of the bar:** the bounds stay `[0, 0.05]`. What is declined is a gate whose
   likely outcome depends on luck.
+
+## 2026-11-15 Ordering, round two (report): the two-killer pot is spent; two more killer slots are next (E31)
+
+Agent's report on branch `climb/cost`, commit `ddd4688` (every new option off; with them off
+the counts are `8f6adce`'s: proof 0-23 56,301,796, ply 6 5,846,840, ply 7 6,404,487). Its
+numbers, not yet mine.
+
+- **Pot left between the two killers, with E30 on** (proof 0-23, both killers searched at the
+  same red node): choosing by record now pays 0.957x / 0.999x / 1.161x at 5 / 7 / 9 pieces
+  left (0.78 / 0.86 / 0.96x before E30). The cheaper killer in fact would still pay 0.76 /
+  0.74 / 0.72x, but the record no longer predicts which it is (correlation of the log
+  ratios 0.40 / 0.39 / 0.12). What a record can tell between two killers is used up.
+- **Where the nodes are now** (red nodes, proof 0-23, 56M): under wins 46.0M at the root,
+  43.3M at 9 left, 40.8M at 7, 14.7M at 5 (E30 took a third off each); under failed moves
+  10.3M at the root and 5.7M at 9 left, unchanged, now 18% of all nodes. Wins that come from
+  the list at 7 and 9 left are few and dear (25k cuts, 4.1M nodes at 7; 434 cuts, 5.8M at 9).
+- **Probe then commit (a budget race between the killers): dropped on an offline
+  simulation.** On the oracle's pairs, budgets of f times the record, doubling: the
+  pessimistic figure (work set aside is lost) is never below 0.993x and the optimistic one
+  never below 0.990x, against a bound of 0.73-0.76x. The cheaper killer is often the one
+  that costs more than its record, so a budget cuts the cheap wins' tails as often as the
+  dear ones. Not built.
+- **Built and screened on nodes** (ratio to the defaults; proof blocks 0-23 / 24-47 / 48-87,
+  then ply 6, ply 7):
+  - `--xk 2` (two more killer slots: a move pushed out of the two killers is kept with its
+    cost; all four are tried as staged first moves, in the history's order, then by cost):
+    0.958 / 0.798 / 0.824, 0.913, 0.935; **0.845x over proof 0-87**; ply 8 0.949x; the five
+    ply-5 files 0.938x in total, the worst 1.07x (`other_openings`). No block above 0.97.
+  - `--xk 1`: 0.959 / 0.852 / 0.877, 0.909, 0.933.
+  - `--xk 2 --hc-key 2` (the history's key counts the nodes of failures too): 0.860 / 0.822 /
+    0.923, 0.879, 0.915; 0.883x over 0-87; `other_openings` 1.27x.
+  - A wider history window (`--hc 8`, 16, 32, the whole list), `--hc-all`, keys 1 and 2
+    alone: 0.86-1.02 on single blocks, nothing on ply 6 and 7, some blocks above 1.
+- **Time** (plain build, proof 0-23, three interleaved rounds): `--xk 2` 0.952x (nodes 0.957x),
+  `--xk 2 --hc-key 2` 0.857x (nodes 0.860x). Time per node is the same in all arms, so time
+  follows nodes; 24-87, where `--xk 2` gains most, was not timed.
+- **The driver** (jobs a, b, c, 16 workers, two runs an arm): keeping the history between a
+  worker's jobs (today) is best; clearing it costs 1.07x nodes, halving it 1.10x (1.37-1.54x
+  on job a). `--xk 2` in the driver read 0.996x nodes and 1.06x time, which three jobs
+  cannot tell from no change or from the bench's gain (sd 0.115 a job; about +/-8%). The
+  agent's guess at why: `solve_job` clears the killers' costs and the extra slots for every
+  job. One run had a 25-minute gap under the lock with no solver running.
+- **A rule broken, by the agent's own account:** its first run of the simulation read 4M
+  rows outside the lock for about two minutes; stopped, and sampled after that.
+
+**What goes to a gate: E31 = `--xk 2` on by default.** Branch `climb/xk`, commit `381560f` (the
+coordinator's flip of the default on top of `ddd4688`; `--xk 0` and `--no-cost-order` switch
+it off).
+
+- **Hypothesis:** with two killers, a move that won cheaply and was pushed out by a later
+  cut is forgotten and must be found again through the list, after dearer moves. Keeping it
+  in a third and fourth slot, with its cost, lets the staged first move choose among four
+  candidates by the same records. Expected on fresh proof positions, one thread: total time
+  about 0.85-0.90x (the tune blocks say 0.845x in nodes; the least of them 0.958x).
+- **Why `--xk 2` and not the variant with key 2:** key 2 is ahead on one block and ply 6/7,
+  behind on the largest block (0.923 against 0.824) and bad on one ply-5 file. One change at
+  a time; key 2 can be asked again on top.
+- **Test:** `SPRT[0, 0.05]` on log time ratio, unused `proof4b` gate units from 118, profiled
+  builds, `--window 0,1`, against `frozen/climb-base.exe`; the cap from `hc.py plan` on the
+  screen `E31-S` (`proof4b` tune units 50-79, which no choice in this round has seen).
+  Guards after a pass: ply 5 (`E31-UP`) and whole proof jobs (`E31-DRV`).
+- **Open before the gate:** what the driver gets from it. A pass on single positions does
+  not show a gain for `prove` on 16 workers; the agent's next round is the driver.
