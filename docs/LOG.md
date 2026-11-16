@@ -2734,3 +2734,40 @@ the lock about 100 s.
 - The evaluation is also the first thing to try on **red's tries at the top of the proof**
   (the replay tool), where a failed try costs the most. After the two replays that are
   running.
+
+## 2026-11-16 E32 and E33: hypotheses, written before the agents start
+
+**Where the prover's time goes** (the baseline replay of the 25 tune replies on base 4, 22
+replies in, `work/replay/base4/results.txt`): 44,235 jobs where red wins took 90,225
+thread-seconds (50.9 G nodes); 97 jobs where red does not win took 7,135 (3.4 G nodes, 35 M
+each). So `tests/proof4` and `tests/proof4b` (red wins) are 93% of the job time, and the
+other kind is 7% with no test set of its own yet.
+
+**E32, an evaluation of the child position as the move order at the top levels** (branch
+`climb/evalorder`).
+
+- *Hypothesis:* ordering the moves by an estimate of both sides' final longest snake (who
+  reaches which free cells first) takes cheaper wins and fewer failed first moves than the
+  8-feature move model.
+- *Expected,* from the port of the reference's evaluation: 0.83-0.92x time on proof positions
+  (48 positions, single positions 0.08x to 2.37x: a screen), about half the nodes where blue
+  has to find the holding move.
+- *Against it:* the ordering study (2026-11-15) found no learned order above 0.97x on held-out
+  nodes with our own features, and said the pot is which win is taken.
+- *Test:* first the port on the 176 tune positions of `proof4b` (units 0-87). If it does not
+  gain there the line stops. Then our own evaluation, written and fitted by us; a screen
+  against the base and against the port; the driver read under `--emulate 16`; one gate,
+  SPRT[0, 0.05] on unused `proof4b` gate units, cap from `hc.py plan` on the screen.
+
+**E33, the tight question at 5 or fewer pieces left** (branch `climb/tightq`).
+
+- *Hypothesis:* the opponent's best next placement that no single move of the mover blocks
+  is a length the opponent is sure of. If the mover alone cannot beat it the mover cannot
+  win; if the mover cannot reach it the mover loses. Asked where today's reach test asks
+  about the lengths now, it decides nodes the search otherwise expands.
+- *Expected,* from the port: 0.81x nodes on proof positions, 0.62x on blue-win positions. In
+  time a gain only if an asked node costs no more than about 1.2x (the port: 1.4x, total
+  time 1.25x).
+- *Test:* a check build that searches every node the rule decides without the rule and
+  compares; `verify 100 1 8 8`; an agent who did not write it; a screen on tune units; one
+  gate as above. Labels and node counts are no evidence for it.
