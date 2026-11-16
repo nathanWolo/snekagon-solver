@@ -20,6 +20,8 @@
 //!   fresh room for a new snake: the largest group of cells that touch no tile and that the other
 //!         side does not reach first, at most the cells in hand
 //!   snakes the number of snakes
+//!   terrb  cells taken (at most 40) when the two walk by turns, layer by layer, and neither may
+//!         pass through the other's cells (the side to move first)
 //! The order score is the weighted sum of these terms and of the model's score of the move.
 //! The weights are fitted on our own solved positions (LOG, E32).
 
@@ -28,13 +30,13 @@ use crate::geom::*;
 use crate::pos::*;
 use crate::pieces::*;
 
-pub const NFEAT: usize = 9;
-pub const NAMES: [&str; NFEAT] = ["est", "ub", "long", "terr", "hand", "ends", "short", "fresh", "snakes"];
+pub const NFEAT: usize = 10;
+pub const NAMES: [&str; NFEAT] = ["est", "ub", "long", "terr", "hand", "ends", "short", "fresh", "snakes", "terrb"];
 
 /// The fitted weights, in the order of `NAMES`, then the weight of the model's score (`MODEL`, the
 /// order below these levels; 64 with every other weight 0 is today's order), then the weight of the
 /// static score (piece size and contact, divided by 64).
-pub const WEIGHTS: [i32; NFEAT + 2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0];
+pub const WEIGHTS: [i32; NFEAT + 2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0];
 
 fn largest_group(mut b: BB) -> i32 {
     let mut best = 0;
@@ -61,6 +63,26 @@ pub fn features(t: &Tables, child: &Pos) -> [i32; NFEAT] {
         wave[p] = if child.left[p] != 0 { neighbours(sh[p].ends) & room[p] } else { 0 };
         seen[p] = wave[p];
     }
+    // the same race where a side cannot walk through the cells the other has taken: the side to
+    // move takes a layer, then the other, by turns
+    let mut held = [0u128; 2];
+    {
+        let mut front = [wave[s], wave[m]];
+        let mut taken = 0u128;
+        for _ in 0..40 {
+            let a = front[0] & !taken;
+            taken |= a;
+            let b = front[1] & !taken;
+            taken |= b;
+            held[0] |= a;
+            held[1] |= b;
+            if a | b == 0 {
+                break;
+            }
+            front = [neighbours(a) & room[s] & !taken, neighbours(b) & room[m] & !taken];
+        }
+    }
+    let terrb = (count(held[1]) as i32).min(40) - (count(held[0]) as i32).min(40);
     // first arrival; the side to move takes the ties
     let mut mine = [0u128; 2];
     mine[s] = wave[s];
@@ -116,6 +138,7 @@ pub fn features(t: &Tables, child: &Pos) -> [i32; NFEAT] {
         d(short),
         d(fresh),
         child.nsnakes[m] as i32 - child.nsnakes[s] as i32,
+        terrb,
     ]
 }
 
