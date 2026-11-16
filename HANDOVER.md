@@ -87,8 +87,28 @@ Roots done with hold 10 against the recorded base arm (wall s; one run each, tun
 
 ## Next steps
 
-Taken over 2026-11-16 by a new agent. **Running now:** step 1 (STOP deleted, the resume command
-below started; its output in `$W/hold10.run2.txt`). If stopped, run the same command again: it resumes.
+Taken over 2026-11-16 by a new agent; **stopped again at 10:37:43 at the coordinator's order** (the
+owner paused the climb for the analysis board). Nothing runs. `$W/hold10/STOP` exists again.
+
+After the restart (all hold 10, `hold-1.exe`):
+- piece 3: about 10:22:07 to 10:33:18 (671 s, waited for the lock first). Finished root 6 (resumed
+  cold from piece 2's results; 23 root moves). **Void**: overlapped the board's 16 lock-less solver
+  processes (10:23:55-10:32:10 and 10:32:41-10:35:41, `work/gui/runs.log`).
+- piece 4: 10:34:37 to 10:37:43 (192 s), inside root 7, no root finished; I stopped its solver
+  (`kill`, my own process) and the replay loop. **Void** (overlapped 10:34:37-10:35:41).
+- Valid: pieces 1-2 only (roots 0-5, and root 6's 232 s lost in piece 2, from before 10:03).
+
+Restored (done 10:38): the whole directory as it was after the stop, void pieces included, is kept
+in `$W/hold10_void/` (with `hold10.run2.txt`). In `$W/hold10/` I kept the first 8,680 lines of
+`results.txt` (= the positions piece 3 read at its start: the file had 8,680 distinct positions
+then, one line each), the first 9,599 lines of `jobs.txt` (dropped from the third `P` marker on),
+the first two lines of `pieces.txt`, and removed `piece-3.*` and `piece-4.*`. That is the state
+after piece 2. Root 6 starts again from piece 2's results.
+
+Next command (when the coordinator says the machine is free): delete `$W/hold10/STOP`, then the
+resume command of step 1. Roots 6-9 take about 40 min locked (base: 1,523 + 206 + 214 + 243 s).
+
+The table script for the comparison is `work/table3.py` (`python work/table3.py 10 base=... h10=... h30=...`).
 
 1. Finish the hold 10 screen: `rm $W/hold10/STOP; sh tools/replay.sh $W/hold-1.exe $W/tune10.txt $W/hold10 --hold 10 --job-log $W/hold10/jobs.txt`
    (about 30-40 min of locked time; it ends with `summary.txt`, check "all ok").
