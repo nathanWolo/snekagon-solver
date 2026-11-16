@@ -2208,3 +2208,46 @@ on this PC for a same-machine comparison?", the owner answered "Yes, run it".
   the script while it waited in the queue: the candidate is held, the screen would only have
   given the cold-solve time, and nine runs were waiting for the lock, the verifier of the
   reach test among them. The earlier entry said the screen would be recorded; it was not.
+
+## 2026-11-16 E29, fourth report: no cheaper node yet, but the halving reaches the driver (0.85-0.89x)
+
+Agent's report, branch `climb/threats`, head `394b50d`; the defaults are still exactly
+`f24a2d2`, which stays the candidate. Its numbers.
+
+- **The driver, tune jobs a, b, c** (`prove --threads 16 --job-threads 1 --depth 1 --tt 27`, the
+  frozen base against the profiled candidate `58e025ada122`, one run an arm, alternated,
+  one job at a time under the lock; root -1 and every child 1 in every run):
+
+  | Job | Base, s | Candidate, s | Time | Nodes |
+  | --- | --- | --- | --- | --- |
+  | a | 27.49 | 23.98 | 0.872x | 0.476x |
+  | b | 49.02 | 41.69 | 0.850x | 0.509x |
+  | c | 43.30 | 38.41 | 0.887x | 0.551x |
+
+  Unlike the extra killer slots, this gain is in the prover, at about the size it has on
+  single positions. One 1.2 s run from the analysis board without the lock fell inside job
+  b's candidate read (so that read may be a little slow, which is against the candidate).
+- **Where the candidate's time goes** (a study build with cycle counters, proof 0-23, total
+  151.3 G cycles against the base's 181.4 G; a second read after the unlocked window agreed
+  within 4% in every section): the reach-threat tests are 40.5 G, 27% of the candidate's
+  time, and nothing else grew: every other section is smaller in total than at the base.
+  Two thirds of the tests' cost is one case: "cannot reach" with a hand of three pieces at
+  6 left, 27.2 G over 807 thousand tests, about 34 thousand cycles each. Without the threat
+  tests the candidate would stand at about 0.61x of the base. That is the pot.
+- **Mechanical cuts with the nodes unchanged:** none that pays (child copy 0.4% at most, a
+  lighter child 0.2%; the bound flood decides the threat's value and cannot be skipped).
+  Not measured: generating only the covering placements in `scan_threats` (14% of the time).
+- **Two cuts inside the three-piece test** (`--reach3-cap`, `d959291`; `--reach3-cap2`,
+  `394b50d`; both off, same nodes): no time gain in two of three rounds (one round read
+  27.7 s against 36.5 s and is not explained). They change how "cannot reach" is produced
+  and would need the verifier; `verify` covers three-piece hands only thinly (1 position in
+  40). Not adopted.
+- **Next lever, the agent's words:** a cheaper exact proof of "cannot reach" for a
+  three-piece hand at 6 left (18% of the candidate's time): profile inside that test, then
+  one search that answers both targets at once.
+
+**Order from here.** `f24a2d2` goes to its gate as it is, once the verifier has cleared
+start3 and the new defaults; it is not held back for a cheaper test. My own checks, the
+profiled pair and the tune screen are prepared meanwhile (they do not depend on the
+verdict; the gate and the freeze do). The cheaper test is the agent's round five, on top,
+and each of its changes goes to the verifier before it can be a default.
