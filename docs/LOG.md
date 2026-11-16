@@ -1690,3 +1690,69 @@ and the killer replies are also tested as threats when such a node starts.
   verifier has cleared the rule.
 - The agent was sent back to finish its timing rounds and to commit one variant on by default
   (the profile is collected with the defaults), with one option that switches all of it off.
+
+## 2026-11-15 E30: the cheapest win from what the search has seen (report, and the hypothesis before the gate)
+
+Branch `climb/cost` (Opus sub-agent), commits `7394610` (counters and options, all off),
+`2b86d29`, `8f6adce` (one variant on by default; `--no-cost-order` gives v9's order and the
+base's node counts). Every option only reorders moves, so no value can change.
+
+- **What it does** (the variant on by default: `--kc-order 1 --kc-mode 1 --kc-evict --hc 4
+  --hc-level 5 --hc-staged`):
+  - each killer carries the size of the subtree it last cut with (a running mean when it cuts
+    again); the killer with the cheaper record is tried first; a new killer replaces the
+    dearer of the two, not the older;
+  - a history by (side to move, pieces left, move) of wins and the nodes they cost; at nodes
+    with 5 pieces left or more it picks between the two killers for the staged first move,
+    and when that fails it reorders the first 4 moves of the list by mean cost of their wins.
+- **The pot, counted in the tree** (proof positions 0-23, `--window 0,1`): red's first move
+  wins 97-99% of the time at 5, 7 and 9 left, so the order of *trying* has nothing left; the
+  nodes are under the wins (62 M of 68 M at 9 left). Where both killers are candidates the
+  other one also wins 92-98% of the time, and the cheaper of the two in fact costs 0.55-0.60x
+  of today's choice. A killer's recorded cost predicts its cost at a sibling with a
+  correlation of 0.60-0.69 in log (red) and 0.71-0.79 (blue): enough to stand on. Choosing by
+  record gets 0.78x at 5 left, 0.86x at 7, 0.96x at 9, of a possible 0.55-0.60x.
+- **Screen** (nodes against the base; proof blocks 0-23 / 24-47 / 48-87, then ply 6 and 7):
+
+  | Variant | 0-23 | 24-47 | 48-87 | ply 6 | ply 7 |
+  | --- | --- | --- | --- | --- | --- |
+  | cheaper killer first | 0.840 | 0.849 | | 0.868 | 0.893 |
+  | + running mean | 0.808 | 0.799 | | 0.859 | 0.882 |
+  | + minimum (instead of mean) | 0.960 | 0.935 | | 1.012 | 0.986 |
+  | + evict the dearer | 0.762 | 0.762 | | 0.859 | 0.849 |
+  | killers: mean + evict (`kme`) | 0.771 | 0.714 | 0.668 | 0.834 | 0.824 |
+  | history alone, 4 moves, 5+ left | 0.771 | 0.653 | | 0.806 | 0.785 |
+  | `kme` + history 4, 7+ left | 0.698 | 0.644 | 0.576 | 0.816 | 0.792 |
+  | **`kme` + history 4, 5+ left, staged (chosen)** | 0.747 | 0.712 | 0.617 | 0.819 | 0.793 |
+  | `kme` + history 8, 5+ left | 0.711 | 0.642 | 0.656 | 0.787 | 0.788 |
+
+  Every variant beats the base on every block; the top five are within block-to-block noise
+  of each other. The minimum loses because one lucky cheap cut stays as the record for ever.
+- **Time** (plain MSVC build, positions 0-23, four arms interleaved, three rounds, sums): off
+  183.1 s; `kme` 151.9 s (0.830x); `kme` + history at 7+ 150.6 s (0.823x); the chosen variant
+  145.4 s (0.794x). The 7+ variant has the fewest nodes and pays 2.86 microseconds a node
+  against 2.58, because it gives up the staged first move there and sorts the whole list.
+- **Other files, nodes with the defaults against off:** the five reference ply-5 files 0.60x
+  to 0.68x (99.5 M against 161.5 M in all), every label right; ply 8 right.
+- **Driver smoke test** (job a, 16 single-thread workers, one run an arm): 347 M nodes and
+  26.9 s against 691 M and 46.5 s. One run against a driver sd of 0.115 a job says only that
+  it does not lose there. The agent noticed that the off run's results file has one line
+  fewer. Checked: not a fault. The driver does not record a job of fewer than 2,000 nodes
+  (`MIN_RECORD`), and that job was answered from the table in one run and not in the other.
+- **In the driver** a worker's history is not cleared between its jobs (the killers' costs
+  are). Whether a reset or a decay is better there is not measured.
+- **The coordinator's own checks of `8f6adce`** (plain build `46f3a9fb8d8e`): with
+  `--no-cost-order` ply 7 0-589 = 8,076,471, ply 6 0-199 = 7,136,589, proof 0-3 narrow =
+  13,150,272 (the base's counts); with the defaults ply 7 6,404,487 and ply 6 5,846,840
+  nodes, ply 8 and the ply-5 files right.
+- **Hypothesis (E30):** the base tries the newest killer first and so pays for whichever win
+  it meets; the candidate prefers the move whose wins were cheap at neighbouring nodes and
+  takes less time for the same values. Expected: about 0.80x total time on proof positions
+  (the plain-build read; an ordering change does not lean on the compiler, so a profiled pair
+  should read much the same). Test: `SPRT[0, 0.05]` on unused `proof4b` gate units, both
+  arms profiled builds with `--window 0,1`, the cap fixed from a tune screen before the first
+  gate unit. Guards before a freeze: ply 5 (the next harder file) and whole proof jobs on 16
+  single-thread workers.
+- **Not chosen now, kept for later:** the 7+ variant with a cheaper window (its nodes at the
+  staged path's cost a node), the history over every candidate, win rate times cost as the
+  key, the history's life in the driver.
