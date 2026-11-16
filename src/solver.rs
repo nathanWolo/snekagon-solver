@@ -78,11 +78,26 @@ pub struct Config {
     pub hc_min: u32,
     /// E30 idea 2: keep the staged first move (table move, then the killer that the history prefers).
     pub hc_staged: bool,
+    /// E30b: the history's key. 0 the mean nodes of a win; 1 that over the win rate (wins over tries);
+    /// 2 all nodes spent on the move (wins and failures) per win.
+    pub hc_key: u8,
+    /// E30b: in the driver, what a worker does with the history between jobs: 0 keeps it, 1 clears
+    /// it, 2 halves it.
+    pub hc_job: u8,
+    /// E30b: the history ranks every listed candidate that has one (moves with a history above the
+    /// killers without one), by a score band, without a sort of the list.
+    pub hc_all: bool,
+    /// E30b: pick the window's moves by a partial selection instead of a sort of the whole list
+    /// (the same order, fewer comparisons).
+    pub hc_select: bool,
+    /// E30b: this many more killer slots (0-2) that keep a move pushed out of the two with its cost;
+    /// all killers are tried as staged first moves in the history's order, then by recorded cost.
+    pub xk: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, hc_key: 0, hc_job: 0, hc_all: false, hc_select: false, xk: 0 }
     }
 }
 
@@ -275,10 +290,13 @@ pub struct Solver {
     pub(crate) killers: [[u16; 2]; MAX_PLY],
     /// E30: the nodes of the subtree with which each killer last cut (0 = not known).
     kcost: [[u64; 2]; MAX_PLY],
+    /// E30b: the extra killer slots and their costs.
+    xk: [[u16; 2]; MAX_PLY],
+    xkc: [[u64; 2]; MAX_PLY],
     /// E30: the study's counters.
     pub cs: Box<CostStats>,
     /// E30 idea 2: by side to move, pieces left and move: [wins, nodes of those wins].
-    hist: Vec<[u64; 2]>,
+    hist: Vec<[u64; 4]>,
     /// The entries of `hist` written since the last `clear()`, so that clearing costs what was used.
     hist_used: Vec<u32>,
     bufs: Vec<Vec<u64>>,
@@ -345,8 +363,10 @@ impl Solver {
             unwind_to: NO_UNWIND,
             killers: [[PASS; 2]; MAX_PLY],
             kcost: [[0; 2]; MAX_PLY],
+            xk: [[PASS; 2]; MAX_PLY],
+            xkc: [[0; 2]; MAX_PLY],
             cs: Box::new(CostStats::new()),
-            hist: if cfg.hc_k > 0 { vec![[0; 2]; 2 * 16 * tables().placements.len()] } else { Vec::new() },
+            hist: if cfg.hc_k > 0 { vec![[0; 4]; 2 * 16 * tables().placements.len()] } else { Vec::new() },
             hist_used: Vec::new(),
             bufs: (0..MAX_PLY).map(|_| Vec::with_capacity(1024)).collect(),
             defer_bufs: (0..MAX_PLY).map(|_| Vec::new()).collect(),
@@ -359,10 +379,8 @@ impl Solver {
         self.gen = self.tt.next_generation();
         self.killers = [[PASS; 2]; MAX_PLY];
         self.kcost = [[0; 2]; MAX_PLY];
-        for &i in &self.hist_used {
-            self.hist[i as usize] = [0; 2];
-        }
-        self.hist_used.clear();
+        self.xk = [[PASS; 2]; MAX_PLY];
+        self.clear_hist();
     }
 
     /// For a thread of a parallel solve: take up the table's present generation.
@@ -370,6 +388,32 @@ impl Solver {
         self.gen = self.tt.generation();
         self.killers = [[PASS; 2]; MAX_PLY];
         self.kcost = [[0; 2]; MAX_PLY];
+        self.xk = [[PASS; 2]; MAX_PLY];
+    }
+
+    /// E30: forget the history.
+    fn clear_hist(&mut self) {
+        for &i in &self.hist_used {
+            self.hist[i as usize] = [0; 4];
+        }
+        self.hist_used.clear();
+    }
+
+    /// E30b: halve the history (the driver between jobs); entries that reach zero are forgotten.
+    fn halve_hist(&mut self) {
+        let mut used = std::mem::take(&mut self.hist_used);
+        used.retain(|&i| {
+            let h = &mut self.hist[i as usize];
+            for x in h.iter_mut() {
+                *x /= 2;
+            }
+            if *h == [0; 4] {
+                false
+            } else {
+                true
+            }
+        });
+        self.hist_used = used;
     }
 
     /// The value within the window (alpha, beta): exact inside it, a bound outside. UNKNOWN when the
@@ -400,6 +444,12 @@ impl Solver {
         self.unwind_to = NO_UNWIND;
         self.killers = *killers;
         self.kcost = [[0; 2]; MAX_PLY];
+        self.xk = [[PASS; 2]; MAX_PLY];
+        match self.cfg.hc_job {
+            1 => self.clear_hist(),
+            2 => self.halve_hist(),
+            _ => {}
+        }
         let v = self.search::<true>(pos, alpha, beta);
         *killers = self.killers;
         if self.aborted {
@@ -859,12 +909,16 @@ impl Solver {
         }
         if !self.hist.is_empty() && (m as usize) < self.t.placements.len() {
             let i = (pos.stm as usize * 16 + level) * self.t.placements.len() + m as usize;
-            if self.hist[i][0] == 0 {
+            if self.hist[i] == [0; 4] {
                 self.hist_used.push(i as u32);
             }
             let h = &mut self.hist[i];
             h[0] += 1;
             h[1] += win;
+            h[2] += 1;
+        }
+        if self.cfg.xk > 0 {
+            self.extra_killers(ply, m, k, c, win);
         }
         let merged = |old: u64| match self.cfg.kc_mode {
             0 => win,
@@ -895,6 +949,64 @@ impl Solver {
         } else {
             self.killers[ply] = [m, k[0]];
             self.kcost[ply] = [win, c[0]];
+        }
+    }
+
+    /// E30b: keep the extra killer slots: `m` leaves them when it becomes a killer; the move pushed out
+    /// of the two killers (with its cost) goes to the front of them. Mirrors the replacement in `cut_by`.
+    fn extra_killers(&mut self, ply: usize, m: u16, k: [u16; 2], c: [u64; 2], win: u64) {
+        let n = (self.cfg.xk as usize).min(2);
+        let x = &mut self.xk[ply];
+        let xc = &mut self.xkc[ply];
+        if let Some(j) = x[..n].iter().position(|&e| e == m) {
+            for i in j..n - 1 {
+                x[i] = x[i + 1];
+                xc[i] = xc[i + 1];
+            }
+            x[n - 1] = PASS;
+            xc[n - 1] = 0;
+        }
+        if k[0] == m || k[1] == m {
+            return;
+        }
+        let (out, oc) = if self.cfg.kc_evict && c[1] > 0 && c[0] > c[1] { (k[0], c[0]) } else { (k[1], c[1]) };
+        let _ = win;
+        if out == PASS {
+            return;
+        }
+        for i in (1..n).rev() {
+            x[i] = x[i - 1];
+            xc[i] = xc[i - 1];
+        }
+        x[0] = out;
+        xc[0] = oc;
+    }
+
+    /// E30b: a failed move: one more try and its nodes, for the history's key.
+    #[inline]
+    fn note_fail(&mut self, pos: &Pos, level: usize, m: u16, cost: u64) {
+        if self.hist.is_empty() || (m as usize) >= self.t.placements.len() {
+            return;
+        }
+        let i = (pos.stm as usize * 16 + level) * self.t.placements.len() + m as usize;
+        if self.hist[i] == [0; 4] {
+            self.hist_used.push(i as u32);
+        }
+        let h = &mut self.hist[i];
+        h[2] += 1;
+        h[3] += cost;
+    }
+
+    /// E30: the history's key of an entry (lower is tried first); MAX when it has too few wins.
+    #[inline]
+    fn hkey(&self, h: &[u64; 4]) -> u64 {
+        if h[0] < self.cfg.hc_min as u64 || h[0] == 0 {
+            return u64::MAX;
+        }
+        match self.cfg.hc_key {
+            0 => h[1] / h[0],
+            1 => (h[1] / h[0]).saturating_mul(h[2].max(h[0])) / h[0],
+            _ => (h[1] + h[3]) / h[0],
         }
     }
 
@@ -1165,18 +1277,39 @@ impl Solver {
         if self.cfg.staged {
             let now = pos.pieces_now();
             let mut first = PASS;
+            let np = t.placements.len();
+            let base = (me * 16 + level) * np;
+            let key = |m: u16, s: &Solver| {
+                let h = if (m as usize) < np { s.hist[base + m as usize] } else { [0; 4] };
+                s.hkey(&h)
+            };
             if hc_on && self.cfg.hc_staged && k1 != PASS && k2 != PASS {
-                let np = t.placements.len();
-                let base = (me * 16 + level) * np;
-                let key = |m: u16, s: &Solver| {
-                    let h = if (m as usize) < np { s.hist[base + m as usize] } else { [0, 0] };
-                    if h[0] >= s.cfg.hc_min as u64 { h[1] / h[0] } else { u64::MAX }
-                };
                 if key(k2, self) < key(k1, self) {
                     std::mem::swap(&mut k1, &mut k2);
                 }
             }
-            for cand in if hc_on && !self.cfg.hc_staged { [tt_move, PASS, PASS] } else { [tt_move, k1, k2] } {
+            let mut cands = [tt_move, k1, k2, PASS, PASS];
+            if self.cfg.xk > 0 {
+                // all killers by the history's key, then by recorded cost (unknown costs last)
+                let kc = self.kcost[ply];
+                let cost_of = |m: u16| if m == self.killers[ply][0] { kc[0] } else if m == self.killers[ply][1] { kc[1] } else { 0 };
+                let mut ks: [(u64, u64, u16); 4] = [(u64::MAX, u64::MAX, PASS); 4];
+                let mut nk = 0;
+                for (j, &m) in [k1, k2, self.xk[ply][0], self.xk[ply][1]].iter().enumerate() {
+                    if m == PASS || (j >= 2 && j - 2 >= self.cfg.xk as usize) {
+                        continue;
+                    }
+                    let c = if j < 2 { cost_of(m) } else { self.xkc[ply][j - 2] };
+                    let hk = if hc_on && self.cfg.hc_staged { key(m, self) } else { u64::MAX };
+                    ks[nk] = (hk, if c == 0 { u64::MAX - 1 } else { c }, m);
+                    nk += 1;
+                }
+                ks[..nk].sort_by_key(|&(a, b, _)| (a, b));
+                for j in 0..4 {
+                    cands[1 + j] = ks[j].2;
+                }
+            }
+            for cand in if hc_on && !self.cfg.hc_staged { [tt_move, PASS, PASS, PASS, PASS] } else { cands } {
                 if cand == PASS {
                     continue;
                 }
@@ -1195,7 +1328,7 @@ impl Solver {
                 if !busy.is_null() {
                     unsafe { &*busy }.start(move_key);
                 }
-                let other = if first == k1 { k2 } else { k1 };
+                let other = if first == k1 { k2 } else if first == k2 { k1 } else { PASS };
                 let oracle = self.cfg.oracle_level as usize == level
                     && (ply - self.root_ply.min(ply)) & 1 == 0
                     && first != tt_move
@@ -1253,11 +1386,17 @@ impl Solver {
                     self.store_if(use_tt, pos.hash, lo.max(v), hi, first, self.nodes - nodes_at_start + 1);
                     return v;
                 }
+                if self.cfg.hc_key > 0 {
+                    self.note_fail(pos, level, first, win);
+                }
                 pre = Some((first, v));
             }
         }
 
         // 4. generate and score the moves
+        let xk_n = self.cfg.xk as usize;
+        let xks = self.xk[ply];
+        let pre_m = pre.map_or(PASS, |p| p.0);
         let mut buf = std::mem::take(&mut self.bufs[ply]);
         buf.clear();
         {
@@ -1324,6 +1463,12 @@ impl Solver {
                     score = KILLER1;
                 } else if m == k2 {
                     score = KILLER2;
+                } else if xk_n > 0 && (m == xks[0] || (xk_n > 1 && m == xks[1])) {
+                    score = KILLER2 >> 1;
+                }
+                if xk_n > 0 && m == pre_m {
+                    // the move searched before the list (any killer slot) stays first
+                    score = TT_MOVE + 1;
                 }
                 buf.push(score << 16 | m as u64);
             });
@@ -1331,10 +1476,40 @@ impl Solver {
 
         // E30 idea 2: among the first few candidates after the table move, the one whose wins at this
         // level cost least goes first (the scores of those places are handed out again in that order)
-        if hc_on && buf.len() > 1 {
-            buf.sort_unstable_by(|a, b| b.cmp(a));
+        if hc_on && self.cfg.hc_all && buf.len() > 1 {
+            // every candidate with a history goes above those without, cheapest first; the table
+            // move (and the move searched before the list) stay first
+            let np = t.placements.len();
+            let base = (me * 16 + level) * np;
+            for e in buf.iter_mut() {
+                let sc = *e >> 16;
+                if sc >= TT_MOVE {
+                    continue;
+                }
+                let m = (*e & 0xFFFF) as usize;
+                if m >= np {
+                    continue;
+                }
+                let k = self.hkey(&self.hist[base + m]);
+                if k != u64::MAX {
+                    if pre.is_some_and(|(f, _)| f as usize == m) {
+                        *e = (TT_MOVE + 1) << 16 | m as u64;
+                    } else {
+                        *e = (KILLER1 + (1 << 24) - k.min((1 << 24) - 1)) << 16 | m as u64;
+                    }
+                } else if pre.is_some_and(|(f, _)| f as usize == m) {
+                    *e = (TT_MOVE + 1) << 16 | m as u64;
+                }
+            }
+        } else if hc_on && buf.len() > 1 {
             let s = if pre.is_some() { 1 } else { 0 };
             let e = (s + self.cfg.hc_k as usize).min(buf.len());
+            if self.cfg.hc_select && e < buf.len() {
+                buf.select_nth_unstable_by(e - 1, |a, b| b.cmp(a));
+                buf[..e].sort_unstable_by(|a, b| b.cmp(a));
+            } else {
+                buf.sort_unstable_by(|a, b| b.cmp(a));
+            }
             if e > s + 1 {
                 let np = t.placements.len();
                 let base = (me * 16 + level) * np;
@@ -1343,8 +1518,8 @@ impl Solver {
                     .enumerate()
                     .map(|(j, &x)| {
                         let m = (x & 0xFFFF) as usize;
-                        let h = if m < np { self.hist[base + m] } else { [0, 0] };
-                        let key = if h[0] >= self.cfg.hc_min as u64 { h[1] / h[0] } else { u64::MAX };
+                        let h = if m < np { self.hist[base + m] } else { [0; 4] };
+                        let key = self.hkey(&h);
                         (key, j, x & 0xFFFF)
                     })
                     .collect();
@@ -1449,6 +1624,9 @@ impl Solver {
                 }
                 if v > alpha {
                     alpha = v;
+                }
+                if alpha < beta && win > 0 && self.cfg.hc_key > 0 {
+                    self.note_fail(pos, level, m, win);
                 }
                 if alpha >= beta {
                     self.cut_by(pos, ply, level, m, tt_move, searched - 1, win, self.nodes - nodes_at_start + 1);
