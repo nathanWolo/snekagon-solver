@@ -1954,3 +1954,48 @@ it off).
   Guards after a pass: ply 5 (`E31-UP`) and whole proof jobs (`E31-DRV`).
 - **Open before the gate:** what the driver gets from it. A pass on single positions does
   not show a gain for `prove` on 16 workers; the agent's next round is the driver.
+
+## 2026-11-15 E29, third report: reach threats at every level, 0.81-0.92x, through a cheaper reach test
+
+Agent's report on branch `climb/threats`, commit `f24a2d2` (on top of `climb/both` `6057bd7`).
+Its numbers, not yet mine.
+
+- **What changed.** Not the triggers the brief asked for. A cheaper reach test
+  (`--reach-start3`, `f368e74`): with three or more pieces in hand and a target above the cells
+  in hand, the first piece is generated only touching an old snake that can be the final
+  snake's longest old one (its length + the cells in hand + the k longest other snakes no
+  longer than it >= the target, k the number of pieces). With it the test at 5 pieces left
+  costs 1,391 cycles for "can reach" and 14,828 for a threat (7,312 and 35,248 before), and
+  the rule pays at every level. New defaults in `f24a2d2`: the rule at every level
+  (`reach_threat_max 99`), also tested at node start at every level (`reach_threat_start 99`),
+  start3 on. `--reach-threat-max 4 --reach-threat-start 4 --no-reach-start3` gives `6057bd7`'s
+  counts; `--no-reach-threat` the frozen base's.
+- **Profiled pair against the frozen base** (three rounds, alternated, `--window 0,1`): proof4
+  0-23 0.831x, 24-47 0.832x; proof4b positions 0-49 0.848x, 50-99 0.915x (medians); 0.867x
+  on the summed medians. Nodes 0.46x, 0.49x, 0.53x, 0.57x.
+- **Labels right** with the new defaults on ply 6 (16 threads), 7, 8, the five ply-5 files,
+  proof4 0-47, proof4b 0-99; `verify 100` passes.
+- **Why the brief's ideas did not apply:** at 5 and 6 left almost every test is asked before
+  the node has spent 16 nodes (it comes right after the first failed move), so an effort
+  trigger has nothing to select on. The margin filter and `--reach-threat-after 2` cost
+  nodes. `--rt-refuter` changes nothing: with the cost order the first killer one ply down
+  already is the move that cut.
+- **The two units that got worse in `E29-S`** (old setting): the regression comes through
+  E30's cost history (with `--hc 0` positions 75 and 97 read 1.07x and 0.92x in nodes
+  instead of 1.56x and 1.55x; with `--no-cost-order` 0.94x and 0.78x). Why is not found; not
+  rechecked under the new defaults.
+- **Not known:** what the tests at 4 left and fewer cost outside the reach search (the reach
+  cycles are 1.3% of the run); the per-unit picture of the weakest block (0.915x).
+- **Not covered by the independent check:** the verifier's shadow runs (`climb/verify-rt`)
+  were on the earlier code. start3 is a new pruning inside the reach test, which every
+  "cannot reach" answer in the solver depends on (threats, and the reach tests before the
+  cluster bounds). The labels and `verify 100` are all that cover it. With start3 on and the
+  rule at every level the nodes went *up* (27,984,567 to 28,463,674 on proof 0-23), which an
+  exact speed-up of a test with a work limit does not obviously do.
+
+**Before any gate:** an independent agent checks start3 and the new defaults the way the
+first rule was checked (the argument in its own words, the reach test's answers with start3
+against without on queries from real searches, the shadow re-search of what the rule
+pruned, a planted fault), and explains the node increase. A wrong "cannot reach" is a wrong
+value somewhere. Then: merge onto the base of that time (E31 is at its gate first), my own
+identity and label checks, a profiled pair, a tune screen, the cap, the one gate.
