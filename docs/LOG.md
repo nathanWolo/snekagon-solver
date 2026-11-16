@@ -2619,3 +2619,28 @@ Agent's report (the reach agent's round six), `climb/threats` at `9bf07c4`, off 
 3%. The reach agent's line of work ends here. The pots that remain are of another kind:
 fewer tests asked (a cheaper sufficient condition before the search), the order effect the
 prunes cause on some positions, the top of the proof, and what the field study finds.
+
+## 2026-11-16 Climb base 4 on the reference's bench files: 0.842x of base 3, fewer nodes than the reference
+
+The old and the new base, alternating file by file under the run lock, one thread, one run
+each (`work/ref/base4_on_ref_files.txt`, 02:30-02:35). The reference was not run again; its
+figures are those of 00:10-00:40 (`work/ref/`).
+
+| File | Base 3, s | Base 4, s | Base 4 nodes | Reference nodes | Reference, thread-s (then) |
+| --- | --- | --- | --- | --- | --- |
+| `ply5_other_openings` | 3.74 | 2.84 | 4,585,644 | 7,452,999 | 12.1, 12.2 |
+| `ply5_blue_wins` | 8.74 | 7.48 | 6,839,041 | 4,403,893 | 10.8, 10.7 |
+| `ply5_blue_wins_holdout` | 8.56 | 7.15 | 6,914,528 | 4,313,743 | 10.8, 10.9 |
+| `ply5_random_units` | 8.03 | 6.73 | 8,005,501 | 6,164,249 | 13.3, 13.6 |
+| `ply5_ublock_refutations` | 43.29 | 36.73 | 26,853,486 | 37,374,142 | 93.2, 94.0 |
+| Total | 72.35 | **60.94** | **53,198,200** | 59,709,026 | 140.2, 141.4 |
+
+- Base 4 takes **0.842x** of base 3's time on these files with 0.509x the nodes. All 126
+  values right.
+- Against the reference: base 3 took 0.555x of its time when the two were run side by side;
+  times 0.842 that is **about 0.47x, or 2.1x faster**. (Set directly beside its earlier
+  figure the new total is 0.43x, but the machine was busier then: base 3 read 77.6 s at
+  that hour and 72.4 s now.)
+- **Nodes: 53.2 M against its 59.7 M**, below the reference for the first time. It is still
+  ahead on three files (1.55x, 1.60x and 1.30x fewer nodes than base 4), which is what the
+  field study is sizing.

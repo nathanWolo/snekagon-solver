@@ -101,6 +101,9 @@ Measured on a Ryzen 7 250 (16 threads) with other work running. So v4 spends abo
 and 141.4 thread-seconds (two rounds); 2.36 microseconds a node. This project's frozen base of that day
 took 77.6 and 78.7 s on the same files (104.5 M nodes), and all 126 values agree. `docs/LOG.md`,
 "Same machine, the reference solver".
+Later that day climb base 4 (reach threats at every level) took 0.842x of that base's time on the five
+files with 53,198,200 nodes, fewer than the reference's, so about 0.47x of the reference's time. The
+reference still needs fewer nodes on `blue_wins`, `blue_wins_holdout` and `random_units`.
 
 ## What is known about the game
 
