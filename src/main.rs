@@ -202,6 +202,7 @@ fn parse_opts(args: &[String]) -> Opts {
             "--no-hc-staged" => o.cfg.hc_staged = false,
             "--hc" => o.cfg.hc_k = val().parse().unwrap(),
             "--hc-level" => o.cfg.hc_level = val().parse().unwrap(),
+            "--emulate" => o.cfg.drv_emulate = val().parse().unwrap(),
             "--hc-staged" => o.cfg.hc_staged = true,
             "--hc-min" => o.cfg.hc_min = val().parse().unwrap(),
             "--tt-skip" => o.cfg.tt_skip = val().parse().unwrap(),
