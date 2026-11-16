@@ -117,6 +117,11 @@ pub struct Config {
     /// E33: the reach question is asked for a mover with at most this many pieces in hand (above it
     /// only the mover's cluster bound is compared with G, when it is known).
     pub tight_q_hand: u32,
+    /// E33: ... and at least this many pieces left.
+    pub tight_q_min: u32,
+    /// E33: no reach question when the mover's cluster bound is known and more than this above
+    /// the target (99 = no limit).
+    pub tight_q_margin: i32,
     /// E33: the positions one such reach question may look at.
     pub tight_q_work: u32,
     /// E33 study counters with cycle counts (`--tq-study`).
@@ -185,7 +190,7 @@ pub fn outside_bucket(n: u32) -> usize {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0, tight_q: 0, tight_q_hand: 2, tight_q_work: 200, tq_study: false }
+        Config { bounds: true, last_pieces: true, threats: true, reach: true, reach_hand: 2, reach_work: 200, model_level: 7, model: MODEL, par_level: 5, par_join: 2, tt_bits: 22, staged: true, lazy: true, narrow: true, answer_bonus: 1024, prefetch: true, tt_skip: 0, witness: true, cost_stats: false, oracle_level: 0, kc_order: 1, kc_level: 0, kc_mode: 1, kc_evict: true, hc_k: 4, hc_level: 5, hc_min: 1, hc_staged: true, reach_threat: true, reach_threat_min: 0, reach_threat_max: 99, reach_threat_work: 2000, reach_threat_grow: true, reach_threat_after: 1, reach_threat_start: 99, rt_study: false, reach_threat_cache: false, rt_effort: [u64::MAX; 8], rt_margin_lo: 99, rt_margin_hi: 99, rt_refuter: 0, tight_q: 0, tight_q_hand: 2, tight_q_min: 0, tight_q_margin: 99, tight_q_work: 200, tq_study: false }
     }
 }
 
@@ -441,6 +446,11 @@ pub struct Solver {
     /// (study), cycles of asked nodes that the rule did not decide (study)].
     pub tq_stats: [[u64; 8]; 16],
     tq_cand: Vec<BB>,
+    /// E33: how `sure_next_length` ended, by pieces left (see its `why`).
+    pub tq_exit: [[u64; 6]; 16],
+    /// E33 study: reach questions by margin (cluster bound - target, 0..7+, 8 = bound not known):
+    /// [questions, decided, cycles].
+    pub tq_margin: [[[u64; 3]; 9]; 16],
 }
 
 /// E30: what the winning moves of cut nodes cost, measured in the tree.
@@ -516,6 +526,8 @@ impl Solver {
             replies: Vec::with_capacity(1024),
             tq_stats: [[0; 8]; 16],
             tq_cand: Vec::with_capacity(512),
+            tq_exit: [[0; 6]; 16],
+            tq_margin: [[[0; 3]; 9]; 16],
         }
     }
 
@@ -1119,9 +1131,18 @@ impl Solver {
                 }
             }
         }
-        let floor = known - delta + 1;
+        let mut floor = known - delta + 1;
+        if let Some(u) = upper {
+            // with a margin limit, a G below u - delta - margin decides nothing: the cluster bound is
+            // not below G + delta and the reach question would not be asked
+            if self.cfg.tight_q_margin < 99 {
+                floor = floor.max(u - delta - self.cfg.tight_q_margin);
+            }
+        }
         let mut cand = std::mem::take(&mut self.tq_cand);
-        let g = sure_next_length(t, pos, floor, &mut cand);
+        let mut why = 0;
+        let g = sure_next_length(t, pos, floor, &mut cand, &mut why);
+        self.tq_exit[level][why] += 1;
         self.tq_cand = cand;
         let c1 = if study { unsafe { core::arch::x86_64::_rdtsc() } } else { 0 };
         if study {
@@ -1151,6 +1172,14 @@ impl Solver {
             }
             return false;
         }
+        // a reach question whose target is far below the cluster bound rarely fails (`--tight-q-margin`)
+        let margin = upper.map_or(99, |u| u - target);
+        if margin > self.cfg.tight_q_margin {
+            if study {
+                self.tq_stats[level][7] += c1 - c0;
+            }
+            return false;
+        }
         self.tq_stats[level][3] += 1;
         let mut work = self.cfg.tight_q_work;
         let r = can_reach_touching_w(t, pos, me, target, &mut work, &mut self.wit[ply][me]);
@@ -1160,6 +1189,11 @@ impl Solver {
             if r {
                 self.tq_stats[level][7] += c2 - c0;
             }
+            let mb = if margin == 99 { 8 } else { (margin.max(0) as usize).min(7) };
+            let e = &mut self.tq_margin[level][mb];
+            e[0] += 1;
+            e[1] += !r as u64;
+            e[2] += c2 - c1;
         }
         if !r {
             self.tq_stats[level][4] += 1;
@@ -1498,7 +1532,7 @@ impl Solver {
             }
         }
         // 2c. E33 (`--tight-q N`): can the mover alone still beat the opponent's sure next length?
-        if self.cfg.tight_q > 0 && level as u32 <= self.cfg.tight_q && reach_on && pos.left[opp] != 0 {
+        if self.cfg.tight_q > 0 && level as u32 <= self.cfg.tight_q && level as u32 >= self.cfg.tight_q_min && reach_on && pos.left[opp] != 0 {
             let upper = if have_clusters && !my_clusters.overflow {
                 let mut u = pos.longest[me] as i32;
                 for i in 0..my_clusters.n {
@@ -2016,7 +2050,7 @@ mod tests {
                 let now = pos.longest[pos.stm as usize ^ 1] as i32;
                 assert!(bf >= now);
                 for floor in [i32::MIN, now + 1, now + 2, now + 3, now + 5, bf, bf + 1] {
-                    let g = sure_next_length(t, &pos, floor, &mut cand);
+                    let g = sure_next_length(t, &pos, floor, &mut cand, &mut 0);
                     let f = floor.max(now + 1);
                     checked += 1;
                     if bf >= f && extensions_at_least(&pos, f) <= MAX_EXT {

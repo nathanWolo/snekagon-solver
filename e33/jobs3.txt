@@ -1,0 +1,6 @@
+s3_base_p0|frozen/climb-base-plain.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet
+s3_q6m6h3_p0|<scratchpad>/wt/tq-v2.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet --tq-study --tight-q 6 --tight-q-min 6 --tight-q-hand 3
+s3_q7m6h4_p0|<scratchpad>/wt/tq-v2.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet --tq-study --tight-q 7 --tight-q-min 6 --tight-q-hand 4
+s3_q8m6h4_p0|<scratchpad>/wt/tq-v2.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet --tq-study --tight-q 8 --tight-q-min 6 --tight-q-hand 4 --profile
+s3_q7m7h4_p0|<scratchpad>/wt/tq-v2.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet --tq-study --tight-q 7 --tight-q-min 7 --tight-q-hand 4
+s3_base2_p0|frozen/climb-base-plain.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet

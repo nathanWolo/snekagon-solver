@@ -132,7 +132,7 @@ fn verify(t: &Tables, games: usize, seed: u64) {
                 let _ = me;
                 let bf = bounds::sure_next_length_brute(t, &pos);
                 let mut cand = Vec::new();
-                let g = bounds::sure_next_length(t, &pos, i32::MIN, &mut cand);
+                let g = bounds::sure_next_length(t, &pos, i32::MIN, &mut cand, &mut 0);
                 let now = pos.longest[opp] as i32;
                 let mut ne = 0;
                 pos.for_each_move(t, opp, pos.left[opp], |m| {
@@ -317,6 +317,8 @@ fn parse_opts(args: &[String]) -> Opts {
                 }
             }
             "--tight-q" => o.cfg.tight_q = val().parse().unwrap(),
+            "--tight-q-min" => o.cfg.tight_q_min = val().parse().unwrap(),
+            "--tight-q-margin" => o.cfg.tight_q_margin = val().parse().unwrap(),
             "--tight-q-hand" => o.cfg.tight_q_hand = val().parse().unwrap(),
             "--tight-q-work" => o.cfg.tight_q_work = val().parse().unwrap(),
             "--tq-study" => o.cfg.tq_study = true,
@@ -486,7 +488,10 @@ fn bench(t: &Tables, o: &Opts) {
                 continue;
             }
             let undec = q[0] - q[2] - q[4];
-            writeln!(out, "# TQ {:2}: {} {} {} {} {} | {} {} {}", l, q[0], q[1], q[2], q[3], q[4], q[5] / q[0], q[6] / q[3].max(1), q[7] / undec.max(1)).unwrap();
+            writeln!(out, "# TQ {:2}: {} {} {} {} {} | {} {} {} | exits {:?}", l, q[0], q[1], q[2], q[3], q[4], q[5] / q[0], q[6] / q[3].max(1), q[7] / undec.max(1), solver.tq_exit[l]).unwrap();
+            if o.cfg.tq_study {
+                writeln!(out, "# TQM {:2} [questions, decided, cycles/question] by margin 0..7+, unknown: {:?}", l, q_m(&solver.tq_margin[l])).unwrap();
+            }
         }
     }
     #[cfg(feature = "tqcheck")]
@@ -604,6 +609,11 @@ fn main() {
             println!("options: --threads N --par-level N --par-join N --pn --pn-slack N --pn-rank N --pn-mul N --pn-ab LEVEL --pn-unit NODES --pn-width N --pn-model --pn-probe --pn-killers --pn-tt BITS --no-prefetch --no-witness --tt-skip LEVEL --no-bounds --no-last --no-threats --no-reach --no-model --model-level N --model W,W,... --reach-hand N --reach-work N --tt <log2 entries> --nodes <limit> --from <i> --to <j> --quiet");
         }
     }
+}
+
+/// E33 study: [questions, decided, cycles per question] by margin.
+fn q_m(m: &[[u64; 3]; 9]) -> Vec<[u64; 3]> {
+    m.iter().map(|e| [e[0], e[1], e[2] / e[0].max(1)]).collect()
 }
 
 /// E30: the cost counters of a bench run.

@@ -1,9 +1,10 @@
 //! Check build of E33, the tight question (feature `tqcheck`; a verification tool, not the solver).
 //!
-//! At every node the rule decides, the node is solved again exactly (full window) by a second
+//! At every node the rule decides, the node is searched again by a second
 //! solver that has the rule switched off (`tight_q = 0`) and a table of its own, so nothing the rule
 //! computed can answer it and it never writes into the searching solver's table. The program aborts
-//! when the exact value breaks the rule's claim (at most 0 for alpha >= 0, a loss for alpha = -1).
+//! when the value breaks the rule's claim (at most 0 for alpha >= 0, a loss for alpha = -1); the
+//! window of that search is (claim, claim + 1), which answers "value <= claim" exactly.
 //! At the same node G is compared with the brute force (`sure_next_length_brute`: every move of
 //! ours, then every placement of the opponent): the G used must not be above it. The "cannot reach"
 //! answer is asked again with unlimited work, and for a hand of at most two (sampled for three)
@@ -34,9 +35,9 @@ pub const NAMES: [&str; 14] = [
     "nodes decided (all re-searched)",
     "  decided by the cluster bound",
     "  decided by a reach question",
-    "  exact value -1",
-    "  exact value 0",
-    "  exact value +1 (would be a mismatch)",
+    "  re-search: value at most -1, claim -1",
+    "  re-search: value at most 0, claim 0",
+    "  re-search: value above the claim (a mismatch)",
     "cannot-reach answers asked again with unlimited work",
     "cannot-reach answers checked by the one-player optimum",
     "mismatches",
@@ -88,8 +89,9 @@ thread_local! {
     static SH: RefCell<Option<Solver>> = const { RefCell::new(None) };
 }
 
-/// The exact value of `pos` for the side to move, by a solver with the rule off and its own table.
-pub fn exact(cfg: &Config, pos: &Pos) -> i32 {
+/// The value of `pos` for the side to move in the window (a, b), by a solver with the rule off and
+/// its own table (exact inside the window, a true bound outside).
+pub fn exact(cfg: &Config, pos: &Pos, a: i32, b: i32) -> i32 {
     SH.with(|s| {
         let mut s = s.borrow_mut();
         if s.is_none() {
@@ -101,7 +103,7 @@ pub fn exact(cfg: &Config, pos: &Pos) -> i32 {
         }
         let sv = s.as_mut().unwrap();
         sv.clear();
-        let v = sv.solve(pos, -1, 1, u64::MAX);
+        let v = sv.solve(pos, a, b, u64::MAX);
         assert!(v != UNKNOWN);
         v
     })
@@ -152,10 +154,12 @@ pub fn check_decided(cfg: &Config, pos: &Pos, alpha: i32, g: i32, target: i32, b
             }
         }
     }
-    let e = exact(cfg, pos);
-    hit(8 + (e + 1) as usize);
+    // the claim is "value <= claim": the window (claim, claim + 1) answers exactly that
     let claim = if alpha >= 0 { 0 } else { -1 };
+    let e = exact(cfg, pos, claim, claim + 1);
     if e > claim {
-        fail("value", format!("position {} alpha {} G {} target {} by reach {}: exact {} above the claim {}", pos.to_text(), alpha, g, target, by_reach, e, claim));
+        hit(10);
+        fail("value", format!("position {} alpha {} G {} target {} by reach {}: re-search {} above the claim {}", pos.to_text(), alpha, g, target, by_reach, e, claim));
     }
+    hit(if claim < 0 { 8 } else { 9 });
 }

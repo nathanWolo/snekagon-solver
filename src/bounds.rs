@@ -572,14 +572,17 @@ pub const MAX_EXT: usize = 48;
 ///    longest kept. Leaving extensions out can only make "every move blocks them all" easier to
 ///    meet, so the length found is never above the true G (and is exact when nothing is left out).
 ///
-/// `cand` is scratch space (the moves of `me` that block every extension seen so far).
-pub fn sure_next_length(t: &Tables, pos: &Pos, floor: i32, cand: &mut Vec<BB>) -> i32 {
+/// `cand` is scratch space (the moves of `me` that block every extension seen so far); `why` says
+/// how it ended (study counters: 0 nothing can reach the floor, 1 no extension at the floor, 2 the
+/// longest length, 3 a shorter one, 4 every kept length is blocked by some move, 5 our pass ends it).
+pub fn sure_next_length(t: &Tables, pos: &Pos, floor: i32, cand: &mut Vec<BB>, why: &mut usize) -> i32 {
     let me = pos.stm as usize;
     let opp = me ^ 1;
     let now = pos.longest[opp] as i32;
     let floor = floor.max(now + 1);
     let left = pos.left[opp];
     if left == 0 {
+        *why = 0;
         return now;
     }
     let ns = pos.nsnakes[opp] as usize;
@@ -602,6 +605,7 @@ pub fn sure_next_length(t: &Tables, pos: &Pos, floor: i32, cand: &mut Vec<BB>) -
         }
     }
     if maxn + l1 + l2 < floor {
+        *why = 0;
         return now;
     }
     // the extensions of at least `floor` cells, longest first: (length, block)
@@ -667,6 +671,7 @@ pub fn sure_next_length(t: &Tables, pos: &Pos, floor: i32, cand: &mut Vec<BB>) -
         });
     }
     if ne == 0 {
+        *why = 1;
         return now;
     }
     // the longest length: the moves of ours that block all its extensions, found among the moves
@@ -712,8 +717,10 @@ pub fn sure_next_length(t: &Tables, pos: &Pos, floor: i32, cand: &mut Vec<BB>) -
     if cand.is_empty() {
         // no legal move of ours blocks them all (or we have none and pass)
         if pos.passes > 0 && !pos.has_move(t, me, pieces) {
+            *why = 5;
             return now; // our pass ends the game
         }
+        *why = 2;
         return top;
     }
     // each shorter length in turn: the moves that also block all of its extensions
@@ -726,10 +733,12 @@ pub fn sure_next_length(t: &Tables, pos: &Pos, floor: i32, cand: &mut Vec<BB>) -
         }
         cand.retain(|&c| ext[s..e2].iter().all(|x| c & x.1 != 0));
         if cand.is_empty() {
+            *why = 3;
             return len; // every move of ours leaves one of length len or more (we have one)
         }
         s = e2;
     }
+    *why = 4;
     now
 }
 

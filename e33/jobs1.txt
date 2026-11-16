@@ -1,0 +1,8 @@
+id_p0|<scratchpad>/wt/tq-v1.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet
+id_ply07|<scratchpad>/wt/tq-v1.exe|tests/set1/ply07.txt --from 0 --to 590 --quiet
+id_blue|<scratchpad>/wt/tq-v1.exe|tests/set1/bench_ply5_blue_wins.txt --quiet
+s1_base_p0|frozen/climb-base-plain.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet
+s1_q5_p0|<scratchpad>/wt/tq-v1.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet --tight-q 5 --tq-study --profile
+s1_q5h3_p0|<scratchpad>/wt/tq-v1.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet --tight-q 5 --tight-q-hand 3 --tq-study
+s1_q5n_p0|<scratchpad>/wt/tq-v1.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet --tight-q 5
+s1_base2_p0|frozen/climb-base-plain.exe|tests/proof4/positions.txt --from 0 --to 24 --window 0,1 --quiet
