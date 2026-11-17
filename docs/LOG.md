@@ -3326,3 +3326,43 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - *When the proof ends:* export the book again and publish it to the same link. Solving the
   third moves of the first 74 replies would take about 67,000 jobs (74 replies at the 907 a
   reply of the other 33), a few hours of the PC: an estimate, and the owner's call.
+
+## 2026-11-16 The centre opening is proved: all 172 replies refuted (23:09)
+
+- The board's Prove run on the position after `1:60` ended at 23:09:23 (`work/gui/runs.log`:
+  `status=done refuted=172 held=0 open=0 searched=95 nodes=363238270863 seconds=38140.7`,
+  begun 12:33:42 with 77 refuted). Owner at 23:10: "Did we just do it? Did we solve the game?"
+- `python tools/certificate.py` on the results file: 172 replies known to lose, none held;
+  1,932 replies in 172 classes by its own count from the piece shapes, 172 lose, 0 open; no
+  reply without its record. "by this file, 1:60 is a win for red".
+- *What it says:* the first move of a game must be the single hex, red may put it in the
+  centre, and after that red wins against every reply. So the start position is a win for the
+  first player. The file holds red's second move against every reply; deeper the strategy is
+  what the solver computes move by move (the play page does that), the trees are not kept.
+  Red's other first moves were not looked at.
+- *What it rests on:* one program in two builds (replies 1-74 by `frozen/prove.exe` on
+  2026-11-15, the rest by `frozen/prove-replay.exe`). Not checked by a second program yet.
+  The certificate script checks the top of the file only: for a reply of the board's run the
+  loss three moves in is the coordinator's line (it stands for the red-win jobs under it,
+  and jobs under 2,000 nodes are not written), so the file alone cannot be re-added by
+  hand. Known soft spot: the table's key check is 38 bits strong at `--tt 27` (the entry
+  above, "the table's key is 38 bits strong").
+- *What it cost:* about 19 hours of this PC on 16 threads over two days (7.6 h for the first
+  74 replies, 45 minutes and then 10.6 h on the board for the other 98). The winning lines
+  alone: 245 G nodes and 5.3 h of wall-clock for the first 74 (16 threads on one position
+  each), 192 G nodes and 88 thread-hours of red-win jobs for the other 98.
+- *Saved:* `proofs/centre-opening/` (`results.txt`, 17 MB, sha256 `cc29e5142c1fb2c0...`;
+  `meta.json` with the path of the seed made relative; `certificate.txt`), commit `dd4c361`.
+- *The play page:* book exported again from the finished file (172 replies, 94,016 third
+  moves, 418 KB; 67 of the first run's 74 replies still have no third move on file) and
+  published to the same link as version 3, after the self-test on a quiet machine: every
+  book move legal (172 answers, 94,016 third moves, no fault); 2,000 random games from the
+  105 replies with third moves, red won all, 10,521 solver moves, six moves in 7 ms on
+  average and 143 ms at most. (The engine loads in 75 ms on a quiet machine: the 12 s seen
+  in the afternoon were the proof's load.)
+- *The check by the reference solver, begun 23:14* (the plan of 13:15: one line first, then
+  say what all 172 would cost): `SOLVER_LOSS_TEST=1 ./build/snek solvepos 840 16 1:60
+  4A:82,83,94,105 4C:67,77,88,89` under the lock, no network, as `nobody`. The line is our
+  cheapest by the nodes of its jobs (403 M nodes, 702 thread-seconds). Output:
+  `work/refcheck/line98.txt`. Noted while reading its source: it has `refute` and
+  `proveline` modes of its own for proving a line reply by reply.

@@ -20,6 +20,13 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 
 Update this section in the same change that freezes a version.
 
+- **The centre opening is proved (2026-11-16 23:09): after `1:60` red wins against all 172
+  classes of blue's reply, so the start position is a first-player win, by our solver.** The
+  proof's files are in `proofs/centre-opening/` (results, replies, certificate). Not yet
+  checked by a second program: the reference solver was given one certificate line at 23:14
+  (`work/refcheck/`); say what all 172 would cost before running them. The proof no longer
+  runs: the bullets below about the board's run and the pause of `1:60` are history. The
+  outreach to the publisher is the owner's. LOG, "The centre opening is proved".
 - **The climb is paused since 2026-11-16 10:37 at the owner's request, and its standing goal
   was cleared by the owner at about 11:00. No climbing agent is running; do not restart the
   climb without the owner's word.** The three lines each have a current `HANDOVER.md` on their
