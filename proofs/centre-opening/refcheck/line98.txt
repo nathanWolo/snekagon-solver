@@ -1,0 +1,1556 @@
+root moves: 777  ply 3 stm 1
+[     1s]    1 solved  4C:49,59,70,71         loss    0.5s       119763 nodes
+[     1s]    2 solved  3V:50,61,71            loss    0.5s       119073 nodes
+[     1s]    3 solved  4I:48,59,70,81         loss    0.6s       147697 nodes
+[     1s]    4 solved  4C:49,50,61,71         loss    0.7s       163526 nodes
+[     1s]    5 solved  4I:18,29,40,51         loss    0.7s       173154 nodes
+[     1s]    6 solved  4B:29,40,41,52         loss    0.7s       164890 nodes
+[     1s]    7 solved  4B:39,40,51,52         loss    0.8s       253811 nodes
+[     1s]    8 solved  4I:19,30,41,52         loss    0.6s       132023 nodes
+[     1s]    9 solved  4B:28,29,40,41         loss    0.7s       162656 nodes
+[     1s]   10 solved  4B:28,39,40,51         loss    1.2s       313165 nodes
+[     1s]   11 solved  4I:38,39,40,41         loss    1.2s       267153 nodes
+[     1s]   12 solved  4C:30,40,51,52         loss    0.6s       160831 nodes
+[     2s]   13 solved  4I:29,40,51,62         loss    1.4s       372193 nodes
+[     2s]   14 solved  4B:29,30,41,42         loss    0.8s       216771 nodes
+[     2s]   15 solved  4I:39,40,41,42         loss    1.5s       457824 nodes
+[     2s]   16 solved  4B:30,41,42,53         loss    0.8s       216056 nodes
+[     2s]   17 solved  4B:40,41,52,53         loss    0.5s       143742 nodes
+[     2s]   18 solved  4B:19,30,40,51         loss    1.2s       332150 nodes
+[     2s]   19 solved  4B:20,31,41,52         loss    0.7s       165764 nodes
+[     2s]   20 solved  4B:30,41,51,62         loss    0.6s       139912 nodes
+[     2s]   21 solved  4B:79,80,91,92         loss    0.4s        94116 nodes
+[     2s]   22 solved  4B:18,29,30,41         loss    0.3s        75811 nodes
+[     2s]   23 solved  4B:68,69,80,81         loss    0.2s         7420 nodes
+[     2s]   24 solved  4I:68,69,70,71         loss    0.3s        31257 nodes
+[     2s]   25 solved  3V:39,40,51            loss    0.8s       173269 nodes
+[     2s]   26 solved  4C:90,92,101,102       loss    0.2s        19206 nodes
+[     2s]   27 solved  4B:70,71,79,80         loss    0.6s       179822 nodes
+[     2s]   28 solved  4C:19,29,40,41         loss    0.4s        81799 nodes
+[     2s]   29 solved  4B:19,30,31,42         loss    0.5s       102485 nodes
+[     3s]   30 solved  4C:41,51,62,63         loss    1.5s       413337 nodes
+[     3s]   31 solved  4C:31,32,43,53         loss    0.3s        63017 nodes
+[     3s]   32 solved  4C:70,80,91,92         loss    0.2s        13972 nodes
+[     3s]   33 solved  4C:79,81,90,91         loss    0.9s       236780 nodes
+[     3s]   34 solved  3V:61,62,71            loss    2.4s       730752 nodes
+[     3s]   35 solved  4I:37,38,39,40         loss    0.3s        74260 nodes
+[     3s]   36 solved  4I:30,41,52,63         loss    0.7s       196912 nodes
+[     3s]   37 solved  4B:30,31,39,40         loss    0.6s       138364 nodes
+[     3s]   38 solved  4C:31,41,52,53         loss    0.4s        86305 nodes
+[     3s]   39 solved  4B:37,48,58,69         loss    0.7s       150914 nodes
+[     3s]   40 solved  4I:28,29,30,31         loss    0.5s       132412 nodes
+[     3s]   41 solved  4B:102,103,114,115     loss    0.2s        22679 nodes
+[     3s]   42 solved  4C:30,31,42,52         loss    1.1s       378828 nodes
+[     3s]   43 solved  4B:18,19,30,31         loss    0.4s       104167 nodes
+[     3s]   44 solved  4C:59,69,80,81         loss    0.6s       179307 nodes
+[     3s]   45 solved  4C:92,103,112,113      loss    0.2s        28063 nodes
+[     3s]   46 solved  4B:58,69,70,81         loss    0.6s       165339 nodes
+[     4s]   47 solved  4B:58,59,70,71         loss    0.9s       226570 nodes
+[     4s]   48 solved  4I:112,113,114,115     loss    0.4s       105046 nodes
+[     4s]   49 solved  4C:40,42,51,52         loss    0.8s       252666 nodes
+[     4s]   50 solved  3I:29,40,51            loss    1.1s       251901 nodes
+[     4s]   51 solved  3I:51,61,71            loss    3.7s       890618 nodes
+[     4s]   52 solved  4C:29,31,40,41         loss    0.8s       201381 nodes
+[     4s]   53 solved  4C:7,8,17,19           loss    0.6s       154175 nodes
+[     4s]   54 solved  4B:29,30,38,39         loss    0.4s       109187 nodes
+[     4s]   55 solved  4C:8,9,18,20           loss    0.8s       207764 nodes
+[     4s]   56 solved  4B:31,42,52,63         loss    0.5s       127458 nodes
+[     4s]   57 solved  4I:20,31,42,53         loss    0.9s       229197 nodes
+[     4s]   58 solved  4B:27,28,39,40         loss    1.5s       507724 nodes
+[     4s]   59 solved  2:61,71                loss    1.7s       447223 nodes
+[     5s]   60 solved  4C:28,30,39,40         loss    0.6s       134847 nodes
+[     5s]   61 solved  4C:19,20,31,41         loss    0.6s       154156 nodes
+[     5s]   62 solved  4C:30,31,40,51         loss    0.4s       100213 nodes
+[     5s]   63 solved  4I:41,52,63,74         loss    0.7s       197426 nodes
+[     5s]   64 solved  4C:20,21,32,42         loss    1.4s       379331 nodes
+[     5s]   65 solved  4B:51,62,63,74         loss    0.8s       214362 nodes
+[     5s]   66 solved  4I:8,19,30,41          loss    0.5s       124646 nodes
+[     5s]   67 solved  3I:39,40,41            loss    1.0s       243456 nodes
+[     5s]   68 solved  4I:17,18,19,20         loss    0.6s       169217 nodes
+[     5s]   69 solved  4B:40,51,52,63         loss    3.7s       999169 nodes
+[     5s]   70 solved  4B:17,28,29,40         loss    0.4s       109740 nodes
+[     5s]   71 solved  4B:17,18,29,30         loss    0.5s       142415 nodes
+[     5s]   72 solved  3V:31,41,52            loss    0.6s       139108 nodes
+[     5s]   73 solved  4C:18,28,39,40         loss    0.4s        94909 nodes
+[     5s]   74 solved  4C:9,10,19,21          loss    0.9s       249527 nodes
+[     5s]   75 solved  4C:51,53,62,63         loss    1.3s       391234 nodes
+[     6s]   76 solved  4I:27,28,29,30         loss    0.3s        81050 nodes
+[     6s]   77 solved  3I:40,51,62            loss    2.0s       558244 nodes
+[     6s]   78 solved  4C:20,30,41,42         loss    0.5s       120210 nodes
+[     6s]   79 solved  3V:40,51,52            loss    2.1s       540258 nodes
+[     6s]   80 solved  4C:28,29,38,40         loss    1.0s       262139 nodes
+[     6s]   81 solved  4C:41,42,51,62         loss    0.3s        68472 nodes
+[     6s]   82 solved  4I:40,41,42,43         loss    0.3s        79256 nodes
+[     6s]   83 solved  4C:9,10,21,31          loss    1.3s       359245 nodes
+[     6s]   84 solved  3I:19,30,41            loss    0.5s       134033 nodes
+[     6s]   85 solved  4B:41,52,53,64         loss    1.5s       385104 nodes
+[     6s]   86 solved  3I:30,41,52            loss    1.1s       275955 nodes
+[     6s]   87 solved  3V:29,40,41            loss    0.5s       125333 nodes
+[     6s]   88 solved  3V:41,51,62            loss    0.8s       165883 nodes
+[     6s]   89 solved  3I:38,39,40            loss    0.5s       134477 nodes
+[     6s]   90 solved  3V:30,41,42            loss    0.5s       112965 nodes
+[     6s]   91 solved  3V:41,52,53            loss    0.4s        96441 nodes
+[     6s]   92 solved  4B:21,32,42,53         loss    1.3s       312062 nodes
+[     6s]   93 solved  4B:31,42,43,54         loss    0.8s       205768 nodes
+[     6s]   94 solved  3V:30,40,51            loss    0.4s        84473 nodes
+[     6s]   95 solved  4C:27,29,38,39         loss    0.4s        90467 nodes
+[     6s]   96 solved  4I:29,30,31,32         loss    0.7s       194649 nodes
+[     6s]   97 solved  4C:18,19,28,30         loss    0.3s       102323 nodes
+[     7s]   98 solved  4B:8,19,20,31          loss    0.4s       120426 nodes
+[     7s]   99 solved  3V:40,41,52            loss    0.9s       239982 nodes
+[     7s]  100 solved  4B:9,20,30,41          loss    0.8s       225891 nodes
+[     7s]  101 solved  4B:19,20,28,29         loss    0.5s       137956 nodes
+[     7s]  102 solved  4B:7,8,19,20           loss    0.7s       178833 nodes
+[     7s]  103 solved  4B:19,20,31,32         loss    0.8s       189155 nodes
+[     7s]  104 solved  4C:19,20,29,31         loss    1.6s       388930 nodes
+[     7s]  105 solved  4I:36,37,38,39         loss    0.3s        77328 nodes
+[     7s]  106 solved  4I:16,17,18,19         loss    0.5s       120768 nodes
+[     7s]  107 solved  4C:41,42,53,63         loss    0.3s        80856 nodes
+[     7s]  108 solved  4I:9,20,31,42          loss    0.9s       190489 nodes
+[     7s]  109 solved  4B:20,31,32,43         loss    0.8s       214080 nodes
+[     7s]  110 solved  4B:8,9,17,18           loss    0.9s       247769 nodes
+[     7s]  111 solved  4B:38,39,47,48         loss    0.5s       130495 nodes
+[     7s]  112 solved  4I:18,19,20,21         loss    1.1s       270397 nodes
+[     8s]  113 solved  3I:29,30,31            loss    0.6s       152515 nodes
+[     8s]  114 solved  4B:30,31,42,43         loss    0.1s        24798 nodes
+[     8s]  115 solved  3V:29,30,41            loss    0.4s        84681 nodes
+[     8s]  116 solved  4C:42,43,54,64         loss    0.4s       108609 nodes
+[     8s]  117 solved  3I:113,114,115         loss    0.8s       203619 nodes
+[     8s]  118 solved  3I:40,41,42            loss    1.5s       390190 nodes
+[     8s]  119 solved  4B:9,10,18,19          loss    0.7s       194958 nodes
+[     8s]  120 solved  4C:6,7,16,18           loss    1.3s       402274 nodes
+[     8s]  121 solved  4B:18,19,27,28         loss    0.5s       152672 nodes
+[     8s]  122 solved  3V:19,20,31            loss    0.5s       122196 nodes
+[     8s]  123 solved  4C:42,52,63,64         loss    0.5s       108325 nodes
+[     8s]  124 solved  4B:10,21,31,42         loss    1.0s       235819 nodes
+[     8s]  125 solved  3V:28,39,40            loss    0.4s       122155 nodes
+[     8s]  126 solved  3V:19,30,31            loss    0.4s        99475 nodes
+[     8s]  127 solved  4B:28,29,37,38         loss    0.4s        98597 nodes
+[     8s]  128 solved  3V:31,42,52            loss    0.7s       156864 nodes
+[     9s]  129 solved  4B:6,7,18,19           loss    1.2s       292047 nodes
+[     9s]  130 solved  4C:20,21,30,32         loss    0.6s       161868 nodes
+[     9s]  131 solved  3V:30,31,42            loss    0.4s        95563 nodes
+[     9s]  132 solved  4I:31,42,53,64         loss    1.6s       427887 nodes
+[     9s]  133 solved  3I:79,80,81            loss    0.7s       203470 nodes
+[     9s]  134 solved  3V:92,103,113          loss    0.4s       121347 nodes
+[     9s]  135 solved  4C:36,38,47,48         loss    0.7s       182688 nodes
+[     9s]  136 solved  4I:47,58,69,80         loss    0.8s       145597 nodes
+[     9s]  137 solved  4C:26,28,37,38         loss    0.2s        59220 nodes
+[     9s]  138 solved  4B:31,32,40,41         loss    0.5s       156548 nodes
+[     9s]  139 solved  4B:21,31,42,52         loss    0.7s       173736 nodes
+[     9s]  140 solved  4C:17,19,28,29         loss    0.3s        73287 nodes
+[     9s]  141 solved  4B:26,27,38,39         loss    0.3s        82426 nodes
+[     9s]  142 solved  3V:41,42,53            loss    0.3s        68394 nodes
+[     9s]  143 solved  4C:18,20,29,30         loss    0.3s        84799 nodes
+[     9s]  144 solved  4I:26,27,28,29         loss    0.4s       128495 nodes
+[     9s]  145 solved  4I:7,18,29,40          loss    0.5s       127438 nodes
+[    10s]  146 solved  4B:20,21,29,30         loss    0.6s       158370 nodes
+[    10s]  147 solved  4B:19,28,29,38         loss    1.9s       528406 nodes
+[    10s]  148 solved  3V:92,101,102          loss    0.5s       140358 nodes
+[    10s]  149 solved  3V:103,114,115         loss    0.6s       150037 nodes
+[    10s]  150 solved  3V:18,29,30            loss    0.3s        65519 nodes
+[    10s]  151 solved  3I:31,42,53            loss    1.2s       265619 nodes
+[    10s]  152 solved  4B:42,53,63,74         loss    0.4s        88746 nodes
+[    10s]  153 solved  4B:31,41,52,62         loss    0.4s        93373 nodes
+[    10s]  154 solved  3I:92,102,112          loss    0.7s       197057 nodes
+[    10s]  155 solved  4B:41,42,53,54         loss    0.3s        81362 nodes
+[    10s]  156 solved  3V:80,91,92            loss    0.4s       115900 nodes
+[    10s]  157 solved  3I:41,52,63            loss    2.0s       466420 nodes
+[    10s]  158 solved  4B:42,53,54,65         loss    0.5s       121218 nodes
+[    10s]  159 solved  4B:16,17,28,29         loss    0.4s       107782 nodes
+[    10s]  160 solved  3I:18,29,40            loss    0.5s       137367 nodes
+[    10s]  161 solved  3I:18,19,20            loss    0.8s       194672 nodes
+[    10s]  162 solved  4C:8,9,20,30           loss    0.9s       220986 nodes
+[    10s]  163 solved  3I:90,91,92            loss    0.8s       227567 nodes
+[    10s]  164 solved  3V:51,62,63            loss    4.4s      1225538 nodes
+[    11s]  165 solved  3I:20,31,42            loss    0.7s       163604 nodes
+[    11s]  166 solved  3I:17,18,19            loss    0.5s       115321 nodes
+[    11s]  167 solved  4I:21,32,43,54         loss    1.4s       329977 nodes
+[    11s]  168 solved  3V:69,80,81            loss    0.5s       150496 nodes
+[    11s]  169 solved  4B:5,6,17,18           loss    1.1s       273480 nodes
+[    11s]  170 solved  3V:81,90,91            loss    0.7s       185529 nodes
+[    11s]  171 solved  3V:69,70,81            loss    0.5s       144956 nodes
+[    11s]  172 solved  3V:59,70,71            loss    0.5s       153716 nodes
+[    11s]  173 solved  3I:69,70,71            loss    0.8s       239278 nodes
+[    11s]  174 solved  3I:59,70,81            loss    0.7s       203368 nodes
+[    11s]  175 solved  4B:8,19,29,40          loss    0.4s       120560 nodes
+[    11s]  176 solved  4C:19,30,39,40         loss    0.7s       176876 nodes
+[    11s]  177 solved  4B:18,27,28,37         loss    0.5s       143052 nodes
+[    11s]  178 solved  4B:27,28,36,37         loss    0.7s       143688 nodes
+[    11s]  179 solved  2:40,51                loss    1.4s       346616 nodes
+[    11s]  180 solved  4C:5,6,15,17           loss    0.8s       201448 nodes
+[    11s]  181 solved  4B:7,18,19,30          loss    0.4s       133914 nodes
+[    11s]  182 solved  2:41,52                loss    0.5s       131639 nodes
+[    12s]  183 solved  3V:20,30,41            loss    0.4s        92403 nodes
+[    12s]  184 solved  3V:30,39,40            loss    0.7s       160539 nodes
+[    12s]  185 solved  3V:42,52,63            loss    0.4s       106937 nodes
+[    12s]  186 solved  3V:28,29,40            loss    0.5s       124503 nodes
+[    12s]  187 solved  4C:17,27,38,39         loss    0.6s       190648 nodes
+[    12s]  188 solved  4C:18,29,38,39         loss    0.3s        76916 nodes
+[    12s]  189 solved  4C:29,30,39,41         loss    0.9s       256130 nodes
+[    12s]  190 solved  4C:53,54,65,75         loss    0.6s       124907 nodes
+[    12s]  191 solved  3V:70,71,80            loss    1.9s       404305 nodes
+[    12s]  192 solved  3I:28,29,30            loss    0.5s       109919 nodes
+[    12s]  193 solved  4I:36,47,58,69         loss    4.6s      1040106 nodes
+[    12s]  194 solved  4B:8,9,20,21           loss    0.9s       222038 nodes
+[    12s]  195 solved  4B:7,8,16,17           loss    0.9s       245800 nodes
+[    13s]  196 solved  3V:20,31,41            loss    0.6s       147695 nodes
+[    13s]  197 solved  4B:32,43,53,64         loss    0.5s       108999 nodes
+[    13s]  198 solved  4C:31,32,41,52         loss    0.3s        66757 nodes
+[    13s]  199 solved  4B:9,20,21,32          loss    1.4s       362196 nodes
+[    13s]  200 solved  4I:6,7,8,9             loss    1.5s       341084 nodes
+[    13s]  201 solved  2:31,42                loss    0.7s       172622 nodes
+[    13s]  202 solved  3V:8,9,18              loss    0.6s       162843 nodes
+[    13s]  203 solved  3V:29,38,39            loss    0.7s       150869 nodes
+[    13s]  204 solved  4C:17,18,27,29         loss    1.6s       446651 nodes
+[    13s]  205 solved  4C:70,71,80,91         loss    1.1s       267973 nodes
+[    13s]  206 solved  2:51,52                loss    0.8s       194193 nodes
+[    13s]  207 solved  4I:7,8,9,10            loss    1.9s       485864 nodes
+[    13s]  208 solved  2:51,62                loss    1.0s       242120 nodes
+[    13s]  209 solved  3V:18,19,30            loss    0.6s       162618 nodes
+[    13s]  210 solved  3V:31,32,43            loss    0.6s       136383 nodes
+[    14s]  211 solved  4C:17,28,37,38         loss    0.2s        63502 nodes
+[    14s]  212 solved  4B:29,38,39,48         loss    0.7s       155461 nodes
+[    14s]  213 solved  2:18,19                loss    0.6s       137286 nodes
+[    14s]  214 solved  4C:27,38,47,48         loss    0.4s        76481 nodes
+[    14s]  215 solved  4I:10,21,32,43         loss    2.1s       488166 nodes
+[    14s]  216 solved  4C:69,70,79,81         loss    1.3s       266852 nodes
+[    14s]  217 solved  2:41,42                loss    0.8s       176409 nodes
+[    14s]  218 solved  2:42,53                loss    0.5s       113981 nodes
+[    14s]  219 solved  3V:7,8,19              loss    0.9s       167389 nodes
+[    14s]  220 solved  2:42,52                loss    1.2s       235663 nodes
+[    14s]  221 solved  2:30,41                loss    0.6s       106228 nodes
+[    14s]  222 solved  3V:19,28,29            loss    0.4s        72719 nodes
+[    14s]  223 solved  4B:32,42,53,63         loss    0.7s       130298 nodes
+[    15s]  224 solved  4B:28,37,38,47         loss    2.0s       446232 nodes
+[    15s]  225 solved  4C:41,43,52,53         loss    0.5s       105934 nodes
+[    15s]  226 solved  4B:20,30,41,51         loss    0.5s       128119 nodes
+[    15s]  227 solved  3V:32,43,53            loss    0.6s       149404 nodes
+[    15s]  228 solved  3V:21,32,42            loss    1.7s       350736 nodes
+[    15s]  229 solved  4I:52,63,74,85         loss    1.5s       337262 nodes
+[    15s]  230 solved  3V:42,43,54            loss    0.8s       198499 nodes
+[    15s]  231 solved  2:41,51                loss    0.8s       180413 nodes
+[    15s]  232 solved  2:40,41                loss    1.0s       229283 nodes
+[    15s]  233 solved  2:30,31                loss    0.6s       152455 nodes
+[    15s]  234 solved  3I:37,38,39            loss    0.5s       138631 nodes
+[    15s]  235 solved  4B:37,38,46,47         loss    1.5s       445259 nodes
+[    16s]  236 solved  4C:30,32,41,42         loss    0.9s       223006 nodes
+[    16s]  237 solved  4C:40,41,52,62         loss    0.7s       136619 nodes
+[    16s]  238 solved  4I:42,53,64,75         loss    0.6s        81880 nodes
+[    16s]  239 solved  4I:28,38,48,58         loss    2.3s       543753 nodes
+[    16s]  240 solved  2:20,31                loss    0.6s       124684 nodes
+[    16s]  241 solved  2:19,20                loss    0.6s       139451 nodes
+[    16s]  242 solved  3I:27,28,29            loss    1.0s       242797 nodes
+[    16s]  243 solved  4C:9,19,30,31          loss    0.3s        73440 nodes
+[    16s]  244 solved  2:31,41                loss    0.8s       200262 nodes
+[    16s]  245 solved  3V:52,63,64            loss    0.7s       155742 nodes
+[    16s]  246 solved  4I:15,16,17,18         loss    1.4s       311229 nodes
+[    16s]  247 solved  3V:17,28,29            loss    0.5s       130019 nodes
+[    16s]  248 solved  4B:16,17,25,26         loss    1.5s       392758 nodes
+[    17s]  249 solved  4C:16,18,27,28         loss    0.3s        69639 nodes
+[    17s]  250 solved  4C:53,63,74,75         loss    0.7s       161187 nodes
+[    17s]  251 solved  3V:27,38,39            loss    0.5s       129752 nodes
+[    17s]  252 solved  4C:5,6,15,26           loss    1.8s       487486 nodes
+[    17s]  253 solved  4B:52,63,64,75         loss    3.6s       939739 nodes
+[    17s]  254 solved  4B:17,18,26,27         loss    2.3s       658402 nodes
+[    17s]  255 solved  4C:20,21,30,41         loss    0.1s        29248 nodes
+[    17s]  256 solved  4C:29,30,41,51         loss    1.0s       292562 nodes
+[    17s]  257 solved  3V:9,10,19             loss    0.9s       224673 nodes
+[    17s]  258 solved  3V:10,21,31            loss    0.9s       221179 nodes
+[    17s]  259 solved  2:17,18                loss    0.6s       166276 nodes
+[    18s]  260 solved  3V:8,9,20              loss    0.9s       228536 nodes
+[    18s]  261 solved  3I:9,20,31             loss    0.7s       173923 nodes
+[    18s]  262 solved  4C:52,54,63,64         loss    1.1s       251465 nodes
+[    18s]  263 solved  3V:20,21,32            loss    1.2s       305889 nodes
+[    18s]  264 solved  4B:36,45,46,55         loss    0.6s       119557 nodes
+[    18s]  265 solved  3V:28,37,38            loss    1.8s       494708 nodes
+[    18s]  266 solved  3I:19,20,21            loss    1.0s       228054 nodes
+[    18s]  267 solved  4I:32,43,54,65         loss    1.7s       386007 nodes
+[    18s]  268 solved  3V:7,8,17              loss    0.7s       194154 nodes
+[    18s]  269 solved  3V:32,42,53            loss    0.4s       102194 nodes
+[    18s]  270 solved  2:19,30                loss    0.6s       144670 nodes
+[    18s]  271 solved  3I:32,42,52            loss    1.3s       328420 nodes
+[    19s]  272 solved  2:52,53                loss    1.0s       242346 nodes
+[    19s]  273 solved  4C:8,18,29,30          loss    0.4s       111883 nodes
+[    19s]  274 solved  2:92,102               loss    2.0s       515201 nodes
+[    19s]  275 solved  3I:16,17,18            loss    0.6s       138707 nodes
+[    19s]  276 solved  4I:5,6,7,8             loss    2.3s       606857 nodes
+[    19s]  277 solved  3V:42,53,63            loss    0.6s       134462 nodes
+[    19s]  278 solved  3I:52,63,74            loss    1.0s       259115 nodes
+[    19s]  279 solved  4C:7,9,18,19           loss    0.5s       133015 nodes
+[    19s]  280 solved  4C:26,37,46,47         loss    0.8s       176880 nodes
+[    19s]  281 solved  3V:31,40,41            loss    1.1s       298018 nodes
+[    19s]  282 solved  4B:7,16,17,26          loss    0.5s       133340 nodes
+[    19s]  283 solved  3I:51,52,53            loss    0.7s       172885 nodes
+[    20s]  284 solved  3I:31,41,51            loss    0.8s       195589 nodes
+[    20s]  285 solved  3V:31,42,43            loss    0.8s       198705 nodes
+[    20s]  286 solved  4C:21,31,42,43         loss    0.8s       179826 nodes
+[    20s]  287 solved  4C:52,53,64,74         loss    0.4s       102622 nodes
+[    20s]  288 solved  3V:18,27,28            loss    0.3s        79990 nodes
+[    20s]  289 solved  3V:6,7,18              loss    1.5s       416843 nodes
+[    20s]  290 solved  4C:41,42,51,53         loss    0.1s        28211 nodes
+[    20s]  291 solved  3V:20,29,30            loss    1.1s       313370 nodes
+[    20s]  292 solved  4C:25,27,36,37         loss    0.3s        82570 nodes
+[    20s]  293 solved  3V:7,18,19             loss    0.4s        99779 nodes
+[    20s]  294 solved  3I:42,53,64            loss    0.5s       118912 nodes
+[    20s]  295 solved  3I:41,42,43            loss    0.4s       100425 nodes
+[    20s]  296 solved  4B:17,26,27,36         loss    1.2s       332580 nodes
+[    20s]  297 solved  2:39,40                loss    0.8s       197330 nodes
+[    21s]  298 solved  2:29,40                loss    0.5s       125896 nodes
+[    21s]  299 solved  4B:51,52,63,64         loss    0.5s       102218 nodes
+[    21s]  300 solved  3I:30,31,32            loss    0.4s        90999 nodes
+[    21s]  301 solved  4C:32,42,53,54         loss    0.9s       210875 nodes
+[    21s]  302 solved  4B:27,36,37,46         loss    1.7s       444840 nodes
+[    21s]  303 solved  4C:35,37,46,47         loss    4.8s      1773542 nodes
+[    21s]  304 solved  4B:81,90,91,100        loss    0.9s       366452 nodes
+[    21s]  305 solved  3V:19,29,40            loss    0.6s       146844 nodes
+[    22s]  306 solved  4I:25,26,27,28         loss    2.9s      1050102 nodes
+[    22s]  307 solved  4I:18,28,38,48         loss    0.8s       217687 nodes
+[    22s]  308 solved  4C:19,21,30,31         loss    0.3s        59554 nodes
+[    22s]  309 solved  4C:30,31,40,42         loss    0.6s       189799 nodes
+[    22s]  310 solved  2:29,30                loss    0.5s       100043 nodes
+[    22s]  311 solved  4I:8,18,28,38          loss    2.3s       702497 nodes
+[    22s]  312 solved  2:81,91                loss    6.5s      1725134 nodes
+[    22s]  313 solved  4B:20,29,30,39         loss    1.9s       491504 nodes
+[    23s]  314 solved  3V:19,20,29            loss    2.7s       649467 nodes
+[    23s]  315 solved  4C:31,42,51,52         loss    0.4s        79573 nodes
+[    23s]  316 solved  4B:27,37,48,58         loss    0.9s       201521 nodes
+[    23s]  317 solved  3V:17,18,29            loss    0.6s       191940 nodes
+[    23s]  318 solved  2:92,103               loss    0.3s       108236 nodes
+[    23s]  319 solved  4B:8,17,18,27          loss    0.4s        94836 nodes
+[    23s]  320 solved  4B:26,35,36,45         loss    0.7s       140107 nodes
+[    23s]  321 solved  4I:17,27,37,47         loss    2.6s       702569 nodes
+[    23s]  322 solved  3I:47,58,69            loss    1.5s       320776 nodes
+[    23s]  323 solved  4C:42,53,62,63         loss    0.8s       176061 nodes
+[    23s]  324 solved  3V:18,19,28            loss    3.0s       876614 nodes
+[    23s]  325 solved  4C:15,16,25,36         loss    4.3s      1259724 nodes
+[    23s]  326 solved  3V:28,29,38            loss    1.5s       333183 nodes
+[    24s]  327 solved  4B:6,17,18,29          loss    0.4s       132417 nodes
+[    24s]  328 solved  4C:25,26,35,46         loss    2.7s       655020 nodes
+[    24s]  329 solved  3V:8,17,18             loss    0.7s       165039 nodes
+[    24s]  330 solved  4B:17,27,38,48         loss    0.8s       201913 nodes
+[    24s]  331 solved  3V:20,31,32            loss    0.6s       146408 nodes
+[    24s]  332 solved  2:52,62                loss    0.9s       221585 nodes
+[    24s]  333 solved  3V:48,58,69            loss    3.4s       808082 nodes
+[    24s]  334 solved  3V:8,19,20             loss    0.4s       107340 nodes
+[    24s]  335 solved  4C:20,31,40,41         loss    0.3s        82246 nodes
+[    24s]  336 solved  4C:19,20,29,40         loss    0.2s        61723 nodes
+[    24s]  337 solved  4C:16,17,26,28         loss    1.3s       378035 nodes
+[    24s]  338 solved  3V:52,53,64            loss    0.3s        73628 nodes
+[    25s]  339 solved  3V:16,17,26            loss    1.1s       327623 nodes
+[    25s]  340 solved  3I:7,8,9               loss    1.2s       287613 nodes
+[    25s]  341 solved  4I:7,17,27,37          loss    1.3s       354743 nodes
+[    25s]  342 solved  3V:9,18,19             loss    0.5s       129986 nodes
+[    25s]  343 solved  4C:16,27,36,37         loss    0.3s        83670 nodes
+[    25s]  344 solved  2:114,115              loss    0.7s       186465 nodes
+[    25s]  345 solved  3V:5,6,17              loss    0.9s       234043 nodes
+[    25s]  346 solved  3V:53,54,65            loss    0.5s       128511 nodes
+[    25s]  347 solved  3V:42,51,52            loss    0.5s       124933 nodes
+[    25s]  348 solved  3V:41,42,51            loss    0.4s       112040 nodes
+[    25s]  349 solved  2:18,29                loss    0.7s       195169 nodes
+[    25s]  350 solved  4B:26,37,47,58         loss    1.1s       295992 nodes
+[    25s]  351 solved  3V:21,31,42            loss    0.6s       140378 nodes
+[    25s]  352 solved  4B:53,64,74,85         loss    0.8s       159698 nodes
+[    26s]  353 solved  4C:7,17,28,29          loss    0.4s       124633 nodes
+[    26s]  354 solved  4C:42,43,52,54         loss    0.5s       155773 nodes
+[    26s]  355 solved  3I:8,19,30             loss    0.8s       214571 nodes
+[    26s]  356 solved  2:52,63                loss    0.5s       133880 nodes
+[    26s]  357 solved  3I:21,32,43            loss    1.7s       399374 nodes
+[    26s]  358 solved  4C:80,81,90,101        loss    5.3s      1505127 nodes
+[    26s]  359 solved  4C:6,8,17,18           loss    0.7s       192189 nodes
+[    26s]  360 solved  3V:53,63,74            loss    0.5s       109914 nodes
+[    26s]  361 solved  4I:16,26,36,46         loss    0.8s       202554 nodes
+[    26s]  362 solved  3V:42,53,54            loss    0.6s       120647 nodes
+[    26s]  363 solved  4B:6,15,16,25          loss    0.5s       111147 nodes
+[    27s]  364 solved  4I:35,36,37,38         loss    3.6s      1180411 nodes
+[    27s]  365 solved  4C:31,32,41,43         loss    0.9s       228555 nodes
+[    27s]  366 solved  4B:15,16,27,28         loss    0.4s       118127 nodes
+[    27s]  367 solved  3I:32,43,54            loss    1.7s       385194 nodes
+[    27s]  368 solved  4B:9,18,19,28          loss    3.3s      1012316 nodes
+[    28s]  369 solved  4B:16,25,26,35         loss    1.1s       300238 nodes
+[    28s]  370 solved  4C:32,43,52,53         loss    1.5s       409157 nodes
+[    28s]  371 solved  3I:42,52,62            loss    0.9s       198352 nodes
+[    29s]  372 solved  4C:21,32,41,42         loss    2.3s       629011 nodes
+[    29s]  373 solved  4C:9,10,19,30          loss    1.1s       362010 nodes
+[    29s]  374 solved  4C:27,28,37,48         loss    3.0s       747777 nodes
+[    29s]  375 solved  4C:63,65,74,75         loss    1.5s       365283 nodes
+[    29s]  376 solved  4B:7,17,28,38          loss    2.1s       715941 nodes
+[    29s]  377 solved  3V:38,47,48            loss    3.4s       920413 nodes
+[    29s]  378 solved  2:19,29                loss    2.1s       518678 nodes
+[    29s]  379 solved  4C:9,20,29,30          loss    0.5s       137176 nodes
+[    30s]  380 solved  3V:20,21,30            loss    0.4s       115387 nodes
+[    30s]  381 solved  4B:6,7,15,16           loss    0.8s       178325 nodes
+[    30s]  382 solved  4C:43,54,63,64         loss    1.4s       354194 nodes
+[    30s]  383 solved  2:8,18                 loss    0.6s       135611 nodes
+[    30s]  384 solved  3I:18,28,38            loss    6.2s      1827741 nodes
+[    30s]  385 solved  4C:15,17,26,27         loss    0.4s       102166 nodes
+[    30s]  386 solved  2:20,30                loss    0.6s       143401 nodes
+[    30s]  387 solved  2:21,31                loss    0.9s       214753 nodes
+[    30s]  388 solved  2:9,19                 loss    0.9s       207955 nodes
+[    30s]  389 solved  4C:26,36,47,48         loss    5.1s      1369183 nodes
+[    30s]  390 solved  4C:54,65,74,75         loss    1.3s       314446 nodes
+[    31s]  391 solved  2:16,17                loss    0.5s       135691 nodes
+[    31s]  392 solved  2:42,43                loss    0.6s       144424 nodes
+[    31s]  393 solved  2:8,19                 loss    0.7s       146411 nodes
+[    31s]  394 solved  4B:43,54,64,75         loss    1.1s       237656 nodes
+[    31s]  395 solved  4B:36,37,45,46         loss    5.6s      1854493 nodes
+[    31s]  396 solved  4C:10,21,30,31         loss    1.0s       294060 nodes
+[    31s]  397 solved  4B:25,26,37,38         loss    2.5s       755782 nodes
+[    31s]  398 solved  3V:30,41,51            loss    0.5s       113286 nodes
+[    32s]  399 solved  2:31,32                loss    0.9s       205798 nodes
+[    32s]  400 solved  2:32,42                loss    1.2s       314908 nodes
+[    32s]  401 solved  3I:17,27,37            loss    0.6s       150685 nodes
+[    32s]  402 solved  2:53,63                loss    0.5s       132871 nodes
+[    32s]  403 solved  2:43,53                loss    0.6s       137452 nodes
+[    32s]  404 solved  3V:41,52,62            loss    1.3s       308246 nodes
+[    32s]  405 solved  3V:52,53,62            loss    0.5s       116600 nodes
+[    32s]  406 solved  2:7,18                 loss    0.9s       189063 nodes
+[    32s]  407 solved  4I:78,79,80,81         loss    1.4s       353557 nodes
+[    33s]  408 solved  3I:26,27,28            loss    3.1s       989732 nodes
+[    33s]  409 solved  3V:17,18,27            loss    2.8s       732809 nodes
+[    33s]  410 solved  2:91,92                loss    0.6s       161584 nodes
+[    33s]  411 solved  3V:30,31,40            loss    0.4s        92664 nodes
+[    33s]  412 solved  2:38,39                loss    0.9s       218832 nodes
+[    33s]  413 solved  3V:9,20,30             loss    1.5s       399019 nodes
+[    33s]  414 solved  2:53,64                loss    0.4s        93883 nodes
+[    33s]  415 solved  2:53,54                loss    0.5s       109775 nodes
+[    33s]  416 solved  4C:25,35,46,47         loss    7.3s      2080171 nodes
+[    33s]  417 solved  4I:25,35,45,55         loss    0.9s       180225 nodes
+[    34s]  418 solved  2:28,29                loss    3.5s       816899 nodes
+[    34s]  419 solved  4I:6,16,26,36          loss    0.6s       117998 nodes
+[    34s]  420 solved  3V:27,36,37            loss    0.6s       124311 nodes
+[    34s]  421 solved  3I:19,29,39            loss    2.3s       613682 nodes
+[    34s]  422 solved  3I:21,31,41            loss    1.4s       319806 nodes
+[    34s]  423 solved  3I:52,53,54            loss    0.7s       130686 nodes
+[    34s]  424 solved  3V:53,62,63            loss    0.8s       174951 nodes
+[    34s]  425 solved  3V:17,26,27            loss    0.4s        86575 nodes
+[    34s]  426 solved  4B:52,53,64,65         loss    0.3s        45737 nodes
+[    35s]  427 solved  4B:10,20,31,41         loss    0.4s       105654 nodes
+[    35s]  428 solved  3V:6,7,16              loss    2.0s       391843 nodes
+[    35s]  429 solved  2:70,71                loss    0.8s       166866 nodes
+[    35s]  430 solved  2:70,81                loss    0.8s       188192 nodes
+[    35s]  431 solved  2:80,81                loss    1.1s       250542 nodes
+[    35s]  432 solved  3V:6,17,18             loss    0.5s       114131 nodes
+[    35s]  433 solved  4C:37,38,47,58         loss    1.6s       399013 nodes
+[    36s]  434 solved  4B:52,61,62,71         loss   35.3s      8223097 nodes
+[    36s]  435 solved  4C:16,26,37,38         loss    2.5s       693584 nodes
+[    36s]  436 solved  3V:43,54,64            loss    0.9s       237450 nodes
+[    36s]  437 solved  4C:7,18,27,28          loss    0.1s        28964 nodes
+[    36s]  438 solved  4B:101,102,110,111     loss    0.2s        19768 nodes
+[    36s]  439 solved  3I:8,9,10              loss    1.1s       252243 nodes
+[    36s]  440 solved  3V:27,28,37            loss    2.4s       666806 nodes
+[    36s]  441 solved  4C:15,25,36,37         loss    4.5s      1160420 nodes
+[    36s]  442 solved  3I:6,7,8               loss    1.3s       359260 nodes
+[    36s]  443 solved  4B:43,53,64,74         loss    0.7s       139466 nodes
+[    36s]  444 solved  3I:10,21,32            loss    2.0s       494757 nodes
+[    36s]  445 solved  4C:26,27,36,47         loss    3.3s       888705 nodes
+[    36s]  446 solved  3V:16,27,28            loss    0.4s        99272 nodes
+[    37s]  447 solved  4C:8,9,18,29           loss    0.8s       196663 nodes
+[    37s]  448 solved  4C:16,17,26,37         loss    1.1s       344802 nodes
+[    37s]  449 solved  3I:7,18,29             loss    0.5s       138451 nodes
+[    37s]  450 solved  4C:6,7,16,27           loss    1.1s       329341 nodes
+[    37s]  451 solved  4C:18,19,30,40         loss    0.6s       177829 nodes
+[    37s]  452 solved  3V:37,46,47            loss    0.9s       203077 nodes
+[    37s]  453 solved  4B:6,16,27,37          loss    1.2s       378692 nodes
+[    37s]  454 solved  4B:15,25,36,46         loss    0.6s       133443 nodes
+[    37s]  455 solved  4C:18,19,28,39         loss    2.2s       561143 nodes
+[    37s]  456 solved  4B:26,27,35,36         loss    5.9s      2025787 nodes
+[    38s]  457 solved  4B:91,92,100,101       loss    0.2s        36725 nodes
+[    38s]  458 solved  4C:8,19,28,29          loss    0.2s        51005 nodes
+[    38s]  459 solved  3V:9,10,21             loss    1.4s       319559 nodes
+[    38s]  460 solved  4B:16,27,37,48         loss    2.8s       723203 nodes
+[    38s]  461 solved  2:9,20                 loss    1.0s       254954 nodes
+[    38s]  462 solved  2:20,21                loss    0.9s       218872 nodes
+[    38s]  463 solved  4C:6,16,27,28          loss    0.4s       115165 nodes
+[    38s]  464 solved  4B:16,26,37,47         loss    1.4s       317702 nodes
+[    38s]  465 solved  4C:26,27,38,48         loss    0.5s       134866 nodes
+[    38s]  466 solved  2:17,27                loss    0.4s       100035 nodes
+[    38s]  467 solved  4C:5,15,26,27          loss    0.5s       141707 nodes
+[    39s]  468 solved  2:28,39                loss    0.6s       135811 nodes
+[    39s]  469 solved  3I:36,37,38            loss    1.2s       249553 nodes
+[    39s]  470 solved  2:7,17                 loss    1.0s       243352 nodes
+[    39s]  471 solved  4I:15,25,35,45         loss    1.2s       246106 nodes
+[    39s]  472 solved  3V:9,20,21             loss    0.5s       121633 nodes
+[    39s]  473 solved  3V:7,16,17             loss    0.6s       157363 nodes
+[    39s]  474 solved  3V:37,48,58            loss    0.7s       166296 nodes
+[    39s]  475 solved  2:29,39                loss    2.4s       598060 nodes
+[    39s]  476 solved  3V:29,30,39            loss    2.1s       584051 nodes
+[    40s]  477 solved  3I:43,53,63            loss    0.9s       187980 nodes
+[    40s]  478 solved  2:6,17                 loss    1.1s       247224 nodes
+[    40s]  479 solved  3V:15,16,25            loss    0.7s       164205 nodes
+[    40s]  480 solved  4B:5,15,26,36          loss    4.2s      1145710 nodes
+[    40s]  481 solved  4I:110,111,112,113     loss    0.5s       147987 nodes
+[    40s]  482 solved  4C:36,37,48,58         loss    0.4s       110423 nodes
+[    40s]  483 solved  3V:43,53,64            loss    0.5s       106981 nodes
+[    40s]  484 solved  3V:53,64,74            loss    0.5s       114172 nodes
+[    40s]  485 solved  3I:15,16,17            loss    0.8s       189639 nodes
+[    40s]  486 solved  4C:15,16,25,27         loss   12.6s      3826551 nodes
+[    40s]  487 solved  2:30,40                loss    0.8s       177513 nodes
+[    40s]  488 solved  3V:19,30,40            loss    0.5s       133555 nodes
+[    40s]  489 solved  4C:15,26,35,36         loss    0.6s       146959 nodes
+[    40s]  490 solved  3I:53,64,75            loss    0.8s       173790 nodes
+[    40s]  491 solved  3V:18,28,39            loss    0.8s       204963 nodes
+[    40s]  492 solved  4C:7,8,19,29           loss    0.6s       159209 nodes
+[    41s]  493 solved  4C:35,36,45,47         loss    0.6s       146318 nodes
+[    41s]  494 solved  4C:25,26,35,37         loss    0.8s       197307 nodes
+[    41s]  495 solved  4C:53,54,63,65         loss    0.3s        42648 nodes
+[    42s]  496 solved  4I:58,69,80,91         loss    2.0s       398575 nodes
+[    42s]  497 solved  4I:51,52,53,54         loss    0.3s        74687 nodes
+[    42s]  498 solved  4B:35,36,47,48         loss    1.9s       760159 nodes
+[    42s]  499 solved  4C:25,26,37,47         loss    1.0s       245697 nodes
+[    42s]  500 solved  4B:53,54,62,63         loss    0.4s       100153 nodes
+[    42s]  501 solved  4B:15,26,36,47         loss    2.5s       648654 nodes
+[    42s]  502 solved  4C:36,37,46,48         loss    1.9s       487683 nodes
+[    42s]  503 solved  4C:52,53,62,64         loss    0.1s        18874 nodes
+[    42s]  504 solved  3V:26,37,38            loss    2.7s       782167 nodes
+[    42s]  505 solved  3I:10,20,30            loss    0.5s       139202 nodes
+[    43s]  506 solved  4B:62,63,74,75         loss    1.0s       237903 nodes
+[    43s]  507 solved  2:27,28                loss    3.1s       949230 nodes
+[    43s]  508 solved  4I:21,31,41,51         loss    0.7s       192166 nodes
+[    43s]  509 solved  4I:45,46,47,48         loss    2.4s       710727 nodes
+[    43s]  510 solved  4C:25,36,45,46         loss    0.5s       100670 nodes
+[    43s]  511 solved  4I:5,15,25,35          loss    0.9s       180431 nodes
+[    43s]  512 solved  4B:21,30,31,40         loss    1.4s       392370 nodes
+[    43s]  513 solved  3V:27,38,48            loss    0.5s       129569 nodes
+[    43s]  514 solved  4B:42,43,51,52         loss    0.3s        61341 nodes
+[    44s]  515 solved  3I:5,6,7               loss    1.2s       282907 nodes
+[    44s]  516 solved  3I:28,38,48            loss    6.7s      1736889 nodes
+[    44s]  517 solved  3I:43,54,65            loss    1.2s       274334 nodes
+[    44s]  518 solved  4B:16,27,28,39         loss    6.1s      1598994 nodes
+[    44s]  519 solved  4C:7,8,17,28           loss    1.5s       491036 nodes
+[    44s]  520 solved  4B:32,41,42,51         loss    0.6s       134703 nodes
+[    44s]  521 solved  2:18,28                loss    8.4s      2228429 nodes
+[    44s]  522 solved  3I:38,48,58            loss    4.9s      1155906 nodes
+[    45s]  523 solved  2:10,20                loss    0.7s       140864 nodes
+[    45s]  524 solved  4I:69,80,91,102        loss    4.5s       776128 nodes
+[    45s]  525 solved  3V:16,17,28            loss    1.3s       340102 nodes
+[    45s]  526 solved  4C:26,27,36,38         loss    1.4s       361546 nodes
+[    45s]  527 solved  3V:37,47,58            loss    0.8s       215746 nodes
+[    46s]  528 solved  4B:43,52,53,62         loss    0.5s       103598 nodes
+[    46s]  529 solved  4I:32,42,52,62         loss    0.6s       144963 nodes
+[    46s]  530 solved  3V:51,52,63            loss    0.5s       119495 nodes
+[    46s]  531 solved  4I:81,91,101,111       loss    0.2s        18155 nodes
+[    46s]  532 solved  2:17,28                loss    2.0s       511300 nodes
+[    46s]  533 solved  4B:9,19,30,40          loss    2.0s       617238 nodes
+[    47s]  534 solved  3I:7,17,27             loss    1.0s       242942 nodes
+[    47s]  535 solved  3V:18,29,39            loss    3.4s       976625 nodes
+[    47s]  536 solved  3V:17,28,38            loss    2.0s       520308 nodes
+[    48s]  537 solved  3I:20,30,40            loss    2.0s       558184 nodes
+[    48s]  538 solved  4B:25,36,37,48         loss    4.4s      1457607 nodes
+[    48s]  539 solved  2:16,26                loss    1.2s       279933 nodes
+[    48s]  540 solved  4C:16,17,28,38         loss    2.1s       659524 nodes
+[    48s]  541 solved  4C:15,16,27,37         loss    0.6s       165106 nodes
+[    48s]  542 solved  3I:8,18,28             loss    2.3s       723385 nodes
+[    48s]  543 solved  3I:6,16,26             loss    0.6s       146461 nodes
+[    48s]  544 solved  4C:91,101,112,113      loss    0.2s        34011 nodes
+[    48s]  545 solved  4C:17,18,29,39         loss    0.5s       160683 nodes
+[    48s]  546 solved  3I:9,19,29             loss    1.9s       536200 nodes
+[    49s]  547 solved  4C:63,64,75,85         loss    0.3s        52728 nodes
+[    49s]  548 solved  4I:15,26,37,48         loss    4.2s      1585829 nodes
+[    49s]  549 solved  4I:62,63,64,65         loss    0.6s       139736 nodes
+[    49s]  550 solved  4C:5,16,25,26          loss    0.5s       142022 nodes
+[    49s]  551 solved  4B:10,19,20,29         loss    0.8s       220667 nodes
+[    49s]  552 solved  3V:36,47,48            loss    6.3s      1722349 nodes
+[    49s]  553 solved  3V:5,15,26             loss    0.8s       206731 nodes
+[    49s]  554 solved  4C:91,92,101,112       loss    0.2s        26278 nodes
+[    49s]  555 solved  3V:42,43,52            loss    0.5s       137806 nodes
+[    49s]  556 solved  4C:27,28,37,39         loss    0.7s       226155 nodes
+[    49s]  557 solved  3I:16,26,36            loss    1.6s       383712 nodes
+[    49s]  558 solved  4C:5,7,16,17           loss    0.4s        84900 nodes
+[    49s]  559 solved  4C:10,20,31,32         loss    0.1s        22758 nodes
+[    49s]  560 solved  4C:8,10,19,20          loss    0.3s        82021 nodes
+[    50s]  561 solved  4B:5,16,26,37          loss    0.5s       111001 nodes
+[    50s]  562 solved  4C:17,18,27,38         loss    7.6s      2157974 nodes
+[    50s]  563 solved  4I:10,20,30,40         loss    2.0s       509711 nodes
+[    50s]  564 solved  4B:54,64,75,85         loss    1.1s       215989 nodes
+[    50s]  565 solved  4C:43,53,64,65         loss    0.9s       133883 nodes
+[    50s]  566 solved  4C:6,7,18,28           loss    1.7s       566091 nodes
+[    50s]  567 solved  4C:91,102,111,112      loss    0.3s        36747 nodes
+[    51s]  568 solved  3V:16,25,26            loss    1.2s       251147 nodes
+[    51s]  569 solved  2:28,38                loss    6.8s      1843421 nodes
+[    51s]  570 solved  3I:27,37,47            loss    1.3s       279865 nodes
+[    51s]  571 solved  4C:5,6,17,27           loss    1.0s       211336 nodes
+[    51s]  572 solved  3V:36,45,46            loss    0.5s       140279 nodes
+[    51s]  573 solved  3V:9,19,30             loss    0.6s       170020 nodes
+[    51s]  574 solved  4C:6,17,26,27          loss    0.1s        31757 nodes
+[    51s]  575 solved  3V:25,26,35            loss    1.9s       408078 nodes
+[    51s]  576 solved  3V:26,35,36            loss    0.5s       116079 nodes
+[    52s]  577 solved  3V:63,74,75            loss    1.1s       261813 nodes
+[    52s]  578 solved  4I:9,19,29,39          loss    2.9s       727925 nodes
+[    52s]  579 solved  3V:54,65,75            loss    1.4s       320949 nodes
+[    52s]  580 solved  2:26,27                loss    0.8s       186420 nodes
+[    52s]  581 solved  3I:17,28,39            loss    4.7s      1241982 nodes
+[    52s]  582 solved  3V:27,37,48            loss    2.0s       424181 nodes
+[    52s]  583 solved  3V:26,27,36            loss    1.1s       271268 nodes
+[    53s]  584 solved  3I:26,36,46            loss    2.7s       631721 nodes
+[    53s]  585 solved  4B:15,26,27,38         loss    2.4s       924994 nodes
+[    53s]  586 solved  3V:26,37,47            loss    0.9s       202097 nodes
+[    53s]  587 solved  3V:32,41,42            loss    1.2s       285636 nodes
+[    53s]  588 solved  3V:21,30,31            loss    0.7s       212413 nodes
+[    53s]  589 solved  4B:80,91,101,112       loss    1.6s       450018 nodes
+[    53s]  590 solved  3V:16,27,37            loss    1.1s       285533 nodes
+[    53s]  591 solved  3I:36,47,58            loss    2.0s       433370 nodes
+[    54s]  592 solved  4C:81,91,102,103       loss    0.1s         2337 nodes
+[    54s]  593 solved  2:6,16                 loss    1.1s       270448 nodes
+[    54s]  594 solved  3V:38,39,48            loss    1.9s       452278 nodes
+[    54s]  595 solved  4I:5,16,27,38          loss    1.1s       292409 nodes
+[    54s]  596 solved  3V:26,36,47            loss    1.7s       386098 nodes
+[    54s]  597 solved  3V:5,6,15              loss    0.9s       235459 nodes
+[    54s]  598 solved  2:63,64                loss    0.6s       149722 nodes
+[    54s]  599 solved  2:62,63                loss    0.8s       211828 nodes
+[    55s]  600 solved  3I:25,26,27            loss    1.6s       403556 nodes
+[    55s]  601 solved  2:37,38                loss    2.1s       546837 nodes
+[    55s]  602 solved  3I:62,63,64            loss    0.9s       200592 nodes
+[    55s]  603 solved  4B:8,18,29,39          loss    1.8s       498425 nodes
+[    55s]  604 solved  3V:27,28,39            loss    1.1s       297328 nodes
+[    55s]  605 solved  3V:101,102,111         loss    0.6s       148513 nodes
+[    55s]  606 solved  2:54,64                loss    1.0s       254066 nodes
+[    55s]  607 solved  3V:17,27,38            loss    4.9s      1404023 nodes
+[    55s]  608 solved  2:16,27                loss    0.8s       176495 nodes
+[    56s]  609 solved  2:43,54                loss    0.8s       200254 nodes
+[    56s]  610 solved  3V:36,37,46            loss    1.5s       343587 nodes
+[    56s]  611 solved  3V:10,20,31            loss    0.2s        59365 nodes
+[    56s]  612 solved  2:27,37                loss    1.0s       258821 nodes
+[    56s]  613 solved  3V:5,16,17             loss    0.5s       123546 nodes
+[    56s]  614 solved  3V:10,19,20            loss    0.4s       106624 nodes
+[    56s]  615 solved  4B:92,101,102,111      loss    0.2s        28660 nodes
+[    56s]  616 solved  3V:53,64,65            loss    0.5s       113933 nodes
+[    57s]  617 solved  3V:81,91,102           loss    0.3s       107320 nodes
+[    57s]  618 solved  4B:35,46,47,58         loss   14.0s      4180141 nodes
+[    57s]  619 solved  2:26,36                loss    2.1s       510686 nodes
+[    57s]  620 solved  4B:81,91,102,112       loss    0.8s       311539 nodes
+[    57s]  621 solved  4B:5,16,17,28          loss    2.1s       759126 nodes
+[    57s]  622 solved  3V:31,32,41            loss    0.3s        89939 nodes
+[    58s]  623 solved  3V:15,25,36            loss    2.5s       623226 nodes
+[    58s]  624 solved  3I:5,15,25             loss    1.3s       293688 nodes
+[    58s]  625 solved  3V:43,52,53            loss    1.4s       343000 nodes
+[    58s]  626 solved  3I:45,46,47            loss    0.9s       238750 nodes
+[    58s]  627 solved  2:25,26                loss    0.9s       193320 nodes
+[    58s]  628 solved  3V:25,36,37            loss    3.2s       869237 nodes
+[    58s]  629 solved  3I:69,80,91            loss    4.9s       991961 nodes
+[    59s]  630 solved  3V:91,101,112          loss    0.5s       130174 nodes
+[    59s]  631 solved  3I:63,74,85            loss    0.8s       195997 nodes
+[    59s]  632 solved  2:8,9                  loss    0.8s       206606 nodes
+[    59s]  633 solved  2:7,8                  loss    0.9s       220552 nodes
+[    59s]  634 solved  2:101,111              loss    0.7s       179470 nodes
+[    59s]  635 solved  3I:110,111,112         loss    0.8s       209962 nodes
+[    59s]  636 solved  3V:35,36,45            loss    0.9s       231767 nodes
+[    60s]  637 solved  2:63,74                loss    0.7s       164001 nodes
+[    60s]  638 solved  2:91,101               loss    0.8s       201937 nodes
+[    60s]  639 solved  2:21,32                loss    1.5s       384911 nodes
+[    60s]  640 solved  3V:35,36,47            loss    0.5s       128254 nodes
+[    61s]  641 solved  3V:15,26,36            loss    2.4s       564737 nodes
+[    61s]  642 solved  2:32,43                loss    1.0s       224982 nodes
+[    61s]  643 solved  3V:25,26,37            loss    0.6s       145491 nodes
+[    61s]  644 solved  4I:25,36,47,58         loss   17.9s      5794012 nodes
+[    61s]  645 solved  3V:53,54,63            loss    0.3s        80393 nodes
+[    61s]  646 solved  3I:58,69,80            loss    1.8s       390720 nodes
+[    61s]  647 solved  3V:45,46,55            loss    1.5s       348108 nodes
+[    62s]  648 solved  4I:41,51,61,71         loss   61.5s     15080015 nodes
+[    62s]  649 solved  3I:91,101,111          loss    0.7s       184189 nodes
+[    62s]  650 solved  3V:46,47,58            loss    1.3s       284630 nodes
+[    62s]  651 solved  3V:101,110,111         loss    0.6s       157498 nodes
+[    62s]  652 solved  3V:62,63,74            loss    1.1s       266708 nodes
+[    62s]  653 solved  3V:8,18,29             loss    0.6s       164647 nodes
+[    62s]  654 solved  3I:35,45,55            loss    1.0s       247054 nodes
+[    62s]  655 solved  3V:25,36,46            loss    0.6s       137673 nodes
+[    63s]  656 solved  3V:36,37,48            loss    3.3s       911062 nodes
+[    63s]  657 solved  3V:101,112,113         loss    0.6s       147907 nodes
+[    63s]  658 solved  3I:111,112,113         loss    0.7s       194004 nodes
+[    63s]  659 solved  3I:15,26,37            loss    1.0s       202195 nodes
+[    63s]  660 solved  4C:92,102,113,114      loss    0.2s        22426 nodes
+[    63s]  661 solved  3I:81,91,101           loss    1.5s       446681 nodes
+[    63s]  662 solved  2:15,16                loss    0.8s       200347 nodes
+[    63s]  663 solved  3I:35,36,37            loss    7.8s      1921836 nodes
+[    63s]  664 solved  3V:15,26,27            loss    0.7s       218234 nodes
+[    64s]  665 solved  4C:101,102,111,113     loss    0.2s        37902 nodes
+[    64s]  666 solved  4C:101,103,112,113     loss    0.2s        32042 nodes
+[    64s]  667 solved  2:101,102              loss    0.7s       168702 nodes
+[    64s]  668 solved  3I:6,17,28             loss    2.1s       626798 nodes
+[    64s]  669 solved  4B:102,103,111,112     loss    0.2s        19320 nodes
+[    64s]  670 solved  2:5,16                 loss    0.7s       143666 nodes
+[    64s]  671 solved  2:91,102               loss    0.7s       195297 nodes
+[    64s]  672 solved  4I:111,112,113,114     loss    0.2s        39779 nodes
+[    64s]  673 solved  2:36,37                loss    1.0s       209072 nodes
+[    64s]  674 solved  3V:15,16,27            loss    0.5s       128578 nodes
+[    64s]  675 solved  4I:6,17,28,39          loss    8.0s      2580965 nodes
+[    65s]  676 solved  3V:102,111,112         loss    0.6s       147953 nodes
+[    65s]  677 solved  2:15,26                loss    0.7s       149857 nodes
+[    65s]  678 solved  3I:25,36,47            loss    2.9s       739271 nodes
+[    65s]  679 solved  3V:37,38,47            loss    2.1s       524666 nodes
+[    65s]  680 solved  2:6,7                  loss    0.8s       200619 nodes
+[    65s]  681 solved  3V:63,64,75            loss    0.4s       116733 nodes
+[    65s]  682 solved  3V:6,15,16             loss    0.7s       146720 nodes
+[    65s]  683 solved  3V:16,26,37            loss    0.8s       197820 nodes
+[    65s]  684 solved  4B:7,18,28,39          loss    2.8s       984457 nodes
+[    66s]  685 solved  3V:64,74,85            loss    0.8s       143445 nodes
+[    66s]  686 solved  2:64,75                loss    0.7s       146067 nodes
+[    66s]  687 solved  2:64,74                loss    0.7s       142003 nodes
+[    66s]  688 solved  2:64,65                loss    0.7s       136810 nodes
+[    66s]  689 solved  3V:64,75,85            loss    1.2s       232015 nodes
+[    66s]  690 solved  2:111,112              loss    0.9s       177230 nodes
+[    66s]  691 solved  2:101,112              loss    0.8s       175994 nodes
+[    67s]  692 solved  3V:5,16,26             loss    0.5s       109893 nodes
+[    67s]  693 solved  3I:54,64,74            loss    1.0s       171228 nodes
+[    67s]  694 solved  3V:54,64,75            loss    0.7s       129215 nodes
+[    67s]  695 solved  2:27,38                loss    7.8s      2234462 nodes
+[    67s]  696 solved  2:10,21                loss    1.5s       278527 nodes
+[    67s]  697 solved  2:9,10                 loss    1.4s       338459 nodes
+[    68s]  698 solved  3I:80,91,102           loss   13.0s      2598751 nodes
+[    68s]  699 solved  3V:80,81,90            loss    3.1s       519783 nodes
+[    68s]  700 solved  3I:15,25,35            loss    1.0s       212310 nodes
+[    68s]  701 solved  3V:54,63,64            loss    0.8s       183627 nodes
+[    68s]  702 solved  3I:63,64,65            loss    0.7s       191490 nodes
+[    68s]  703 solved  2:102,103              loss    0.7s       172297 nodes
+[    69s]  704 solved  3V:65,74,75            loss    1.0s       265705 nodes
+[    69s]  705 solved  2:26,37                loss    1.3s       311432 nodes
+[    69s]  706 solved  3V:91,92,101           loss    1.6s       447312 nodes
+[    69s]  707 solved  2:37,47                loss    2.7s       600798 nodes
+[    69s]  708 solved  2:112,113              loss    0.6s       164481 nodes
+[    69s]  709 solved  2:103,113              loss    0.7s       170088 nodes
+[    69s]  710 solved  3V:91,102,112          loss    0.5s       127665 nodes
+[    69s]  711 solved  2:113,114              loss    0.7s       167924 nodes
+[    69s]  712 solved  2:38,48                loss    5.1s      1455368 nodes
+[    70s]  713 solved  3I:25,35,45            loss    1.1s       215763 nodes
+[    70s]  714 solved  3I:65,75,85            loss    1.4s       306813 nodes
+[    70s]  715 solved  3V:6,16,27             loss    0.9s       249767 nodes
+[    70s]  716 solved  3V:35,46,47            loss   13.2s      3452590 nodes
+[    70s]  717 solved  3I:16,27,38            loss    4.9s      1285239 nodes
+[    70s]  718 solved  3V:26,27,38            loss    1.3s       332588 nodes
+[    71s]  719 solved  3V:25,35,46            loss    3.1s       615742 nodes
+[    71s]  720 solved  4C:102,103,112,114     loss    0.3s        28608 nodes
+[    71s]  721 solved  4B:101,102,113,114     loss    0.2s        19040 nodes
+[    71s]  722 solved  4B:91,102,103,114      loss    0.3s        67216 nodes
+[    71s]  723 solved  2:54,65                loss    0.7s       167627 nodes
+[    71s]  724 solved  2:102,112              loss    0.7s       170233 nodes
+[    71s]  725 solved  3V:6,17,27             loss    0.8s       174415 nodes
+[    71s]  726 solved  2:110,111              loss    0.7s       180798 nodes
+[    72s]  727 solved  2:5,6                  loss    1.3s       245213 nodes
+[    72s]  728 solved  3I:46,47,48            loss    5.3s      1323120 nodes
+[    72s]  729 solved  2:36,47                loss    1.2s       275301 nodes
+[    72s]  730 solved  3V:8,19,29             loss    1.2s       327196 nodes
+[    72s]  731 solved  4B:6,17,27,38          loss   19.7s      6352341 nodes
+[    72s]  732 solved  4C:42,43,52,63         loss    0.1s        15945 nodes
+[    72s]  733 solved  3V:101,102,113         loss    0.6s       146312 nodes
+[    72s]  734 solved  3I:26,37,48            loss   19.5s      4972127 nodes
+[    72s]  735 solved  2:15,25                loss    1.1s       204317 nodes
+[    73s]  736 solved  3I:91,102,113          loss    0.7s       169900 nodes
+[    73s]  737 solved  3I:112,113,114         loss    0.8s       201851 nodes
+[    73s]  738 solved  3I:101,102,103         loss    0.8s       208751 nodes
+[    73s]  739 solved  2:46,47                loss    1.8s       388207 nodes
+[    73s]  740 solved  2:36,46                loss    2.2s       547228 nodes
+[    73s]  741 solved  3V:102,103,112         loss    0.6s       146317 nodes
+[    73s]  742 solved  3V:91,102,103          loss    0.5s       130648 nodes
+[    73s]  743 solved  3V:103,112,113         loss    0.6s       146722 nodes
+[    73s]  744 solved  3V:102,113,114         loss    0.6s       150617 nodes
+[    73s]  745 solved  3V:92,102,113          loss    0.5s       137753 nodes
+[    74s]  746 solved  2:103,114              loss    0.6s       164025 nodes
+[    74s]  747 solved  2:102,113              loss    0.8s       175614 nodes
+[    74s]  748 solved  2:58,69                loss    1.5s       329610 nodes
+[    74s]  749 solved  2:35,45                loss    1.1s       203104 nodes
+[    74s]  750 solved  3V:7,18,28             loss    2.7s       912989 nodes
+[    74s]  751 solved  2:69,80                loss    1.5s       341808 nodes
+[    74s]  752 solved  3I:5,16,27             loss    0.6s       139395 nodes
+[    74s]  753 solved  2:45,55                loss    1.2s       261692 nodes
+[    74s]  754 solved  3V:7,17,28             loss    2.8s       835763 nodes
+[    75s]  755 solved  2:35,36                loss    0.8s       164168 nodes
+[    75s]  756 solved  2:65,75                loss    0.8s       176809 nodes
+[    75s]  757 solved  2:74,75                loss    0.9s       188217 nodes
+[    75s]  758 solved  2:74,85                loss    0.8s       187588 nodes
+[    75s]  759 solved  4C:53,54,63,74         loss    0.1s        13597 nodes
+[    75s]  760 solved  3I:92,103,114          loss    0.8s       203165 nodes
+[    75s]  761 solved  2:5,15                 loss    0.9s       239447 nodes
+[    75s]  762 solved  4C:64,65,74,85         loss    0.1s        12629 nodes
+[    75s]  763 solved  2:35,46                loss    2.1s       489074 nodes
+[    75s]  764 solved  3V:64,65,74            loss    0.3s        92660 nodes
+[    76s]  765 solved  2:25,36                loss    2.5s       560083 nodes
+[    76s]  766 solved  3V:102,103,114         loss    0.5s       152468 nodes
+[    76s]  767 solved  2:25,35                loss    0.9s       190215 nodes
+[    76s]  768 solved  2:75,85                loss    0.8s       188594 nodes
+[    76s]  769 solved  2:47,58                loss    1.8s       434302 nodes
+[    76s]  770 solved  2:45,46                loss    1.9s       497714 nodes
+[    77s]  771 solved  2:37,48                loss   10.1s      2931086 nodes
+[    78s]  772 solved  2:48,58                loss    3.3s       909187 nodes
+[    78s]  773 solved  4I:80,91,102,113       loss   14.2s      3765819 nodes
+[    79s]  774 solved  3V:80,91,101           loss   10.1s      2451797 nodes
+[    79s]  775 solved  2:47,48                loss   10.1s      3374418 nodes
+[    87s]  776 solved  2:80,91                loss   18.0s      6203641 nodes
+[   211s]  777 solved  4B:40,50,61,71         loss  211.2s     79604685 nodes
+ply 3 stm 1: loses  (777/777 root moves solved, 382256217 nodes, 211.4s)
+  2:5,6                  loss
+  2:6,7                  loss
+  2:7,8                  loss
+  2:8,9                  loss
+  2:9,10                 loss
+  2:15,16                loss
+  2:16,17                loss
+  2:17,18                loss
+  2:18,19                loss
+  2:19,20                loss
+  2:20,21                loss
+  2:25,26                loss
+  2:26,27                loss
+  2:27,28                loss
+  2:28,29                loss
+  2:29,30                loss
+  2:30,31                loss
+  2:31,32                loss
+  2:35,36                loss
+  2:36,37                loss
+  2:37,38                loss
+  2:38,39                loss
+  2:39,40                loss
+  2:40,41                loss
+  2:41,42                loss
+  2:42,43                loss
+  2:45,46                loss
+  2:46,47                loss
+  2:47,48                loss
+  2:51,52                loss
+  2:52,53                loss
+  2:53,54                loss
+  2:62,63                loss
+  2:63,64                loss
+  2:64,65                loss
+  2:70,71                loss
+  2:74,75                loss
+  2:80,81                loss
+  2:91,92                loss
+  2:101,102              loss
+  2:102,103              loss
+  2:110,111              loss
+  2:111,112              loss
+  2:112,113              loss
+  2:113,114              loss
+  2:114,115              loss
+  2:5,16                 loss
+  2:6,17                 loss
+  2:7,18                 loss
+  2:8,19                 loss
+  2:9,20                 loss
+  2:10,21                loss
+  2:15,26                loss
+  2:16,27                loss
+  2:17,28                loss
+  2:18,29                loss
+  2:19,30                loss
+  2:20,31                loss
+  2:21,32                loss
+  2:25,36                loss
+  2:26,37                loss
+  2:27,38                loss
+  2:28,39                loss
+  2:29,40                loss
+  2:30,41                loss
+  2:31,42                loss
+  2:32,43                loss
+  2:35,46                loss
+  2:36,47                loss
+  2:37,48                loss
+  2:40,51                loss
+  2:41,52                loss
+  2:42,53                loss
+  2:43,54                loss
+  2:47,58                loss
+  2:51,62                loss
+  2:52,63                loss
+  2:53,64                loss
+  2:54,65                loss
+  2:58,69                loss
+  2:63,74                loss
+  2:64,75                loss
+  2:69,80                loss
+  2:70,81                loss
+  2:74,85                loss
+  2:80,91                loss
+  2:91,102               loss
+  2:92,103               loss
+  2:101,112              loss
+  2:102,113              loss
+  2:103,114              loss
+  2:5,15                 loss
+  2:6,16                 loss
+  2:7,17                 loss
+  2:8,18                 loss
+  2:9,19                 loss
+  2:10,20                loss
+  2:15,25                loss
+  2:16,26                loss
+  2:17,27                loss
+  2:18,28                loss
+  2:19,29                loss
+  2:20,30                loss
+  2:21,31                loss
+  2:25,35                loss
+  2:26,36                loss
+  2:27,37                loss
+  2:28,38                loss
+  2:29,39                loss
+  2:30,40                loss
+  2:31,41                loss
+  2:32,42                loss
+  2:35,45                loss
+  2:36,46                loss
+  2:37,47                loss
+  2:38,48                loss
+  2:41,51                loss
+  2:42,52                loss
+  2:43,53                loss
+  2:45,55                loss
+  2:48,58                loss
+  2:52,62                loss
+  2:53,63                loss
+  2:54,64                loss
+  2:61,71                loss
+  2:64,74                loss
+  2:65,75                loss
+  2:75,85                loss
+  2:81,91                loss
+  2:91,101               loss
+  2:92,102               loss
+  2:101,111              loss
+  2:102,112              loss
+  2:103,113              loss
+  3I:5,16,27             loss
+  3I:6,17,28             loss
+  3I:7,18,29             loss
+  3I:8,19,30             loss
+  3I:9,20,31             loss
+  3I:10,21,32            loss
+  3I:15,26,37            loss
+  3I:16,27,38            loss
+  3I:17,28,39            loss
+  3I:18,29,40            loss
+  3I:19,30,41            loss
+  3I:20,31,42            loss
+  3I:21,32,43            loss
+  3I:25,36,47            loss
+  3I:26,37,48            loss
+  3I:29,40,51            loss
+  3I:30,41,52            loss
+  3I:31,42,53            loss
+  3I:32,43,54            loss
+  3I:36,47,58            loss
+  3I:40,51,62            loss
+  3I:41,52,63            loss
+  3I:42,53,64            loss
+  3I:43,54,65            loss
+  3I:47,58,69            loss
+  3I:52,63,74            loss
+  3I:53,64,75            loss
+  3I:58,69,80            loss
+  3I:59,70,81            loss
+  3I:63,74,85            loss
+  3I:69,80,91            loss
+  3I:80,91,102           loss
+  3I:91,102,113          loss
+  3I:92,103,114          loss
+  3I:5,15,25             loss
+  3I:6,16,26             loss
+  3I:7,17,27             loss
+  3I:8,18,28             loss
+  3I:9,19,29             loss
+  3I:10,20,30            loss
+  3I:15,25,35            loss
+  3I:16,26,36            loss
+  3I:17,27,37            loss
+  3I:18,28,38            loss
+  3I:19,29,39            loss
+  3I:20,30,40            loss
+  3I:21,31,41            loss
+  3I:25,35,45            loss
+  3I:26,36,46            loss
+  3I:27,37,47            loss
+  3I:28,38,48            loss
+  3I:31,41,51            loss
+  3I:32,42,52            loss
+  3I:35,45,55            loss
+  3I:38,48,58            loss
+  3I:42,52,62            loss
+  3I:43,53,63            loss
+  3I:51,61,71            loss
+  3I:54,64,74            loss
+  3I:65,75,85            loss
+  3I:81,91,101           loss
+  3I:91,101,111          loss
+  3I:92,102,112          loss
+  3I:5,6,7               loss
+  3I:6,7,8               loss
+  3I:7,8,9               loss
+  3I:8,9,10              loss
+  3I:15,16,17            loss
+  3I:16,17,18            loss
+  3I:17,18,19            loss
+  3I:18,19,20            loss
+  3I:19,20,21            loss
+  3I:25,26,27            loss
+  3I:26,27,28            loss
+  3I:27,28,29            loss
+  3I:28,29,30            loss
+  3I:29,30,31            loss
+  3I:30,31,32            loss
+  3I:35,36,37            loss
+  3I:36,37,38            loss
+  3I:37,38,39            loss
+  3I:38,39,40            loss
+  3I:39,40,41            loss
+  3I:40,41,42            loss
+  3I:41,42,43            loss
+  3I:45,46,47            loss
+  3I:46,47,48            loss
+  3I:51,52,53            loss
+  3I:52,53,54            loss
+  3I:62,63,64            loss
+  3I:63,64,65            loss
+  3I:69,70,71            loss
+  3I:79,80,81            loss
+  3I:90,91,92            loss
+  3I:101,102,103         loss
+  3I:110,111,112         loss
+  3I:111,112,113         loss
+  3I:112,113,114         loss
+  3I:113,114,115         loss
+  3V:5,6,17              loss
+  3V:6,7,18              loss
+  3V:7,8,19              loss
+  3V:8,9,20              loss
+  3V:9,10,21             loss
+  3V:15,16,27            loss
+  3V:16,17,28            loss
+  3V:17,18,29            loss
+  3V:18,19,30            loss
+  3V:19,20,31            loss
+  3V:20,21,32            loss
+  3V:25,26,37            loss
+  3V:26,27,38            loss
+  3V:27,28,39            loss
+  3V:28,29,40            loss
+  3V:29,30,41            loss
+  3V:30,31,42            loss
+  3V:31,32,43            loss
+  3V:35,36,47            loss
+  3V:36,37,48            loss
+  3V:39,40,51            loss
+  3V:40,41,52            loss
+  3V:41,42,53            loss
+  3V:42,43,54            loss
+  3V:46,47,58            loss
+  3V:51,52,63            loss
+  3V:52,53,64            loss
+  3V:53,54,65            loss
+  3V:62,63,74            loss
+  3V:63,64,75            loss
+  3V:69,70,81            loss
+  3V:101,102,113         loss
+  3V:102,103,114         loss
+  3V:5,16,26             loss
+  3V:6,17,27             loss
+  3V:7,18,28             loss
+  3V:8,19,29             loss
+  3V:9,20,30             loss
+  3V:10,21,31            loss
+  3V:15,26,36            loss
+  3V:16,27,37            loss
+  3V:17,28,38            loss
+  3V:18,29,39            loss
+  3V:19,30,40            loss
+  3V:20,31,41            loss
+  3V:21,32,42            loss
+  3V:25,36,46            loss
+  3V:26,37,47            loss
+  3V:27,38,48            loss
+  3V:30,41,51            loss
+  3V:31,42,52            loss
+  3V:32,43,53            loss
+  3V:37,48,58            loss
+  3V:41,52,62            loss
+  3V:42,53,63            loss
+  3V:43,54,64            loss
+  3V:50,61,71            loss
+  3V:53,64,74            loss
+  3V:54,65,75            loss
+  3V:64,75,85            loss
+  3V:80,91,101           loss
+  3V:91,102,112          loss
+  3V:92,103,113          loss
+  3V:6,15,16             loss
+  3V:7,16,17             loss
+  3V:8,17,18             loss
+  3V:9,18,19             loss
+  3V:10,19,20            loss
+  3V:16,25,26            loss
+  3V:17,26,27            loss
+  3V:18,27,28            loss
+  3V:19,28,29            loss
+  3V:20,29,30            loss
+  3V:21,30,31            loss
+  3V:26,35,36            loss
+  3V:27,36,37            loss
+  3V:28,37,38            loss
+  3V:29,38,39            loss
+  3V:30,39,40            loss
+  3V:31,40,41            loss
+  3V:32,41,42            loss
+  3V:36,45,46            loss
+  3V:37,46,47            loss
+  3V:38,47,48            loss
+  3V:42,51,52            loss
+  3V:43,52,53            loss
+  3V:53,62,63            loss
+  3V:54,63,64            loss
+  3V:65,74,75            loss
+  3V:81,90,91            loss
+  3V:92,101,102          loss
+  3V:101,110,111         loss
+  3V:102,111,112         loss
+  3V:103,112,113         loss
+  3V:5,16,17             loss
+  3V:6,17,18             loss
+  3V:7,18,19             loss
+  3V:8,19,20             loss
+  3V:9,20,21             loss
+  3V:15,26,27            loss
+  3V:16,27,28            loss
+  3V:17,28,29            loss
+  3V:18,29,30            loss
+  3V:19,30,31            loss
+  3V:20,31,32            loss
+  3V:25,36,37            loss
+  3V:26,37,38            loss
+  3V:27,38,39            loss
+  3V:28,39,40            loss
+  3V:29,40,41            loss
+  3V:30,41,42            loss
+  3V:31,42,43            loss
+  3V:35,46,47            loss
+  3V:36,47,48            loss
+  3V:40,51,52            loss
+  3V:41,52,53            loss
+  3V:42,53,54            loss
+  3V:51,62,63            loss
+  3V:52,63,64            loss
+  3V:53,64,65            loss
+  3V:59,70,71            loss
+  3V:63,74,75            loss
+  3V:69,80,81            loss
+  3V:80,91,92            loss
+  3V:91,102,103          loss
+  3V:101,112,113         loss
+  3V:102,113,114         loss
+  3V:103,114,115         loss
+  3V:5,15,26             loss
+  3V:6,16,27             loss
+  3V:7,17,28             loss
+  3V:8,18,29             loss
+  3V:9,19,30             loss
+  3V:10,20,31            loss
+  3V:15,25,36            loss
+  3V:16,26,37            loss
+  3V:17,27,38            loss
+  3V:18,28,39            loss
+  3V:19,29,40            loss
+  3V:20,30,41            loss
+  3V:21,31,42            loss
+  3V:25,35,46            loss
+  3V:26,36,47            loss
+  3V:27,37,48            loss
+  3V:30,40,51            loss
+  3V:31,41,52            loss
+  3V:32,42,53            loss
+  3V:37,47,58            loss
+  3V:41,51,62            loss
+  3V:42,52,63            loss
+  3V:43,53,64            loss
+  3V:48,58,69            loss
+  3V:53,63,74            loss
+  3V:54,64,75            loss
+  3V:64,74,85            loss
+  3V:81,91,102           loss
+  3V:91,101,112          loss
+  3V:92,102,113          loss
+  3V:5,6,15              loss
+  3V:6,7,16              loss
+  3V:7,8,17              loss
+  3V:8,9,18              loss
+  3V:9,10,19             loss
+  3V:15,16,25            loss
+  3V:16,17,26            loss
+  3V:17,18,27            loss
+  3V:18,19,28            loss
+  3V:19,20,29            loss
+  3V:20,21,30            loss
+  3V:25,26,35            loss
+  3V:26,27,36            loss
+  3V:27,28,37            loss
+  3V:28,29,38            loss
+  3V:29,30,39            loss
+  3V:30,31,40            loss
+  3V:31,32,41            loss
+  3V:35,36,45            loss
+  3V:36,37,46            loss
+  3V:37,38,47            loss
+  3V:38,39,48            loss
+  3V:41,42,51            loss
+  3V:42,43,52            loss
+  3V:45,46,55            loss
+  3V:52,53,62            loss
+  3V:53,54,63            loss
+  3V:61,62,71            loss
+  3V:64,65,74            loss
+  3V:70,71,80            loss
+  3V:80,81,90            loss
+  3V:91,92,101           loss
+  3V:101,102,111         loss
+  3V:102,103,112         loss
+  4I:5,15,25,35          loss
+  4I:6,16,26,36          loss
+  4I:7,17,27,37          loss
+  4I:8,18,28,38          loss
+  4I:9,19,29,39          loss
+  4I:10,20,30,40         loss
+  4I:15,25,35,45         loss
+  4I:16,26,36,46         loss
+  4I:17,27,37,47         loss
+  4I:18,28,38,48         loss
+  4I:21,31,41,51         loss
+  4I:25,35,45,55         loss
+  4I:28,38,48,58         loss
+  4I:32,42,52,62         loss
+  4I:41,51,61,71         loss
+  4I:81,91,101,111       loss
+  4I:5,6,7,8             loss
+  4I:6,7,8,9             loss
+  4I:7,8,9,10            loss
+  4I:15,16,17,18         loss
+  4I:16,17,18,19         loss
+  4I:17,18,19,20         loss
+  4I:18,19,20,21         loss
+  4I:25,26,27,28         loss
+  4I:26,27,28,29         loss
+  4I:27,28,29,30         loss
+  4I:28,29,30,31         loss
+  4I:29,30,31,32         loss
+  4I:35,36,37,38         loss
+  4I:36,37,38,39         loss
+  4I:37,38,39,40         loss
+  4I:38,39,40,41         loss
+  4I:39,40,41,42         loss
+  4I:40,41,42,43         loss
+  4I:45,46,47,48         loss
+  4I:51,52,53,54         loss
+  4I:62,63,64,65         loss
+  4I:68,69,70,71         loss
+  4I:78,79,80,81         loss
+  4I:110,111,112,113     loss
+  4I:111,112,113,114     loss
+  4I:112,113,114,115     loss
+  4I:5,16,27,38          loss
+  4I:6,17,28,39          loss
+  4I:7,18,29,40          loss
+  4I:8,19,30,41          loss
+  4I:9,20,31,42          loss
+  4I:10,21,32,43         loss
+  4I:15,26,37,48         loss
+  4I:18,29,40,51         loss
+  4I:19,30,41,52         loss
+  4I:20,31,42,53         loss
+  4I:21,32,43,54         loss
+  4I:25,36,47,58         loss
+  4I:29,40,51,62         loss
+  4I:30,41,52,63         loss
+  4I:31,42,53,64         loss
+  4I:32,43,54,65         loss
+  4I:36,47,58,69         loss
+  4I:41,52,63,74         loss
+  4I:42,53,64,75         loss
+  4I:47,58,69,80         loss
+  4I:48,59,70,81         loss
+  4I:52,63,74,85         loss
+  4I:58,69,80,91         loss
+  4I:69,80,91,102        loss
+  4I:80,91,102,113       loss
+  4B:5,16,17,28          loss
+  4B:6,17,18,29          loss
+  4B:7,18,19,30          loss
+  4B:8,19,20,31          loss
+  4B:9,20,21,32          loss
+  4B:15,26,27,38         loss
+  4B:16,27,28,39         loss
+  4B:17,28,29,40         loss
+  4B:18,29,30,41         loss
+  4B:19,30,31,42         loss
+  4B:20,31,32,43         loss
+  4B:25,36,37,48         loss
+  4B:28,39,40,51         loss
+  4B:29,40,41,52         loss
+  4B:30,41,42,53         loss
+  4B:31,42,43,54         loss
+  4B:35,46,47,58         loss
+  4B:40,51,52,63         loss
+  4B:41,52,53,64         loss
+  4B:42,53,54,65         loss
+  4B:51,62,63,74         loss
+  4B:52,63,64,75         loss
+  4B:58,69,70,81         loss
+  4B:91,102,103,114      loss
+  4B:5,15,26,36          loss
+  4B:6,16,27,37          loss
+  4B:7,17,28,38          loss
+  4B:8,18,29,39          loss
+  4B:9,19,30,40          loss
+  4B:10,20,31,41         loss
+  4B:15,25,36,46         loss
+  4B:16,26,37,47         loss
+  4B:17,27,38,48         loss
+  4B:20,30,41,51         loss
+  4B:21,31,42,52         loss
+  4B:27,37,48,58         loss
+  4B:31,41,52,62         loss
+  4B:32,42,53,63         loss
+  4B:40,50,61,71         loss
+  4B:43,53,64,74         loss
+  4B:54,64,75,85         loss
+  4B:81,91,102,112       loss
+  4B:6,7,15,16           loss
+  4B:7,8,16,17           loss
+  4B:8,9,17,18           loss
+  4B:9,10,18,19          loss
+  4B:16,17,25,26         loss
+  4B:17,18,26,27         loss
+  4B:18,19,27,28         loss
+  4B:19,20,28,29         loss
+  4B:20,21,29,30         loss
+  4B:26,27,35,36         loss
+  4B:27,28,36,37         loss
+  4B:28,29,37,38         loss
+  4B:29,30,38,39         loss
+  4B:30,31,39,40         loss
+  4B:31,32,40,41         loss
+  4B:36,37,45,46         loss
+  4B:37,38,46,47         loss
+  4B:38,39,47,48         loss
+  4B:42,43,51,52         loss
+  4B:53,54,62,63         loss
+  4B:70,71,79,80         loss
+  4B:91,92,100,101       loss
+  4B:101,102,110,111     loss
+  4B:102,103,111,112     loss
+  4B:5,6,17,18           loss
+  4B:6,7,18,19           loss
+  4B:7,8,19,20           loss
+  4B:8,9,20,21           loss
+  4B:15,16,27,28         loss
+  4B:16,17,28,29         loss
+  4B:17,18,29,30         loss
+  4B:18,19,30,31         loss
+  4B:19,20,31,32         loss
+  4B:25,26,37,38         loss
+  4B:26,27,38,39         loss
+  4B:27,28,39,40         loss
+  4B:28,29,40,41         loss
+  4B:29,30,41,42         loss
+  4B:30,31,42,43         loss
+  4B:35,36,47,48         loss
+  4B:39,40,51,52         loss
+  4B:40,41,52,53         loss
+  4B:41,42,53,54         loss
+  4B:51,52,63,64         loss
+  4B:52,53,64,65         loss
+  4B:58,59,70,71         loss
+  4B:62,63,74,75         loss
+  4B:68,69,80,81         loss
+  4B:79,80,91,92         loss
+  4B:101,102,113,114     loss
+  4B:102,103,114,115     loss
+  4B:5,16,26,37          loss
+  4B:6,17,27,38          loss
+  4B:7,18,28,39          loss
+  4B:8,19,29,40          loss
+  4B:9,20,30,41          loss
+  4B:10,21,31,42         loss
+  4B:15,26,36,47         loss
+  4B:16,27,37,48         loss
+  4B:19,30,40,51         loss
+  4B:20,31,41,52         loss
+  4B:21,32,42,53         loss
+  4B:26,37,47,58         loss
+  4B:30,41,51,62         loss
+  4B:31,42,52,63         loss
+  4B:32,43,53,64         loss
+  4B:37,48,58,69         loss
+  4B:42,53,63,74         loss
+  4B:43,54,64,75         loss
+  4B:53,64,74,85         loss
+  4B:80,91,101,112       loss
+  4B:6,15,16,25          loss
+  4B:7,16,17,26          loss
+  4B:8,17,18,27          loss
+  4B:9,18,19,28          loss
+  4B:10,19,20,29         loss
+  4B:16,25,26,35         loss
+  4B:17,26,27,36         loss
+  4B:18,27,28,37         loss
+  4B:19,28,29,38         loss
+  4B:20,29,30,39         loss
+  4B:21,30,31,40         loss
+  4B:26,35,36,45         loss
+  4B:27,36,37,46         loss
+  4B:28,37,38,47         loss
+  4B:29,38,39,48         loss
+  4B:32,41,42,51         loss
+  4B:36,45,46,55         loss
+  4B:43,52,53,62         loss
+  4B:52,61,62,71         loss
+  4B:81,90,91,100        loss
+  4B:92,101,102,111      loss
+  4C:5,15,26,27          loss
+  4C:6,16,27,28          loss
+  4C:7,17,28,29          loss
+  4C:8,18,29,30          loss
+  4C:9,19,30,31          loss
+  4C:10,20,31,32         loss
+  4C:15,25,36,37         loss
+  4C:16,26,37,38         loss
+  4C:17,27,38,39         loss
+  4C:18,28,39,40         loss
+  4C:19,29,40,41         loss
+  4C:20,30,41,42         loss
+  4C:21,31,42,43         loss
+  4C:25,35,46,47         loss
+  4C:26,36,47,48         loss
+  4C:30,40,51,52         loss
+  4C:31,41,52,53         loss
+  4C:32,42,53,54         loss
+  4C:41,51,62,63         loss
+  4C:42,52,63,64         loss
+  4C:43,53,64,65         loss
+  4C:49,59,70,71         loss
+  4C:53,63,74,75         loss
+  4C:59,69,80,81         loss
+  4C:70,80,91,92         loss
+  4C:81,91,102,103       loss
+  4C:91,101,112,113      loss
+  4C:92,102,113,114      loss
+  4C:5,6,15,26           loss
+  4C:6,7,16,27           loss
+  4C:7,8,17,28           loss
+  4C:8,9,18,29           loss
+  4C:9,10,19,30          loss
+  4C:15,16,25,36         loss
+  4C:16,17,26,37         loss
+  4C:17,18,27,38         loss
+  4C:18,19,28,39         loss
+  4C:19,20,29,40         loss
+  4C:20,21,30,41         loss
+  4C:25,26,35,46         loss
+  4C:26,27,36,47         loss
+  4C:27,28,37,48         loss
+  4C:30,31,40,51         loss
+  4C:31,32,41,52         loss
+  4C:37,38,47,58         loss
+  4C:41,42,51,62         loss
+  4C:42,43,52,63         loss
+  4C:53,54,63,74         loss
+  4C:64,65,74,85         loss
+  4C:70,71,80,91         loss
+  4C:80,81,90,101        loss
+  4C:91,92,101,112       loss
+  4C:5,6,15,17           loss
+  4C:6,7,16,18           loss
+  4C:7,8,17,19           loss
+  4C:8,9,18,20           loss
+  4C:9,10,19,21          loss
+  4C:15,16,25,27         loss
+  4C:16,17,26,28         loss
+  4C:17,18,27,29         loss
+  4C:18,19,28,30         loss
+  4C:19,20,29,31         loss
+  4C:20,21,30,32         loss
+  4C:25,26,35,37         loss
+  4C:26,27,36,38         loss
+  4C:27,28,37,39         loss
+  4C:28,29,38,40         loss
+  4C:29,30,39,41         loss
+  4C:30,31,40,42         loss
+  4C:31,32,41,43         loss
+  4C:35,36,45,47         loss
+  4C:36,37,46,48         loss
+  4C:41,42,51,53         loss
+  4C:42,43,52,54         loss
+  4C:52,53,62,64         loss
+  4C:53,54,63,65         loss
+  4C:69,70,79,81         loss
+  4C:101,102,111,113     loss
+  4C:102,103,112,114     loss
+  4C:5,6,17,27           loss
+  4C:6,7,18,28           loss
+  4C:7,8,19,29           loss
+  4C:8,9,20,30           loss
+  4C:9,10,21,31          loss
+  4C:15,16,27,37         loss
+  4C:16,17,28,38         loss
+  4C:17,18,29,39         loss
+  4C:18,19,30,40         loss
+  4C:19,20,31,41         loss
+  4C:20,21,32,42         loss
+  4C:25,26,37,47         loss
+  4C:26,27,38,48         loss
+  4C:29,30,41,51         loss
+  4C:30,31,42,52         loss
+  4C:31,32,43,53         loss
+  4C:36,37,48,58         loss
+  4C:40,41,52,62         loss
+  4C:41,42,53,63         loss
+  4C:42,43,54,64         loss
+  4C:49,50,61,71         loss
+  4C:52,53,64,74         loss
+  4C:53,54,65,75         loss
+  4C:63,64,75,85         loss
+  4C:5,16,25,26          loss
+  4C:6,17,26,27          loss
+  4C:7,18,27,28          loss
+  4C:8,19,28,29          loss
+  4C:9,20,29,30          loss
+  4C:10,21,30,31         loss
+  4C:15,26,35,36         loss
+  4C:16,27,36,37         loss
+  4C:17,28,37,38         loss
+  4C:18,29,38,39         loss
+  4C:19,30,39,40         loss
+  4C:20,31,40,41         loss
+  4C:21,32,41,42         loss
+  4C:25,36,45,46         loss
+  4C:26,37,46,47         loss
+  4C:27,38,47,48         loss
+  4C:31,42,51,52         loss
+  4C:32,43,52,53         loss
+  4C:42,53,62,63         loss
+  4C:43,54,63,64         loss
+  4C:54,65,74,75         loss
+  4C:91,102,111,112      loss
+  4C:92,103,112,113      loss
+  4C:5,7,16,17           loss
+  4C:6,8,17,18           loss
+  4C:7,9,18,19           loss
+  4C:8,10,19,20          loss
+  4C:15,17,26,27         loss
+  4C:16,18,27,28         loss
+  4C:17,19,28,29         loss
+  4C:18,20,29,30         loss
+  4C:19,21,30,31         loss
+  4C:25,27,36,37         loss
+  4C:26,28,37,38         loss
+  4C:27,29,38,39         loss
+  4C:28,30,39,40         loss
+  4C:29,31,40,41         loss
+  4C:30,32,41,42         loss
+  4C:35,37,46,47         loss
+  4C:36,38,47,48         loss
+  4C:40,42,51,52         loss
+  4C:41,43,52,53         loss
+  4C:51,53,62,63         loss
+  4C:52,54,63,64         loss
+  4C:63,65,74,75         loss
+  4C:79,81,90,91         loss
+  4C:90,92,101,102       loss
+  4C:101,103,112,113     loss

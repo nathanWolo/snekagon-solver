@@ -3366,3 +3366,14 @@ through its own script under `tools/locked.sh` because the check build needs a f
   cheapest by the nodes of its jobs (403 M nodes, 702 thread-seconds). Output:
   `work/refcheck/line98.txt`. Noted while reading its source: it has `refute` and
   `proveline` modes of its own for proving a line reply by reply.
+- *Its answer (23:18): the reference solver agrees on that line.* `ply 3 stm 1: loses
+  (777/777 root moves solved, 382256217 nodes, 211.4s)`: every one of blue's moves loses.
+  Its 777 root moves are as many as the jobs our file holds under that answer. Kept as
+  `proofs/centre-opening/refcheck/line98.txt`. It took 211 s on 16 threads: 0.95x our nodes
+  for the line and 4.8x our thread-seconds (3,382 against 702; 113,000 nodes a
+  thread-second in WSL against our 574,000).
+- *All 172 lines, estimated from this one:* by nodes (ours 437 G, times 0.95, at 113,000 a
+  thread-second) about 64 hours on 16 threads; by thread-seconds (ours 621,000, times 4.8)
+  about 52 hours. One line, and the cheapest one: it could be off by a factor of two either
+  way. Not started: the owner's call. It can run in pieces, because `PROGRESS=<file>` keeps
+  every solved root move and a rerun goes on from there.
