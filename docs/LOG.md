@@ -3498,3 +3498,37 @@ through its own script under `tools/locked.sh` because the check build needs a f
   means running their code (the owner's word, as for any downloaded code); (3) the outreach:
   the designer has had that issue on his repository since 19 October; (4) the post names two
   more people, Darragh Griffin and K0tovsk1y.
+
+## 2026-11-21 The first proof's answers, checked with our solver (owner: "Yes, check them")
+
+- Asked after the entry above: "Should our solver check the earlier proof's 172 answers, a run
+  of some hours?" Owner: "Yes, check them".
+- **Hypothesis** (written before the run): every line of `K0tovsk1y/snekagon-solution`'s
+  `proof/index.txt` is true by our solver: after `1:60`, their blue reply Y and their red
+  answer Z, blue to move loses. Expected: 172 of 172, in 4 to 8 hours on 16 threads (a line
+  is one winning try of our own proof, 46 s for a cheap one).
+- *The list.* Read from the public file by three independent readers (a workflow of three
+  agents over the same page); the three readings are equal, 172 lines. Kept as read in
+  `work/k0check/index.txt`. Nothing else of that repository was fetched and none of its code
+  was run. `python tools/crosscheck.py prepare work/k0check/index.txt work/k0check` checks
+  it against our own count of the replies (`certificate.py`): every Y and Z is a placement of
+  the piece it names, every Y is a legal reply, and the 172 lines cover our 172 classes
+  exactly once. **14 answers are the same move as in our proof** (after the symmetry that
+  maps the two replies onto each other), **158 are different.** `work/k0check/map.tsv`.
+- *The question.* One root per line, `-1 1:60 Y Z` (expected value -1: blue, to move, loses),
+  for the proof driver of the final proof's build:
+  `sh tools/locked.sh frozen/prove-replay.exe prove work/k0check/lines.txt --threads 16
+  --job-threads 1 --depth 1 --tt 27 --out work/k0check/results.txt`. Depth 1 from a root
+  three moves in gives the same jobs as the proof itself: positions four moves in, red to
+  move, "does red win". The driver finds the exact value and exits 1 on any value that is
+  not the expected one. The run is restartable from its results file.
+- **Controls first** (`work/k0check/controls.txt`, 19:29-19:32, 171 s): a line of our own
+  proof (`4A:17,18,29,40` answered by `4C:101,103,112,113`) came out -1, ok, in 45.9 s with
+  729 jobs (the proof's own record: 46 s). Red's U against the zig-zag
+  (`1:60 4B:16,27,28,39 4C:40,41,50,52`) came out 0, WRONG, with blue's `4A:49,59,70,81` as
+  the move that holds, which is what the designer's repository says. A failed red try from
+  our results file came out +1 for blue, WRONG. Exit code 1. So the check can fail, and it
+  tells a draw from a loss.
+- **Started 19:33:02**, all 172 lines (the 14 shared ones too, so that one run covers the
+  whole list). Progress: one line per root in `work/k0check/run.log`; times in
+  `work/k0check/run.times`; `python tools/crosscheck.py report work/k0check` sums it up.
