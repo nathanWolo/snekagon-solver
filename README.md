@@ -37,11 +37,18 @@ tree.
 - One of the 172 lines, the cheapest by this solver's count, has been solved again by a second
   program: Darragh Griffin's fourth version of the solver in the designer's repository. All 777
   of blue's moves lose there (211 s on 16 threads; output in `proofs/centre-opening/refcheck/`).
-  The other 171 rest on this solver alone. Checking them all that way would take about 50 to 65
-  hours.
-- This solver is checking the 172 answers of the earlier proof (`tools/crosscheck.py`, started
-  2026-11-21). That tests the earlier proof with this program. It adds nothing to the checks of
-  this one. The result goes into `docs/LOG.md`, "The first proof's answers, checked".
+  Of the other 171, 14 have the same answer in the earlier proof, so that proof's program
+  claims them too (it was not run here). The remaining 157 rest on this solver alone. Checking
+  all 172 with the second program would take about 50 to 65 hours.
+- This solver has checked the 172 answers of the earlier proof (`tools/crosscheck.py`, run on
+  2026-11-21 and 22): by this solver every one of them wins. After red's centre cell, each of
+  their replies and their answer to it, blue loses. It took 5.9 hours on 16 threads. That tests
+  the top of the earlier proof with a program that shares no code with theirs, but follows the
+  rules as the same repository implements them and has the soft spot named below. It does not
+  test the positions that proof stores under its answers, or its checker. And it adds nothing
+  to the checks of this proof: it was run with the program that made this proof, and agreement
+  that 172 more positions are wins could not reveal a win reported in error. The run's output
+  for each line is not in this repository. `docs/LOG.md`, "The first proof's answers, checked".
 - The earlier proof's own checker has not been run on this proof.
 - The rules are the rules as the designer's repository implements them. They have not been
   checked here against the printed game. Both proofs and the one-line check share that reading.
@@ -93,7 +100,7 @@ lines of work, kept for the history.
 ## How it was made
 
 The code, the experiments and the log were written by Claude, Anthropic's AI model, working as
-coding agents on the owner's PC between 14 and 21 November 2026. The owner set the goal and the
+coding agents on the owner's PC between 14 and 22 November 2026. The owner set the goal and the
 rules of evidence and made the decisions. Speed changes were accepted by measurement: one
 hypothesis per change, a test fixed in advance on positions the change had not been tuned on, and
 every value checked against a known one.

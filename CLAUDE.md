@@ -54,10 +54,12 @@ Update this section in the same change that freezes a version.
   the copy's history changes. **State: public since 2026-11-21, about 21:30** (it was pushed as a
   private repository first; the owner, asked "Make the repository public as it is staged?"
   with the list of what it shows and leaves out: "Yes"). **Each later push needs the owner's
-  word.** One is given (2026-11-21, 21:33): asked "May I push that result to the public
+  word.** One was given (2026-11-21, 21:33): asked "May I push that result to the public
   repository when the run ends?", about the cross-check, the owner said "Yes, push it". Read
   as that one push (the result in the log, the README's line on it, these notes), not a
-  standing permission. Still the owner's to decide: the blog draft, the play page, a licence. LOG,
+  standing permission. **It is for this result, in the commit that adds it (2026-11-22):
+  once that commit is pushed, no push is allowed without the owner's word.** Still the
+  owner's to decide: the blog draft, the play page, a licence. LOG,
   "A public copy of the repository".
 - **The result is not new (found 2026-11-21): a proof that red wins with `1:60` was published
   on 2026-10-19**, a month before ours, by the GitHub user K0tovsk1y: issue #3 on
@@ -66,20 +68,22 @@ Update this section in the same change that freezes a version.
   play page; built on the designer's engine; no licence). This project never read it before
   that day; its list of 172 answers has been read as data since, and none of its code has
   been downloaded or run. Ours is a second proof by a program
-  that shares no code with it. Whether to cross-check the two (our solver on their 172
-  answers needs only their `proof/index.txt` as data; their checker on ours is downloaded
-  code), how to frame the post and what to tell the designer are the owner's. Also found:
+  that shares no code with it. Our solver has since checked their 172 answers (the next
+  bullet). Whether to run their checker on ours (downloaded code), how to frame the post and
+  what to tell the designer are the owner's. Also found:
   the reference solver's fourth version, the one we ran, is Darragh Griffin's contribution to
   the designer's repository, not the designer's own. LOG, "an earlier proof found".
-- **Our solver is checking that proof's 172 answers (owner, 2026-11-21: "Yes, check them"):
-  started 19:33:02, about 7.5 hours expected.** Everything is in `work/k0check/` (`run.log`
-  one line per finished line, `run.times`, `results.txt` to restart from);
-  `python tools/crosscheck.py report work/k0check` sums it up. When it ends: add the result
-  to the LOG entry "The first proof's answers, checked", and change the post's three
-  sentences that say neither proof has been run through the other's program. **A page to
-  watch it is up** (owner's request): `tools/crosscheck_watch.py` on 8772, behind the gate
-  on 8781 and a quick tunnel, as for the board below; stop all three, and remove the launch
-  entry `crosscheck-watch`, when the owner no longer needs them. LOG, "A page to watch the
+- **Our solver has checked that proof's 172 answers (owner, 2026-11-21: "Yes, check them"):
+  all 172 are confirmed, none wrong** (2026-11-21 19:33 to 11-22 01:26, 5.88 hours on 16
+  threads, exit 0). Everything is in `work/k0check/` (`run.log` one line per line of theirs,
+  `run.times`, `results.txt`, `summary.tsv`); `python tools/crosscheck.py report
+  work/k0check` sums it up. It tests the earlier proof with our program and is no check of
+  ours. Their checker has not been run on our proof (downloaded code: the owner's word
+  first), and whether a copy of their list of answers (the run's files) goes into git is the
+  owner's too. **The page to watch the run is down:** its server, the gate and the tunnel
+  were stopped when the run ended, and the launch entry `crosscheck-watch` is removed;
+  `tools/crosscheck_watch.py` shows the finished run if it is started again. LOG,
+  "The first proof's answers, checked" and "A page to watch the
   cross-check".
 - **A blog post on the result is drafted (2026-11-21, owner's request):**
   `docs/blog/solving-snekagon.html`, private at

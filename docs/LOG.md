@@ -3532,6 +3532,42 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - **Started 19:33:02**, all 172 lines (the 14 shared ones too, so that one run covers the
   whole list). Progress: one line per root in `work/k0check/run.log`; times in
   `work/k0check/run.times`; `python tools/crosscheck.py report work/k0check` sums it up.
+- **Result: 172 of 172 confirmed, none wrong, none unknown** (ended 2026-11-22 01:26:04,
+  exit 0). Every line has the value -1 for blue: after `1:60`, their reply and their answer
+  to it, blue to move loses. 5.88 hours on 16 threads (21,181 s; 86.4 thread-hours; 169.1 G
+  nodes; 166,854 jobs). A line took 28.6 to 440.1 s, median 109.5 s, and ten took more than
+  300 s. The slowest: `3V:28,29,40` answered by `4A:7,8,9,20` (440 s), `4I:15,25,35,45` by
+  `4A:57,67,77,88` (381 s), `2:16,17` by `4I:53,63,73,83` (360 s). The 14 lines whose answer
+  is also ours took 1,712 s of it, the 158 others 19,469 s. `run.err` has no error line. The
+  hypothesis held, and inside its 4 to 8 hours. One row per line:
+  `work/k0check/summary.tsv`, written by `python tools/crosscheck.py report work/k0check`.
+- *What it shows.* By our solver, every answer at the top of the earlier proof wins: its 172
+  lines cover the 172 classes of replies once each (`prepare`, by our own count of the
+  replies), and each answer has the value -1 for blue. Our solver shares no code with the
+  program that made that proof. It does share the rules as the designer's repository
+  implements them, and it has its own soft spot, the 38-bit key check. On 158 of the 172
+  replies their answer is a different move from ours under every symmetry that maps the two
+  replies onto each other. By our solver both win, so by our solver red has at least two
+  winning answers to each of those replies. On the other 14 replies the two proofs give the
+  same answer: those 14 lines of our proof are claimed by their program too, as published
+  (it was not run here). The line the reference solver checked is not one of the 14.
+- *What it does not show.* It is no check of our own proof: it is the same program, the same
+  table (`--tt 27`, so the same 38-bit key check) and the same reading of the rules, and 158
+  of its lines are not in our proof at all. Agreement that 172 more positions are wins could
+  not reveal a win reported in error, which is the error that would break our proof. It did
+  not test the earlier proof below its answers (the positions it stores under them), its
+  checker or its play page. None of that repository's code has been downloaded or run; only
+  `proof/index.txt` was read. Their checker on our 172 answers would be the other half. It
+  is downloaded code, so it waits for the owner's word.
+- *After the run.* The README's lines on what has been checked and the notes in CLAUDE.md
+  state the result. The run's files stay in `work/k0check/`, which is not in git: they hold
+  the earlier proof's list of answers, and whether a copy of that list goes into this
+  repository is the owner's to decide. The post's draft is not in the public copy; it is
+  updated outside this push. The page to watch the run is down (the next entry).
+- *The push.* This entry goes to the public copy with the one push the owner allowed: asked
+  on 2026-11-21 at 21:33 "May I push that result to the public repository when the run
+  ends?", the owner said "Yes, push it". It carries the result and the notes on it, nothing
+  else. Any later push needs the owner's word again.
 
 ## 2026-11-21 A page to watch the cross-check (owner: "can you put up the browser progress thing for this run")
 
@@ -3556,6 +3592,10 @@ through its own script under `tools/locked.sh` because the check build needs a f
   hours in all by that mean.
 - To stop when the owner no longer needs them: the tunnel, the gate and the page's server
   (two background shells and a preview server of the session), and the launch entry.
+- **Stopped on 2026-11-22 at 01:30**, four minutes after the run ended (the owner had been
+  told on 11-21 that they would go down with the run): the tunnel, the gate, the page's
+  server, and the launch entry. Checked: nothing listens on 8772 or 8781, and the tunnel's
+  address no longer answers.
 
 ## 2026-11-21 A public copy of the repository (owner: "Can you put all the snekagon work up on a public repo on my github?")
 
