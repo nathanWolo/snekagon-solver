@@ -26,7 +26,8 @@ Update this section in the same change that freezes a version.
   checked by a second program beyond one line: the reference solver confirmed the cheapest
   certificate line (211 s on 16 threads, `proofs/centre-opening/refcheck/`); all 172 would
   take about 50 to 65 hours on 16 threads by that one line, and running them is the owner's
-  call (asked at 23:20). The proof no longer
+  call (asked at 23:20; asked again on 2026-11-21 with the blog post, the owner said "Not
+  now", so do not start it or ask again unprompted). The proof no longer
   runs: the bullets below about the board's run and the pause of `1:60` are history. The
   outreach to the publisher is the owner's. LOG, "The centre opening is proved".
 - **A blog post on the result is drafted (2026-11-21, owner's request):**
