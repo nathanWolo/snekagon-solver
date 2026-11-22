@@ -120,7 +120,8 @@ reference still needs fewer nodes on `blue_wins`, `blue_wins_holdout` and `rando
 
 - After `1:60 4B:16,27,28,39`, red wins with `4B:70,81,82,93` (2026-11-15; `docs/LOG.md`). So the
   blue reply the reference studied loses against the right answer. Checked by three runs of this
-  project's engines; not checked with the reference solver.
+  project's engines; not checked with the reference solver. The earlier proof (below) already
+  contained a red win here, with `4I:71,82,93,104`.
 
 ## Added 2026-11-21: what this note missed
 

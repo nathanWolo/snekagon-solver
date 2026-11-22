@@ -6,8 +6,9 @@ What the log has taught, distilled. `LOG.md` has the record and the numbers' sou
 
 Confirmed: fixed length, fresh units. Gate: stopped where the test decided, so it reads high. Tune:
 screens and profiles, for ranking only. Node counts are exact and repeat; seconds are this machine's
-(Ryzen 7 5800XT, one thread unless said). The reference's figures are its author's, on another
-machine, and were not reproduced here.
+(Ryzen 7 5800XT, one thread unless said). The reference's published figures are its authors' (the
+fourth version's are Darragh Griffin's), from another machine. Its node counts on its five bench
+files were reproduced here exactly on 2026-11-16; its times were not.
 
 ## About the problem
 

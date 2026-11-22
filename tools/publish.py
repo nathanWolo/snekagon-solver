@@ -1,6 +1,7 @@
 """Makes the public copy of this repository.
 
-    python tools/publish.py OUT_DIR [--skip GLOB ...] [--drop PATH ...] [--keep-trailers] [--force]
+    python tools/publish.py OUT_DIR [--skip GLOB ...] [--drop PATH ...] [--scrub-paths]
+                                    [--keep-trailers] [--force]
 
 The commit messages of the working repository carry "Co-Authored-By: Claude ..." lines. The public
 copy is the same history without them: every commit keeps its tree, its parents, its author, its
@@ -11,23 +12,28 @@ changed. OUT_DIR becomes a bare repository holding
     commit-map                    a branch with one file, commit-map.tsv: the hash of every commit
                                   here and in the public copy, since the docs cite the hashes here
 
-A file named with --drop (its exact path) is left out of every commit, contents and all: for a file
-that must not be published while the rest of its branch may.
+--drop PATH       leaves a file (its exact path) out of every commit, contents and all: for a file
+                  that must not be published while the rest of its branch may.
+--scrub-paths     replaces, in the contents of every text file, the folders of this machine that
+                  scripts and logs name (the user's home, the app's session folder, its scratch
+                  folder) by <user>, <session-folder> and <scratchpad>.
 
-The copy is checked before the script says "ok": every commit must have the same people and dates
-as its original, parents that are the copies of the original's parents, a message that differs by
-the removed lines only, and the same tree, or with --drop the same files except the dropped ones,
-whose contents must be gone from the copy. With --keep-trailers and no --drop nothing is changed
-and every hash must come out the same, which tests the copying itself.
-
-What is left out of the public copy, and why, is in CLAUDE.md ("The public copy").
+The copy is checked before the script says "ok". Every commit must have the same people and dates
+as its original, parents that are the copies of the original's parents, and a message that differs
+by the removed lines only. Its files must be the original's files: the same tree, or, where an
+option changed something, the same paths and modes except the dropped files, each changed file
+equal to its original after the replacement. A dropped file's contents must be gone from the copy,
+and with --scrub-paths no file of the copy may still name the user's home. With --keep-trailers
+and no other option nothing is changed and every hash must come out the same, which tests the
+copying itself.
 
 The same input gives the same output, so a later run gives the old commits the same hashes and a
 push of the copy is an ordinary fast-forward (the branch commit-map alone is replaced each time):
 
     git -C OUT_DIR push URL 'refs/heads/*:refs/heads/*' '+refs/heads/commit-map:refs/heads/commit-map'
 
-Pushing is the owner's call: this script only builds the copy.
+Pushing is the owner's call: this script only builds the copy. The options the public copy is made
+with, and why, are in CLAUDE.md ("The public copy").
 """
 import argparse
 import fnmatch
@@ -58,6 +64,30 @@ def clean(message):
     return b"\n".join(kept) + b"\n"
 
 
+def path_rules():
+    """The folders of this machine, as scripts and logs write them: C:\\Users\\NAME\\..., C:/Users/NAME/...,
+    /c/Users/NAME/... The name is this machine's, read here and written nowhere."""
+    user = re.escape(Path.home().name.encode())
+    sep = rb"[\\/]+"
+    home = rb"(?:[A-Za-z]:|/[a-z]|/mnt/[a-z])" + sep + rb"Users" + sep + user
+    local = home + sep + rb"AppData" + sep + rb"Local" + sep
+    part = rb"[\w.-]+"
+    return [
+        (re.compile(local + rb"Claude-Data" + sep + part + sep + rb"scratch-workspaces" + sep + part + sep + part + sep + rb"scratch-[\w-]+"),
+         b"<session-folder>"),
+        (re.compile(local + rb"Temp" + sep + rb"claude" + sep + part + sep + part + sep + rb"scratchpad"), b"<scratchpad>"),
+        (re.compile(rb"(Users" + sep + rb")" + user + rb"(?![\w])"), rb"\1<user>"),
+    ], re.compile(rb"Users" + sep + user + rb"(?![\w])")
+
+
+def scrubbed(data, rules):
+    if b"\0" in data:
+        return data
+    for pattern, text in rules:
+        data = pattern.sub(text, data)
+    return data
+
+
 def read_exactly(stream, n):
     parts = []
     while n:
@@ -69,15 +99,16 @@ def read_exactly(stream, n):
     return b"".join(parts)
 
 
-def copy(refs, out, keep, drops=()):
-    """fast-export | (messages cleaned, dropped files left out) | fast-import. Returns {original commit: its copy}."""
+def copy(refs, out, keep, drops, rules):
+    """fast-export | (messages cleaned, files dropped or scrubbed) | fast-import. Returns {original commit: its copy}."""
     drops = {d.encode() for d in drops}
     marks_file = out / "publish-marks.txt"
     src = subprocess.Popen(["git", "fast-export", "--show-original-ids", "--reencode=no", "--signed-tags=strip", *refs],
                            cwd=ROOT, stdout=subprocess.PIPE)
     dst = subprocess.Popen(["git", "fast-import", "--quiet", "--export-marks=" + str(marks_file)], cwd=out, stdin=subprocess.PIPE)
     mark_of = {}
-    in_commit = message_next = False
+    kind = None
+    message_next = False
     mark = None
     for line in iter(src.stdout.readline, b""):
         if line.startswith(b"data "):
@@ -86,20 +117,24 @@ def copy(refs, out, keep, drops=()):
                 message_next = False
                 if not keep:
                     body = clean(body)
+            elif kind == "blob" and rules:
+                body = scrubbed(body, rules)
             dst.stdin.write(b"data %d\n" % len(body))
             dst.stdin.write(body)
             continue
         if line.startswith(b"commit "):
-            in_commit, mark = True, None
-        elif line.startswith((b"blob", b"reset ", b"tag ")):
-            in_commit = False
-        elif in_commit and line.startswith(b"mark :"):
+            kind, mark = "commit", None
+        elif line == b"blob\n":
+            kind = "blob"
+        elif line.startswith((b"reset ", b"tag ")):
+            kind = None
+        elif kind == "commit" and line.startswith(b"mark :"):
             mark = line[5:].strip().decode()
-        elif in_commit and line.startswith(b"original-oid "):
+        elif kind == "commit" and line.startswith(b"original-oid "):
             mark_of[line.split()[1].decode()] = mark
-        elif in_commit and line.startswith(b"committer "):
+        elif kind == "commit" and line.startswith(b"committer "):
             message_next = True
-        elif in_commit and drops and line.startswith((b"M ", b"D ")):
+        elif kind == "commit" and drops and line.startswith((b"M ", b"D ")):
             # "M <mode> <blob> <path>" or "D <path>": a dropped file never enters the copy's trees
             path = line.rstrip(b"\n").split(b" ", 3 if line.startswith(b"M ") else 1)[-1]
             if path in drops:
@@ -111,14 +146,10 @@ def copy(refs, out, keep, drops=()):
     new_of_mark = dict(l.split() for l in marks_file.read_text().splitlines())
     marks_file.unlink()
     if drops:
-        # the dropped files' contents came through the stream as loose blobs: take them out of the copy
+        # the dropped files' contents came through the stream as blobs nothing points to: take them out
         git("reflog", "expire", "--expire=now", "--all", cwd=out)
         git("gc", "--quiet", "--prune=now", cwd=out)
     return {old: new_of_mark[m] for old, m in mark_of.items()}
-
-
-def listing(cwd, commit, drops=()):
-    return [l for l in git("ls-tree", "-r", commit, cwd=cwd).decode().splitlines() if l.split("\t", 1)[1] not in drops]
 
 
 def records(cwd, refs):
@@ -131,27 +162,47 @@ def records(cwd, refs):
     return out
 
 
-def check(refs, out, new_of, keep, drops=()):
+def entries(cwd, commit, drops=()):
+    out = {}
+    for l in git("ls-tree", "-r", commit, cwd=cwd).decode().splitlines():
+        meta, path = l.split("\t", 1)
+        if path not in drops:
+            out[path] = tuple(meta.split())
+    return out
+
+
+def check(refs, out, new_of, keep, drops, rules, leak):
     old, new = records(ROOT, refs), records(out, ["--all"])
     if len(old) != len(new) or set(old) != set(new_of):
         raise SystemExit(f"commit counts differ: {len(old)} here, {len(new)} in the copy, {len(new_of)} mapped")
-    changed = thinner = 0
+    changed = 0
+    trees, blobs = {}, {}
+
+    def same_file(a, b):
+        if (a, b) not in blobs:
+            blobs[(a, b)] = bool(rules) and scrubbed(git("cat-file", "blob", a), rules) == git("cat-file", "blob", b, cwd=out)
+        return blobs[(a, b)]
+
+    def same_files(h, ta, tb):
+        if (ta, tb) not in trees:
+            a, b = entries(ROOT, h, drops), entries(out, new_of[h])
+            trees[(ta, tb)] = a.keys() == b.keys() and all(
+                a[p] == b[p] or (a[p][:2] == b[p][:2] and same_file(a[p][2], b[p][2])) for p in a)
+        return trees[(ta, tb)]
+
     for h, f in old.items():
         g = new.get(new_of[h])
         if g is None:
             raise SystemExit(f"{h}: its copy {new_of[h]} is not in the copy's history")
         if f[2:8] != g[2:8]:
             raise SystemExit(f"{h}: people or dates differ in the copy")
-        if f[0] != g[0]:
-            # allowed only where a dropped file was: every other file must be there, unchanged
-            if not drops or listing(ROOT, h, drops) != listing(out, new_of[h]):
-                raise SystemExit(f"{h}: the copy's files differ by more than the dropped ones")
-            thinner += 1
+        if f[0] != g[0] and not ((drops or rules) and same_files(h, f[0], g[0])):
+            raise SystemExit(f"{h}: the copy's files differ by more than the options allow")
         if [new_of[p] for p in f[1].decode().split()] != g[1].decode().split():
             raise SystemExit(f"{h}: the copy's parents are not the copies of its parents")
         if (f[8] if keep else clean(f[8])) != g[8]:
             raise SystemExit(f"{h}: the message differs by more than the removed lines")
-        if keep and new_of[h] != h:
+        if keep and not drops and not rules and new_of[h] != h:
             raise SystemExit(f"{h}: copied unchanged, but its hash came out as {new_of[h]}")
         changed += f[8] != g[8]
         if not keep and any(ATTRIBUTION.match(l) for l in g[8].split(b"\n")):
@@ -163,12 +214,24 @@ def check(refs, out, new_of, keep, drops=()):
     if drops:
         if git("log", "--all", "--format=%H", "--", *drops, cwd=out).strip():
             raise SystemExit("a dropped file is still in the copy's history")
-        blobs = {l.split()[0] for l in git("rev-list", "--objects", *refs).decode().splitlines()
-                 if " " in l and l.split(" ", 1)[1] in drops}
-        for b in blobs:
+        gone = {l.split()[0] for l in git("rev-list", "--objects", *refs).decode().splitlines()
+                if " " in l and l.split(" ", 1)[1] in drops}
+        for b in gone:
             if subprocess.run(["git", "cat-file", "-e", b], cwd=out, capture_output=True).returncode == 0:
                 raise SystemExit(f"the contents of a dropped file ({b[:10]}) are still in the copy")
-    return len(old), changed, thinner
+    if rules:
+        # every file of every commit of the copy, once each: none may still name the user's home
+        ids = sorted({l.split()[0] for l in git("rev-list", "--objects", "--all", cwd=out).decode().splitlines() if " " in l})
+        dump = git("cat-file", "--batch", cwd=out, data=("\n".join(ids) + "\n").encode())
+        at = 0
+        while at < len(dump):
+            end = dump.index(b"\n", at)
+            oid, kind, size = dump[at:end].decode().split()
+            body = dump[end + 1:end + 1 + int(size)]
+            at = end + 1 + int(size) + 1
+            if kind == "blob" and leak.search(body):
+                raise SystemExit(f"a file of the copy ({oid[:10]}) still names the user's home")
+    return len(old), changed, len([1 for v in trees.values() if v]), len([1 for v in blobs.values() if v])
 
 
 def add_map(out, new_of):
@@ -194,7 +257,8 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--skip", action="append", default=[], help="a branch name pattern to leave out (may be given several times)")
     ap.add_argument("--drop", action="append", default=[], help="a file to leave out of every commit (its exact path; may be given several times)")
-    ap.add_argument("--keep-trailers", action="store_true", help="remove no line from the messages: without --drop every hash must come out unchanged")
+    ap.add_argument("--scrub-paths", action="store_true", help="replace this machine's folders in file contents by placeholders")
+    ap.add_argument("--keep-trailers", action="store_true", help="remove no line from the messages")
     ap.add_argument("--force", action="store_true", help="replace OUT_DIR if it exists")
     a = ap.parse_args()
     out = Path(a.out).resolve()
@@ -207,13 +271,18 @@ def main():
         raise SystemExit("a local branch is called commit-map: that name is taken by the copy")
     skipped = [n for n in names if any(fnmatch.fnmatch(n, p) for p in a.skip)]
     refs = ["refs/heads/" + n for n in names if n not in skipped]
+    rules, leak = path_rules() if a.scrub_paths else ([], None)
     git("init", "--quiet", "--bare", str(out))
-    new_of = copy(refs, out, a.keep_trailers, a.drop)
-    commits, changed, thinner = check(refs, out, new_of, a.keep_trailers, a.drop)
-    if not a.keep_trailers or a.drop:
+    new_of = copy(refs, out, a.keep_trailers, a.drop, rules)
+    commits, changed, thinner, files = check(refs, out, new_of, a.keep_trailers, a.drop, rules, leak)
+    if not a.keep_trailers or a.drop or rules:
         add_map(out, new_of)
-    print(f"ok: {len(refs)} branches, {commits} commits, {changed} messages changed, a dropped file taken out of {thinner} commits")
-    print(f"branches left out: {', '.join(skipped) or 'none'}; files dropped: {', '.join(a.drop) or 'none'}")
+    here = git("symbolic-ref", "--short", "HEAD").decode().strip()
+    if here not in skipped:
+        git("symbolic-ref", "HEAD", "refs/heads/" + here, cwd=out)
+    print(f"ok: {len(refs)} branches, {commits} commits, {changed} messages changed")
+    print(f"branches left out: {', '.join(skipped) or 'none'}")
+    print(f"files dropped: {', '.join(a.drop) or 'none'}; folders replaced in {files} versions of files; {thinner} different trees checked file by file")
     print(f"the copy is in {out}")
 
 

@@ -29,7 +29,31 @@ Update this section in the same change that freezes a version.
   call (asked at 23:20; asked again on 2026-11-21 with the blog post, the owner said "Not
   now", so do not start it or ask again unprompted). The proof no longer
   runs: the bullets below about the board's run and the pause of `1:60` are history. The
-  outreach to the publisher is the owner's. LOG, "The centre opening is proved".
+  outreach to the designer (and to Griffin and K0tovsk1y) is the owner's. LOG, "The centre
+  opening is proved".
+- **The public copy (owner, 2026-11-21: "Can you put all the snekagon work up on a public repo
+  on my github?").** The GitHub repository `nathanWolo/snekagon-solver` is a copy made by
+  `tools/publish.py`, never a push of this repository: the commit messages here carry Claude
+  attribution lines that the owner's rule of 2026-11-21 keeps off the owner's commits, and
+  `climb/field` holds a port of the reference solver's evaluation with its weights (no
+  licence). Build the copy and push it with:
+
+  ```
+  python tools/publish.py OUT --force --skip climb/field --skip "worktree-agent-*" --skip wasm \
+      --drop work/evalorder/top/port.txt --drop work/evalorder/top/unl_port.txt \
+      --drop docs/blog/solving-snekagon.html --scrub-paths
+  git -C OUT push https://github.com/nathanWolo/snekagon-solver.git 'refs/heads/*:refs/heads/*' \
+      '+refs/heads/commit-map:refs/heads/commit-map'
+  ```
+
+  Left out, and why: `climb/field` (the port); two files with that port's scores; `wasm` (the
+  play page waits for the designer's OK); the blog draft (the owner's to publish); the three
+  `worktree-agent-*` leftovers; this machine's folders in file contents. The copy's hashes
+  differ from the ones cited here (its branch `commit-map` maps them). The same options give
+  the old commits the same hashes, so a later push is a fast-forward: keep the options, or
+  the copy's history changes. **State (2026-11-21): pushed as a private repository; it
+  becomes public on the owner's word, and each later push needs the owner's word too.** LOG,
+  "A public copy of the repository".
 - **The result is not new (found 2026-11-21): a proof that red wins with `1:60` was published
   on 2026-10-19**, a month before ours, by the GitHub user K0tovsk1y: issue #3 on
   `BoltKey/snekagon-lab` ("Snekagon is solved") and the repository
@@ -57,7 +81,7 @@ Update this section in the same change that freezes a version.
   https://claude.ai/artifact/8t491NKw9H9EAkqStawz4v . Rebuild its generated parts with
   `python tools/mkblog.py <wasm/play folder of branch wasm> [--preview DIR]`, then publish
   the same file to that link with `worker.js`, `snek.wasm` and `book.json` beside it.
-  Nothing is public and the publisher has not been contacted: both are the owner's. LOG,
+  The post is not public and the designer has not been contacted: both are the owner's. LOG,
   "A blog post on the result". Version 3 (11-21 evening) has the designer's attempt in
   detail and says that ours is the second proof.
 - **The climb is paused since 2026-11-16 10:37 at the owner's request, and its standing goal

@@ -3556,3 +3556,66 @@ through its own script under `tools/locked.sh` because the check build needs a f
   hours in all by that mean.
 - To stop when the owner no longer needs them: the tunnel, the gate and the page's server
   (two background shells and a preview server of the session), and the launch entry.
+
+## 2026-11-21 A public copy of the repository (owner: "Can you put all the snekagon work up on a public repo on my github?")
+
+- **Audit first** (a workflow of 13 agents, 19:55-20:20: six readers, one per risk, over all 30
+  branches and the whole history; a second agent re-checked each reader's serious findings; a
+  critic looked for gaps). No secret anywhere: no token, key, tunnel address or `?k=` link in
+  any commit, and the gate's token file was never tracked. What it did find:
+  - *Blocking:* `climb/field` (commit `5e73da7`, on that branch only) holds `src/refeval.rs`, a
+    port of the reference solver's learned evaluation with its 14 weights, and ports of its
+    tight bounds. That repository has no licence. On `climb/evalorder` two files hold that
+    port's scores for 39,240 positions (`work/evalorder/top/port.txt`, `unl_port.txt`), from
+    which the weights could be fitted again.
+  - *The owner's rule on commits* (2026-11-21: no Claude attribution, only the owner's
+    authorship): 232 of the 236 commits ended with a `Co-Authored-By: Claude ...` line.
+  - *Stale text a reader meets first:* the research note still called the opening's value
+    open and the reference solver never run; CLAUDE.md called the reference solver's author
+    the publisher; LESSONS and IDEAS likewise. Corrected or dated at the tip (commit
+    `088b666` and the next one). The same lines stay as they were on the older branches,
+    which are snapshots of their day.
+  - *For the owner to know:* the log and CLAUDE.md quote the owner's messages and the plan
+    to write to the designer; 37 files named folders of this PC (the Windows user name, the
+    app's session folder); two private artifact links; commit times carry the time zone.
+  - Nothing of K0tovsk1y's is tracked, no labelled position of the reference repository is
+    tracked, there is no binary in any commit, and quotes from other people's text are short
+    and attributed (the longest from the video is 10 words).
+- **The copy is made by a tool, and this repository is never pushed itself:**
+  `tools/publish.py` (docstring; the options in CLAUDE.md, "The public copy"). It pipes
+  `git fast-export` into `git fast-import`, takes the attribution lines out of the messages,
+  leaves out chosen branches and files, replaces this machine's folders in file contents, and
+  then checks every commit of the copy against its original (people, dates, parents, message,
+  files). Its self-test: with nothing to change, all 236 hashes come out unchanged. Two runs
+  give the same hashes, so a later push is a fast-forward. The copy's branch `commit-map`
+  maps its hashes to the ones this log cites.
+- **Left out of the copy:** `climb/field`; the two score files; `wasm` (the play page: the
+  project's rule is that a public playable page waits for the designer's OK); the blog draft
+  `docs/blog/solving-snekagon.html` (the owner's to publish, and it embeds the play
+  section); the three `worktree-agent-*` branches (leftovers, no commit of their own). In:
+  25 branches, 234 commits.
+- **A README** for readers (`README.md`): the result, that it is the second proof, how far it
+  has been checked, how to build and run, credit, what the copy leaves out.
+- **Checked by a second workflow** (3 agents, 21:07-21:16) before any push: the README's 38
+  factual claims against the repository (32 supported; the others reworded, among them "about
+  19.5 hours", the certificate command, the files under `work/`); its claims about people
+  and its tone (fuller credit to K0tovsk1y, Nelson Elhage added, the one checked line named
+  as the cheapest, the shared reading of the rules, the meaning of the 38-bit key); and the
+  copy itself against this repository (refs, the 14 weights and the port's names absent from
+  every commit, the score files' contents absent, no attribution line, trees equal on all
+  commits, no secret at any tip). That check is what found the blog draft and the folders.
+- `python tools/certificate.py proofs/centre-opening/results.txt` run again on the committed
+  file: its output is byte for byte the committed `certificate.txt`.
+- The blog's sentence on the first proof's announcement now says "the solver's code", as the
+  issue does (it said "speed"); private artifact version 4. The sentence about the credits
+  of the video stands: the end card in the designer's repository credits "engine, solver and
+  the Manim code of this video" to Claude Opus 5.5 (`video/chapters2.py:1444`, read on
+  2026-11-21).
+- **State:** the repository `nathanWolo/snekagon-solver` was created on GitHub as PRIVATE and
+  the copy pushed to it, default branch `parallel-v9`. It becomes public on the owner's
+  word. Open for the owner: whether the blog draft and the play page go in, a licence (none
+  chosen; the owner's other solvers carry MIT), and whether the copy keeps the original
+  messages after all.
+- Not done: no build from a fresh clone was tried (the cross-check run has the machine), and
+  the README's commands other than `info`, `text`, `verify` and the certificate were read
+  from the source, not run today.
