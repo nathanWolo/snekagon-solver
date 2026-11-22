@@ -3417,3 +3417,84 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - *For the owner:* the voice ("we", and "I" in the last section), the paragraph on how it was
   made, the placeholder for the repository's link, and the paragraph on what has checked the
   proof, which says one line of 172 and changes if the reference runs all of them.
+
+## 2026-11-21 The designer's attempt in the blog post; an earlier proof found (owner's request, 18:20-19:30)
+
+- Owner: "Can we add some more detail on what Španěl's attempt at solving the game accomplished?
+  Like how far he got, and what his roadblocks were?" (Before that, the same evening: the bullet
+  on the closed form reworded to the owner's wording, commit `c50fe9a`.)
+- **Found on the way: the game had already been proved a first-player win, a month before us.**
+  Issue #3 on `BoltKey/snekagon-lab`, "Snekagon is solved", opened 2026-10-19 21:03 UTC by the
+  GitHub user K0tovsk1y; open, no comments on 11-21. It says its author watched the video, let
+  Claude work on the solver's code for a day, spread the computation over a few machines and
+  "first proved that Blue cannot win and then that Red wins by opening in the center". Its
+  repository `K0tovsk1y/snekagon-solution` (one commit, 2026-10-19, C++, built on the
+  designer's engine, no licence) holds `proof/index.txt` with one red answer for each of the
+  172 classes of blue's reply to `1:60`, 172 `.lvb` files with red's fifth move for 166,912
+  classes of blue's fourth move (the solver proves the rest), a checker (`snek proofcheck proof
+  16`, about 26 laptop-hours) and a page to play against it. Its notes: search 16 to 19 October
+  2026, about 1.2e13 nodes, about 160 laptop-hours (an hour of an 8-core laptop), the 172
+  winning solves alone about 55; 123 replies fell to the first answer tried, the hardest took
+  about 200 tries; no second program checked it. Against `4B:16,27,28,39` it plays
+  `4I:71,82,93,104` (ours: `4B:70,81,82,93`).
+  This project never read it: the research of 11-14 read the README at `61eb3a4` and not the
+  issues, and no doc here mentions it before today. It was read today through web pages only;
+  nothing of it was downloaded or run.
+- *Sources for the designer's attempt:* the checkout at `61eb3a4` (README lines 311-472;
+  `video/script_snapshot.md`, the narration with a fact sheet "as of 8 October 2026";
+  `video/snekagon_en.vtt`, the final subtitles; the git log and two commit messages).
+- *What they say.* Adam Španěl (git "Adam Spanel", commits 09-30 to 10-12, with Claude Opus
+  5.5) had tried minimax and asked language models before; in 2026 he had a model build the
+  tools. First test: one position after four moves, all 956 red moves lose, 11 billion
+  positions, about 10 thread-hours. He then tried to prove that blue wins after `1:60
+  4B:16,27,28,39` (the engine's favourite reply, about 65 % for blue): 1,589 red answers, each
+  needing one blue move with 600 to 1,100 red follow-ups, positions after five moves. After a
+  week on his laptop: 16 answers proved (15 by the engine's first blue move), 13 to 241
+  thread-hours each, about 60 on average, about 1,300 thread-hours and 18,463 jobs in all (7
+  October): one percent, "a year or two" for the line, "a decade or more" for the game. Red's
+  `3V:40,41,50` resisted: 40 blue moves refuted (31 losses, 9 draws), 282 thread-hours, 992 of
+  1,032 untried; a sample of 24: 14 refuted, 10 unresolved. "Move 76" is blue's
+  `4I:46,57,68,79` after `1:60 4B:16,27,28,39 3V:40,41,50 4C:49,59,70,71 4I:52,62,72,82`: it
+  holds an exact draw (17:17) and the engine ranked it 76th, the 75 before it lose. It is not
+  red's U `4C:40,41,50,52`; the first draft was right not to equate them.
+- *After the video.* Solver v4 (threat zones, the last pieces in closed form, tight bounds,
+  win tests, `refute`, `proveline`) is commit `184001d` by **Darragh Griffin**, 2026-10-16,
+  pull request #1; the network engine (`351bbe2`, pull request #2) is his too. So the
+  "reference solver" we measured against and ran is his version, in the designer's
+  repository. His notes: blue's only win against the stubborn answer is `3V:9,20,21` (ranked
+  932nd of 1,032 by the policy, 964th by the 1-ply evaluation; `351bbe2` message), and red's
+  U `4C:40,41,50,52` leaves blue no win in 938 moves (382 s on 5 threads; the commit calls
+  this "the known verdict"), so the zig-zag does not beat the centre. The repository's last
+  commit is 2026-10-17 and it names no winner.
+- *Written* (`docs/blog/solving-snekagon.html`): "What was known" rewritten with these parts:
+  the first solver; one line, from blue's side; what stood in the way (the price, the answer
+  that would not fall, move 76); after the video; a proof, a month before ours. A new figure:
+  1,589 squares, 16 blue and one red. **The post no longer says it is the first proof:** the
+  lede, the second paragraph, "What to trust" (a bullet on the second proof, and the closing
+  claim is now "two proofs by two programs agree"), "What is still open" (a cross-check), the
+  thanks (Griffin) and the footer (links to the first proof). One quotation from the video is
+  left, its closing words; the two from the video's description are gone.
+- *Checked:* two workflows. Five readers (history, the distributed solve and its records, the
+  video's material, the rest of the README, the live pages) gave 268 quoted facts; then five
+  checkers tried to refute 42 claims of the new text against the checkout and the live pages,
+  and one reader looked for unfairness and omissions. 33 claims were supported as written
+  and 9 in part, none refuted; corrected after them: the next reply's rating (the narration says "around 50", the screen 54: now
+  "well ahead of every other reply"); "he set out to prove the engine right" (the video: blue
+  "had the better chances, so we tried"); the decade is "if blue wins", and a draw is worse;
+  the sample of 24 left 10 unresolved; the estimate of 10,000 to 30,000 is "earlier", from the
+  first test's cost for one answer; "blue's only win" is Griffin's phrase and is given as
+  his; both loose ends are credited to his notes; the three ideas our solver shares with v4
+  are credited to him; the figure's caption no longer reads as if we were first to win
+  against the zig-zag; "the sixteen proofs still stand"; the heading "What stopped it" became
+  "What stood in the way" (no source says he stopped). Page viewed at 1,024 px and 375 px: no
+  sideways scroll, 1,589 squares, 172 bars, 172 boards, no console error. Published as
+  version 3 of https://claude.ai/artifact/8t491NKw9H9EAkqStawz4v .
+- *Not checked:* that the other proof is correct (its files were not read beyond the index);
+  its play page; the video itself (its subtitles and script are in the repository).
+- *For the owner:* (1) how to frame the post now that the result is not new; the sentence
+  "Ours was made without it" is what this project's record shows, and is theirs to change;
+  (2) a cross-check is possible both ways: our solver on their 172 answers needs only their
+  `index.txt` as data (a run of some hours: the owner's call), their checker on our answers
+  means running their code (the owner's word, as for any downloaded code); (3) the outreach:
+  the designer has had that issue on his repository since 19 October; (4) the post names two
+  more people, Darragh Griffin and K0tovsk1y.

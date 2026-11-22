@@ -121,6 +121,25 @@ reference still needs fewer nodes on `blue_wins`, `blue_wins_holdout` and `rando
   blue reply the reference studied loses against the right answer. Checked by three runs of this
   project's engines; not checked with the reference solver.
 
+## Added 2026-11-21: what this note missed
+
+- **An earlier proof.** Issue #3 on that repository ("Snekagon is solved", 2026-10-19, user
+  K0tovsk1y) announces a proof that red wins with `1:60`, in the repository
+  `K0tovsk1y/snekagon-solution`: 172 classes of blue's reply, a red answer to each
+  (`proof/index.txt`), 166,912 classes of blue's fourth move with red's fifth move stored, a
+  checker and a play page; about 160 laptop-hours (8-core laptop) on 16 to 19 October 2026.
+  This note was written from the README and did not look at the issues. `docs/LOG.md`,
+  "an earlier proof found".
+- **Who wrote what.** The repository is the designer's, Adam Španěl (git "Adam Spanel",
+  GitHub BoltKey): engine, solver v1 to v3, the pilot, the distributed solve, the video
+  (commits 2026-09-30 to 10-12). Solver v4 and the tools `refute` and `proveline` are commit
+  `184001d` by Darragh Griffin (pull request #1, 2026-10-16); the network engine is his too.
+  "The reference solver (its v4)" above is therefore his version.
+- **How far the designer's own attempt got** (the video's script and fact sheet, in
+  `video/` of that repository): 16 of red's 1,589 answers to `4B:16,27,28,39` proved to lose
+  in a week, about 1,300 thread-hours; `3V:40,41,50` resisted 40 blue moves. Later, in
+  Griffin's notes: blue's only win against it is `3V:9,20,21`.
+
 ## Not verified here
 
 - The reference code was run on this machine once, on 2026-11-16, for its `benchset` on its five bench

@@ -30,13 +30,25 @@ Update this section in the same change that freezes a version.
   now", so do not start it or ask again unprompted). The proof no longer
   runs: the bullets below about the board's run and the pause of `1:60` are history. The
   outreach to the publisher is the owner's. LOG, "The centre opening is proved".
+- **The result is not new (found 2026-11-21): a proof that red wins with `1:60` was published
+  on 2026-10-19**, a month before ours, by the GitHub user K0tovsk1y: issue #3 on
+  `BoltKey/snekagon-lab` ("Snekagon is solved") and the repository
+  `K0tovsk1y/snekagon-solution` (the same 172 classes, a red answer to each, a checker, a
+  play page; built on the designer's engine; no licence). This project never read it before
+  that day, and none of it has been downloaded or run. Ours is a second proof by a program
+  that shares no code with it. Whether to cross-check the two (our solver on their 172
+  answers needs only their `proof/index.txt` as data; their checker on ours is downloaded
+  code), how to frame the post and what to tell the designer are the owner's. Also found:
+  the reference solver's fourth version, the one we ran, is Darragh Griffin's contribution to
+  the designer's repository, not the designer's own. LOG, "an earlier proof found".
 - **A blog post on the result is drafted (2026-11-21, owner's request):**
   `docs/blog/solving-snekagon.html`, private at
   https://claude.ai/artifact/8t491NKw9H9EAkqStawz4v . Rebuild its generated parts with
   `python tools/mkblog.py <wasm/play folder of branch wasm> [--preview DIR]`, then publish
   the same file to that link with `worker.js`, `snek.wasm` and `book.json` beside it.
   Nothing is public and the publisher has not been contacted: both are the owner's. LOG,
-  "A blog post on the result".
+  "A blog post on the result". Version 3 (11-21 evening) has the designer's attempt in
+  detail and says that ours is the second proof.
 - **The climb is paused since 2026-11-16 10:37 at the owner's request, and its standing goal
   was cleared by the owner at about 11:00. No climbing agent is running; do not restart the
   climb without the owner's word.** The three lines each have a current `HANDOVER.md` on their
