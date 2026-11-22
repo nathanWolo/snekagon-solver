@@ -54,7 +54,10 @@ Update this section in the same change that freezes a version.
   the copy's history changes. **State: public since 2026-11-21, about 21:30** (it was pushed as a
   private repository first; the owner, asked "Make the repository public as it is staged?"
   with the list of what it shows and leaves out: "Yes"). **Each later push needs the owner's
-  word.** Still the owner's to decide: the blog draft, the play page, a licence. LOG,
+  word.** One is given (2026-11-21, 21:33): asked "May I push that result to the public
+  repository when the run ends?", about the cross-check, the owner said "Yes, push it". Read
+  as that one push (the result in the log, the README's line on it, these notes), not a
+  standing permission. Still the owner's to decide: the blog draft, the play page, a licence. LOG,
   "A public copy of the repository".
 - **The result is not new (found 2026-11-21): a proof that red wins with `1:60` was published
   on 2026-10-19**, a month before ours, by the GitHub user K0tovsk1y: issue #3 on
