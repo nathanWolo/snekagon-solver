@@ -2,7 +2,7 @@
 
 Written 2026-11-14 from the publisher's rules PDF, Board Game Arena's help pages and the public repository
 `github.com/BoltKey/snekagon-lab` (commit `61eb3a4`), which holds an engine, an exact solver and their
-measurements. That repository is read as data only: its code has not been run here (see "Not verified").
+measurements. When this was written that repository had been read as data only; its solver has been run here since (see "Not verified").
 
 ## The rules, as the reference implements them
 
@@ -111,7 +111,8 @@ reference still needs fewer nodes on `blue_wins`, `blue_wins_holdout` and `rando
 - After `1:60 4B:16,27,28,39`, blue does not win: red's reply `4C:40,41,50,52` refutes all 938 blue moves
   (382 s on 5 threads), and blue's `4A:49,59,70,81` there does not lose.
 - One position after 4 moves from engine self-play is a red win (1.2 G nodes with the v2 solver).
-- The value of the start position, and of the centre opening `1:60`, is open.
+- The value of the start position, and of the centre opening `1:60`, was open in that repository when
+  this was written. It is settled since: red wins (see "Added 2026-11-21" below).
 - Their estimate for the centre opening at v2/v3 speed: 10,000 to 30,000 thread-hours.
 - By symmetry there are 12 distinct first moves.
 
@@ -167,5 +168,5 @@ The second command solves the 24 positions of one bench file on one thread from 
 its README describes). Our figures for the same five files are in `docs/LOG.md` under "Where v4
 stands on the reference's bench files"; the files themselves are rebuilt by `tools/mktests.py` as
 `tests/set1/bench_*.txt` and run with `frozen/base.exe bench tests/set1/bench_ply5_blue_wins.txt`.
-Read the script and the build line before running them: I have read the sources as data but have
-not executed them.
+Read the script and the build line before running them. (When this was written the sources had been
+read as data and not executed; the solver has been built and run here since 2026-11-16.)

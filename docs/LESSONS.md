@@ -111,8 +111,9 @@ machine, and were not reproduced here.
 - Merge the parallel solve (branch `parallel-v9`: 3.4x wall-clock on 8 threads; the plumbing cost about 2% with one thread on v4)?
 - E11 was accepted on a second gate after the first was void for lack of units (LOG, E11). Overrule if you disagree.
 - Is 5% the right bar for keeping a speed change?
-- The reference solver was not run here (downloaded code). A same-machine comparison needs the owner
-  to build and run it; the commands are in `docs/research/rules-and-prior-work.md`.
+- Settled 2026-11-16: the reference solver has been run here since that day, with the owner's
+  permission (LOG, "Same machine, the reference solver"). Before that every comparison used its
+  published figures; the commands are in `docs/research/rules-and-prior-work.md`.
 - The project lives in a folder the app made for this session and needs a permanent home.
 - The red win after `1:60 4B:16,27,28,39` is checked by three runs of this project's engines. A
   run of the reference solver on `1:60 4B:16,27,28,39 4B:70,81,82,93` (blue to move, expected

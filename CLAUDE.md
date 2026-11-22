@@ -5,7 +5,7 @@ This file is the orientation. Details live in `docs/`. Keep it short and true.
 ## The goal
 
 - **Target:** an exact solver for the board game Snekagon (rules: `docs/research/rules-and-prior-work.md`),
-  fast enough that the start position can one day be solved. The score is thread-seconds to solve a
+  fast enough that the start position can be solved (it was, on 2026-11-16: see "Right now"). The score is thread-seconds to solve a
   position exactly, with the value correct. Lower is better.
 - **Production:** the real work a full solution needs: positions after about five moves that come up in
   the proof of an opening. The reference repository's `bench/ply5_*` units stand in for it.
@@ -35,7 +35,8 @@ Update this section in the same change that freezes a version.
   `BoltKey/snekagon-lab` ("Snekagon is solved") and the repository
   `K0tovsk1y/snekagon-solution` (the same 172 classes, a red answer to each, a checker, a
   play page; built on the designer's engine; no licence). This project never read it before
-  that day, and none of it has been downloaded or run. Ours is a second proof by a program
+  that day; its list of 172 answers has been read as data since, and none of its code has
+  been downloaded or run. Ours is a second proof by a program
   that shares no code with it. Whether to cross-check the two (our solver on their 172
   answers needs only their `proof/index.txt` as data; their checker on ours is downloaded
   code), how to frame the post and what to tell the designer are the owner's. Also found:
@@ -92,8 +93,9 @@ Update this section in the same change that freezes a version.
   when the owner no longer needs them. LOG, "The board from the owner's phone".
 - **A page to play against the proof** (owner's idea, 2026-11-16): a book from the results file
   for red's second and third moves, then the solver compiled to WebAssembly (branch `wasm`,
-  crate `wasm/`, timed in a browser). The reference solver's author is the game's publisher;
-  the owner will write to him once the proof is done, and a public page waits for his OK.
+  crate `wasm/`, timed in a browser). The reference repository is the game designer's (the
+  fourth version of its solver is Darragh Griffin's); the owner will write to the designer,
+  and a public page waits for his OK.
   LOG, "A page to play against the proof". **A private prototype is published** (owner:
   "Sure go ahead"; https://claude.ai/artifact/ENmNkdWWKGVoFCUqXeUFJH, book of 15:53 with 107
   replies): source in `wasm/play/` on branch `wasm`, book by `python tools/mkbook.py

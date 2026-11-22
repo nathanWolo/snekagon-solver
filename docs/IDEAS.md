@@ -5,7 +5,9 @@ failed or dropped (with the key and what would reopen it). `LOG.md` has every ru
 
 ## Open, by expected gain for the effort
 
-0. **Finish the centre opening: paused by the owner on 2026-11-15, speed first.** `1:60` has
+0. **Finish the centre opening: done on 2026-11-16** (LOG, "The centre opening is proved"; red
+   wins against all 172 replies). *The rest of this item is as written at the pause of
+   2026-11-15:* paused by the owner, speed first. `1:60` has
    172 blue replies after symmetry; 74 were refuted at the pause (11:56), none held, 6.3
    minutes a reply. Resume only on the owner's word (CLAUDE.md, "Right now"). The climb's ruler
    for proof work is `tests/proof4/` (TESTING.md).
