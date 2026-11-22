@@ -29,6 +29,13 @@ Update this section in the same change that freezes a version.
   call (asked at 23:20). The proof no longer
   runs: the bullets below about the board's run and the pause of `1:60` are history. The
   outreach to the publisher is the owner's. LOG, "The centre opening is proved".
+- **A blog post on the result is drafted (2026-11-21, owner's request):**
+  `docs/blog/solving-snekagon.html`, private at
+  https://claude.ai/artifact/8t491NKw9H9EAkqStawz4v . Rebuild its generated parts with
+  `python tools/mkblog.py <wasm/play folder of branch wasm> [--preview DIR]`, then publish
+  the same file to that link with `worker.js`, `snek.wasm` and `book.json` beside it.
+  Nothing is public and the publisher has not been contacted: both are the owner's. LOG,
+  "A blog post on the result".
 - **The climb is paused since 2026-11-16 10:37 at the owner's request, and its standing goal
   was cleared by the owner at about 11:00. No climbing agent is running; do not restart the
   climb without the owner's word.** The three lines each have a current `HANDOVER.md` on their

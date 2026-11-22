@@ -3377,3 +3377,43 @@ through its own script under `tools/locked.sh` because the check build needs a f
   about 52 hours. One line, and the cheapest one: it could be off by a factor of two either
   way. Not started: the owner's call. It can run in pieces, because `PROGRESS=<file>` keeps
   every solved root move and a rerun goes on from there.
+
+## 2026-11-21 A blog post on the result, first draft (owner's request, 16:40-17:25)
+
+- Owner: "Now that we solved the game, I want to write a nice blog post to share the result
+  with the internet. I'm thinking it could start with an intro to the game, some exposition
+  on the methods we used at a high level, some exposition on the previous work done by the
+  games creator and how far they got, and what low level improvements we were making to make
+  the solving feasible in a reasonable amount of time".
+- *Written:* `docs/blog/solving-snekagon.html`, page content for an artifact (no byline, no
+  name of the owner). Sections: the result and what has checked it; the game; what was known
+  (the designer's video and repository); what a proof looks like; making it fast enough; the
+  run; what to trust; play against it; what is still open; how this was made.
+  `python tools/mkblog.py PLAY_DIR [--preview OUT_DIR]` fills two generated parts in place:
+  the 172 lines of the certificate with their seconds (the bar chart and the wall of 172
+  small boards are drawn from them), and the play page's script from `wasm/play/play.html`
+  on branch `wasm`, started when the board comes near the screen. The worker, the solver and
+  the book are published beside the page; they are not in this branch.
+- *Published privately:* https://claude.ai/artifact/8t491NKw9H9EAkqStawz4v (version 1). The
+  publisher has not been contacted and nothing is public. The play section in particular
+  waits for his OK, like the play page.
+- *Numbers:* every figure in the text was read against this log, SHIPLOG, LESSONS and the
+  proof's files; `mkblog.py` prints the ones that come from the certificate (172 replies;
+  median 237 s; slowest `3V:8,9,20`, 4,807 s; one try for 100 replies, 84 at most; 46
+  distinct answers, 4C 92 and 4B 71; `4C:101,103,112,113` 31 times; 84 answers touch the
+  centre). Corrected on that pass: the total is 19.5 hours when the 33 minutes of the solve
+  that seeded the first reply are counted (7.6 h + 0.56 h + 0.75 h + 10.6 h; the entry of
+  11-16 says "about 19"); 0.555x of the reference's time was climb base 3, and 0.47x is that
+  times 0.842; the jobs on file (153,736) are the second run's; "every pruning rule was
+  verified" became "the last pruning rule".
+- *Checked* (the app's browser pane, a local copy with the same three files): no sideways
+  scroll at 375 px and at 1,100 px, light and dark; 172 bars, 172 boards, 8 pieces; no
+  console error. On the board inside the post: `4B:16,27,28,39`, red answered
+  `4B:70,81,82,93` from the proof; then `2:105,115`, red solved `4C:74,85,94,95` in 2.1 s.
+- *Not checked:* the published page itself (the pane is not signed in). The video: only its
+  description and the repository's README were read, so the section on the designer's work
+  and the words about "a saving move the engine ranked only 76th" need the owner's eye. That
+  the 76th move is `4C:40,41,50,52` is an inference and the post does not say it.
+- *For the owner:* the voice ("we", and "I" in the last section), the paragraph on how it was
+  made, the placeholder for the repository's link, and the paragraph on what has checked the
+  proof, which says one line of 172 and changes if the reference runs all of them.
