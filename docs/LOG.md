@@ -3532,3 +3532,27 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - **Started 19:33:02**, all 172 lines (the 14 shared ones too, so that one run covers the
   whole list). Progress: one line per root in `work/k0check/run.log`; times in
   `work/k0check/run.times`; `python tools/crosscheck.py report work/k0check` sums it up.
+
+## 2026-11-21 A page to watch the cross-check (owner: "can you put up the browser progress thing for this run")
+
+- `python tools/crosscheck_watch.py [--port 8772] [DIR]`: a server on 127.0.0.1 with one page
+  (`/`) and its data (`/api/status`), read from the run's folder (`lines.txt`, `map.tsv`,
+  `run.log`, the tail of `run.err`, `run.times`). It starts, stops and writes nothing. The
+  page asks every 4 s (no event stream: the tunnel holds those back) and shows: lines done
+  of 172, the time spent and an estimate of what is left (the mean of the finished lines),
+  the line in work on a board with the count of blue's moves refuted so far, and the list of
+  lines with verdict and seconds. A tap on a line shows that line.
+- Put up as the board was on 2026-11-16: the page's server (launch entry `crosscheck-watch`),
+  in front of it `python tools/gui_gate.py --port 8781 --board 127.0.0.1:8772` (watch only,
+  the token in `work/gui/gate.token`), and a Cloudflare quick tunnel to the gate only (its
+  address is in `work/k0check/tunnel.log` and changes with every start). The board itself
+  (8770) is not running; nothing but the gate is on the tunnel.
+- Checked: at the pane's width (871 px) and at 375 px there is no sideways scroll, no row
+  wider than the list and no console error. Locally and through the tunnel alike: 403
+  without a token, with a wrong one, and for `/api/status` without the cookie; 200 with the
+  token; `POST /api/run` refused.
+- The run outlived its tenth minute (the shell that started it had a time limit set): at
+  19:46, 4 of 172 lines were done, all four confirmed, about 158 s a line, so about 7.5
+  hours in all by that mean.
+- To stop when the owner no longer needs them: the tunnel, the gate and the page's server
+  (two background shells and a preview server of the session), and the launch entry.

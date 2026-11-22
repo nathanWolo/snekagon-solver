@@ -41,6 +41,16 @@ Update this section in the same change that freezes a version.
   code), how to frame the post and what to tell the designer are the owner's. Also found:
   the reference solver's fourth version, the one we ran, is Darragh Griffin's contribution to
   the designer's repository, not the designer's own. LOG, "an earlier proof found".
+- **Our solver is checking that proof's 172 answers (owner, 2026-11-21: "Yes, check them"):
+  started 19:33:02, about 7.5 hours expected.** Everything is in `work/k0check/` (`run.log`
+  one line per finished line, `run.times`, `results.txt` to restart from);
+  `python tools/crosscheck.py report work/k0check` sums it up. When it ends: add the result
+  to the LOG entry "The first proof's answers, checked", and change the post's three
+  sentences that say neither proof has been run through the other's program. **A page to
+  watch it is up** (owner's request): `tools/crosscheck_watch.py` on 8772, behind the gate
+  on 8781 and a quick tunnel, as for the board below; stop all three, and remove the launch
+  entry `crosscheck-watch`, when the owner no longer needs them. LOG, "A page to watch the
+  cross-check".
 - **A blog post on the result is drafted (2026-11-21, owner's request):**
   `docs/blog/solving-snekagon.html`, private at
   https://claude.ai/artifact/8t491NKw9H9EAkqStawz4v . Rebuild its generated parts with
