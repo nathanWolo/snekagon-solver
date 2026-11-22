@@ -99,6 +99,12 @@ machine, and were not reproduced here.
 - **Test the explanation too.** I wrote down why the narrow passes lost ("a win is the cheaper
   proof") before testing it. A count of nodes by window on labelled positions took two minutes and
   showed the opposite.
+- **Research the claim, not only the code.** The research of 2026-11-14 read the reference
+  repository's README, rules and data at one commit. It did not open the repository's issues,
+  where one of 2026-10-19, titled "Snekagon is solved", announced a proof of the result this
+  project then spent three days reaching. It was found on 2026-11-21, while the blog post was
+  being checked. Before building: read the issues, pull requests and forks of the prior work,
+  and search for the result itself (LOG, "an earlier proof found").
 
 ## Open questions for the owner
 
