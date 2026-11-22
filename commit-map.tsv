@@ -1,0 +1,239 @@
+public_commit	working_commit	subject
+007e9309946442a478f8d597636e34dcef85890b	4cd5c48a2dfdcf3023ace92f699ea9cd7bea74ba	E32: the number of snakes as a term
+00ee1c2741e6ef87a679cadde19e7b3c6e4c6f19	c79d02796ac4b89cb4b483671b713b4f90a969b6	Log the reach-threat agent's second report (about 0.96x at 4 pieces left or fewer) and the order of the next gates
+01398a89187ec72d019b72b3c7a8c8710cad3bbb	9201f1785f2a0ca1fa3056d42ccd7f03a02c8508	Log: the verifier clears reach threats round three (f24a2d2), with limits
+01834a6a0548937142dc9bab62828e7bd66fe344	bf1ab019f1da8f16063de7f1f250734d348d6b47	Log the reference bench files, the version ladders and the node timing study; ladder tool
+076c7be435a94a0841d0ef76f451a7991ae12c3f	9a459f920b9440e98d5ab2206ff7b3df25affce9	Log: the field study (the reference's lead is move order near the root); two lines of work from it
+07aaf5febeb8acec7a31d4078381b484d6003a3c	19d4dad709c2f128f98a9549849ac9201059257a	Reach threats on by default, at nodes with at most 4 pieces left, tested also at node start (--no-reach-threat turns the rule off)
+08b512b1ffca60e463a8fcb4e10b3016d34302a8	6c034145295299058452661ce128c0db2136bba1	Study outputs: proof 24-47, ply06 0-199, reach-threat bands
+0b0c435dd40b532888bd18c08ec7e6fa98103454	35d81c7a3fc67bdba45258adf9c0c87bad72ac19	Merge the analysis board (branch gui b531c89): tools/gui.py, gui/, its rules check and endpoint test
+0b34bfdc7b8bc258c0ded57c53e1b5d49db3dab5	7068a185f071ffd28de835d66c145ce25fc11a11	prove --replay: the roots of a file as the replies of one proof; tools/replay.sh runs it in pieces under the lock
+0c3360d3aad92a5f2325d40db78ced4547887a13	84e8f3b1b4ac162f99f0c37ef19443c9ca4416ed	E14: after a failed move, the moves that cover the refuting reply go first
+0c84c96eebc1a506245acf1bd0c0d25b01bf9e17	239ad89a8eb4f2d69d40fc7d3787d6f98603432c	Order study: results (pot by level, out-of-sample fits at 5, 7, 9 left)
+0d3dae131a80ec3cb14766ff32d104f302c7c3d0	005f91aa5226fc889199923627900c9182a1d78f	tools/shadow_runs.sh: the shadow-check runs, each under the run lock
+0f83843342360ad0f6c5650e86ae78b01b909295	696cb1bc731aa1adbd94c2752459b28466d13ce9	Reach threats: --rt-refuter 1|2 takes the move that cut the child as the reply that refuted a move (default 0: the first killer one ply down; same nodes)
+10814637ec194e19490eba9183d373091278c6ab	0a7382f36a4b49c11398b3587a75cd902c1baf78	Merge branch 'main' into parallel-v9
+10c228be6fd66411911750bb5b559765e1b1cd8f	9c368c8e331728ce2c3813953c13df424ec8a297	prove --emulate W: one worker thread, W solvers taking the jobs in turn, exact node counts
+11bd6ba4625f052bd59e61752814a3165654b03c	92e4d4f7a10620a46489c5f31b6edae941c0627f	Log: the timing page on the owner's phone (the artifact runs the solver; 3 ms six moves in)
+1521eb555bae53864b3e668e4d098d4eea20b478	0daef7ce9c4330827d2c4f96b4c34845bd600d5c	Same machine: the frozen base takes 0.555x of the reference solver's time on its five bench files; all 126 values agree
+15225d812777edf3e00a3a22045f323e924efd04	5e4747594c5ba9131f70b48bee2ed859b604c693	Add tools/certificate.py: lists the refuted replies to the centre opening from a results file
+1559a42793691e6bd7bb8036286e35950976b94a	62f5f21540e34ae3b34929a8b41983ac9b0cb187	Merge main (docs, certificate tool) into parallel-v9
+156b90dce1da25245df9bbf6862731610303a4b2	983ba27c6e5304681ea5fcc8cc5a9ffa9ef15322	Log: the tries of the reply in work on the board; what a restart of the board leaves behind
+15e791b20cfcc2c039fa0ea29bff68200456d00a	d935a6b48a6f18833618265508d1a31a39c32070	Log E24's result: single-thread workers 10-17% ahead of the shared-table job on totals, uneven by job
+16b3c03b496b0f794efd822ca6dccc2f2f45489b	85237eccc745279f91c9f89b3b1278252a7adfea	E34 hand-over: hold 10 screen resumed
+1851cb200760769a4c750af623574ffd3a18b30a	892a521b70741ec447a3dad1f849522804350fe3	Log E28's pre-gate checks: identity, labels, and the verifier's side-by-side runs (no mismatch)
+188917c93a47fafa9505b6054cca746d11f42393	024b86f84ce72a399050694005dc537ef79b03a0	The first proof's 172 answers: all confirmed by our solver
+1e526f79892c481ccdc2cf6cb4398d2547485b2d	bbd52c151a525fc5f797562396449e09f4f1e7b7	E29 round three: checks, screen (0.915x, sd 0.277 a unit), and the gate's hypothesis and cap 266
+23fc957ff64cb4154b03cf55c83844059ff96609	b88d4608880093fb352df74ec9ec6c3a102351c4	Analysis board: Prove, the proof driver refutes a position's replies one by one
+2425f1f7932b0046c5cce2a04d449453f3c861a6	9a6b6bbca4ff6da5e6e6f7b65e63274f41cbe0ee	Analysis board: measured solve times by ply, steadier controls, init order
+2451caa2e94aad1be0fe80208a3dce5fb85f961e	68d5e9ea3fef9ab9ddea6fad01d214f8b1ea8cb8	E9: search the table move or a killer before generating the move list
+24747606bbb58916482d1a5e2fc302a93c86ef69	ea239d3c537b15b040791e2cbec1ab11b70803cd	E33: the tight question (--tight-q N, off by default): the mover alone against the opponent's sure next length; check build (--features tqcheck), unit tests, a G check in verify
+247c5f543d7bd0610d8573057f23e889959d8e67	089c9bc192ca8d29c3c2acb6c55cf1762b998a63	Experiment runner, testing contract, run log, backlog
+2679885577565d8f91de86be162fb5d41ac48811	db4959eba9d72768300d86fa32c2e095ae14f5bd	E32: the race by turns as a term (terrb)
+2696c43c95caccfa7b8fbff9c45ae523bb97dde0	c50fe9a99a1599f39e2d429a8974750987d6603f	Blog post: explain the closed form for the last pieces where it is first named
+26d56c3b21424e2cb5435862bc2266a4a02a484d	dba611bf0ce7616eb083265da9eaca17973432bd	Reach threats: --rt-effort[5|6|7] T (test above reach_threat_max once the node has spent T nodes), --rt-margin-lo/hi M (no test when the bound after the reply is more than M above its length), effort counters under --rt-study (defaults unchanged; same nodes)
+26f60b6da4a59184b3e63f0bf61e726bf627dfb4	c66c66cfb7372b29ea82bcf9e2e91259795cb1e6	E29 third report: reach threats at every level with a cheaper reach test, 0.81-0.92x; needs the independent check first
+271ea3e8cc2e9d141e36bd140bcf998d4dd49b53	3d68dbfe8e8d613a7c2543540066d0d3d63e0bce	Options --prefetch and --tt-skip (off by default, not yet timed); sharepot.py and its result
+2afb63a2bab6420b89c17f466081090b30d9f711	52cae32d7dcc3eb7f715dc93914fcb6c27f93a65	Proof driver: --wide, one search with the full window, one move at a time at wide nodes
+2b9b522cb0a7b1756d8c01f922b5214833a977b4	b6ba68611d80488fdc07267abcdd92837efa5c36	Freeze climb base 4: reach threats at every level (E29R3 pass, 0.856x; driver 0.844x)
+2be3c93d054d43a2c6d6b3413c548cc0e2b88a9a	45bb47344c077a6d147b3315581868ea53d535ab	Ordering round four: the order is used up inside the driver; build.sh fails on a failed compile; next line is the top of the proof
+2c7bf301331c82fdae18a50889be6f1072bc8b30	7133ee6f4dfba495a7f26e9a2c3d7c92cea5062d	The run lock is first come first served (tools/lockfair.sh; locked.sh is a stub that calls it)
+2cfe7fdb17fbc0e091c7df81d8117075f5c249c2	d5e052d1ee63fea0f0f0110b7adf2747aaaa99d3	E30: screen on profiled builds (0.765x, sd 0.356 a unit); cap fixed at 120 before the gate
+2d1a2a889579f3bf7a46108de0fcc63df599c00f	7c14943356d9e914410efbd611d673e5b597082f	Merge main (docs) into parallel-v9
+2d6886f4d198018d5a9de06eae4b90c6655a3a16	251a17b829f6c02ebc01da00674b27e575c0cd3a	Freeze v7 (E11)
+2f08f3aa2adbc00b1065cb2b637023d24455a6b3	9a59761244841f57714317fb97da55067e1fcf86	Freeze v9 (E14)
+2f784e20b929fb6b20fa62cec10ec4e6e3a90ccd	8bef903d479d895c2ef282423d1f11ad12068d42	certificate.py: count a reply as lost only with the searched position behind it in the file
+2f9bd30cec34e69cfde611215bddad098e62250a	bf7001664ef61db10e2c555a47d53463fb40b478	evalmoves: the model's score column
+30876124a9bce498f4271420c6479822a0c15ac8	2adb793ac74cf8348370cd478e2985f77e4ff257	E12: the reach test starts from the longest snake of the target snake
+309bd05dded40989cb60bcd8c46644f1dff79cd2	88d90437b6caa219a03ef7e1de2dc2b4b8d29c52	Log: the plan for a page to play against the proof; the solver timed in a browser
+31882628bf67c54e60c8752d3941cb7c7118bbc8	9682047c272a89dca85bcc1fb8f6e07f498b5d3d	E32 fit tooling: snek evalmoves (terms of the evaluation per move, with solves)
+3226d3b08c8d2d054081dd7cded3b7f32d5735c9	1b2a3b605b5b085d35a6b48e205b4686b1c240b5	E32: driver options, all off: --emulate W (one worker thread, W solvers in turn, W jobs out: exact node counts), --drv-carry (killer costs and extra slots kept over a worker's jobs), --drv-share (history merged between workers at job boundaries)
+330584db26ee6ba77df9303e8ec7b9fc6da14ee5	37d44984bdd24082af7952018e35e6e1c73733d1	The public copy: the README corrected after review, folders of this machine replaced, the log entry
+3376bbb68b3947cdf40c7eb8a314d38c0faae190	25d9339097c4f0e44ce54f2f3493814339dea66e	Board: compact tries and unchanged rows left out of a poll; tries under the board on a phone
+346c76d71d99a7d827c52d5d0bad691db378d398	394b50dba7ef33646468304fff35ee8c59c82120	Reach test, three pieces: --reach3-cap2 adds the same cut for the second piece and forbids later pieces to join a snake longer than the longest the first piece joined (off by default; same nodes)
+355d81712d2d0d9c0f261d73d38cb3e212b42f6a	4b75f5d608b80c309fa9e4685911f3c47dda2640	E32: the static score is a term too
+36430e16ed300a036f361367a579abe94e8fd1d1	44a10bb82d873a1d9d273931959e7da4ac4eb2aa	First exact solver (alpha-beta, table, length bounds) and the test set builder
+36c345b0c3f1b4d0296f41f9af95013d695db19a	4b012200ccda55ef21690d74487214c76f9d5891	Board: the tries of the reply in work (from the results file), a stand-in driver for tests
+39ad29854d7b33df73285e39f10b7d781455251f	7c11643ba6c38f03517febae3ac9a240715804c0	Shadow runs for reach threats: parallel runs, the value check in chunks, a summary table; rtcheck prints a line per position
+3bc113e9a2d626a77396a0882acfa71e81d9d1cc	cbb4875080fd37a5a51f8238cc8096ca5d6ecbee	Docs: the red win at ply 2, the centre-opening run and how to resume it
+3dbd2328aa3d65b31e6d5a501fe69b83ec14f0bd	f91743616fcf79df762b41d468d01728e30a1720	E29 on the new base: screen 0.966x (sd 0.164); gate put off, the rule's agent goes a third round
+3e2d53afc0fa2a182479728e3b78b9f7cfabf12e	52e63976cee9f37cc8707679ac61aeceefe55bca	Log: the board's Prove mode is live; the path-length fault and what was checked
+4008e9f9498a43b90fa1116f02a8a49f7a57aaf2	17d40ff54416332201723c397bd3e1ad67938cdb	Log: how to build and publish the play page again; the entry's end time
+443b7ca90ae1d4ff6710b0bad18c6007bd607817	ddd4688305af84ed25438f9cac1b6860d369737c	E30b: extra killer slots (--xk), history keys that know failures (--hc-key), the history over every candidate (--hc-all), partial selection (--hc-select), the history between driver jobs (--hc-job); all off
+44d85322c438cec92e9902c35383201c779cb866	f98ab0a8c89addf9ecfe6e3a87254c695c9a4069	Freeze v2
+456f1cc48f7b06d0c401aec2ded2a3da8d326ebc	9a382fab77da2f287f19829f07f971aaac951544	E32 round 2: logistic weights out of sample (no gain); top-of-proof order study; stopped for the owner
+45a7036b28bc33ed00f4655ba6ca392e4e76c9f9	8ad8886ff49867c9f0ecec18af802dcae5b044d0	Log: hypotheses of E32 (an evaluation as the move order) and E33 (the tight question)
+471bd4508d2576905c3200a95ad8661c61733a36	1312ec468f9b4765ff49d2653d34b8bfee7ff937	Note: the full check by the reference solver is not to be run now (owner, 2026-11-21)
+4871a59bfabdd954d45aa8218da9d6cb50ece592	c944ca1550be232e44f0466a2f8d2f1369d3c67b	E32 round 2: the order of red's tries at the 25 tune replies, offline (toprank.py); hand-over
+48bf8929beda0cbe57132f8d74753e10b0aa120c	d9592910f3f19a107148c7b101ef1a39e2ec4f4e	Reach test, three pieces from the longest snake: --reach3-cap cuts a first piece before the position after it is built when its later pieces cannot reach the target (off by default; same nodes)
+494a8203602e6a0af16f6967d7ed3115a28539fb	380df905ba51c907711bf562b3c031ee958c1880	Log E27's install, identity and screen; the stuck lock
+49f80e7d4ebef66c7a061931cfdda37e7ac9dcf6	9bf07c4c1285e01a2646c84bda11b43c3a75f9f1	Reach test: --reach-ub-inc decides the cut on the child's bound from the parent's clusters, flooding only the cluster the piece lies in (off by default; same nodes); feature ubcheck checks it in place
+4a646d8d24a4777eb5aeaebf46918f90c363d2bd	3e6695a9186abc07b20643525a1f9bca1493b54b	E29 fourth report: the node halving reaches the driver (0.85-0.89x on three jobs); the dear case is the three-piece cannot-reach test
+4b69d1fa61955a110b1b3c3dd2f1486b169a451e	af3134df767de561eb0a2e47d08880daa73c171b	Rules: the owner allows running the reference solver (its local solving modes)
+4c9b5edbc95f070620890a8a0fc8086fa12d6257	64d2bf40124b713d222562772f2be5c1c5695d0f	Tests: a unit test of START3's k term, and a debug guard on its 4-slot array (nothing the release build runs changes)
+4def6db2d94308939ccdba62b683d4e806848732	ab9ce3100c27e482f95aab9bea446c61974af7f8	Analysis board: a local page to set up positions and run the solver (tools/gui.py, gui/)
+4e15108142c96ad3e72920382439670a698f6333	d8ae7ecfea155fd0817fa9b080a67b5fe859d5bc	provegate.py: a paired wall-clock read of the proof driver on whole jobs; eight more reserved jobs
+506c7e8423d583105f24b174b58e1bbb80e5bebf	938a220d986fb5deab340e3eee2260ab5a45ed6c	Reach tests keep the sequence they find; a later test at the same ply or the ply below answers yes from it when the player's cells and pieces are the same and its cells are still empty (same nodes; --no-witness)
+5156b69f219e6a6e3743294b7fe42cd4fd815c55	598ec2e540a1181d58ac5036b4edcdb9e168013c	Grow anchors: the touch mask first, then the per-cell masks with an exit once nothing is left (same nodes)
+51d8d1c770ed4fb01abfa4171be77019eba2d7d1	df82bf5384b11c96ace41e977117b11457ea867b	Reach test: --reach-ub-upto asks the upper bound after a piece only whether it is below the target, with the early-stopping flood (off by default; same nodes)
+523b1288e575b541282561dfe623f2f26f866771	fcf08f41cfebff1eb46d949b570ad7a2ef18c482	Log the study agent's report: reach threats halve the nodes, exact, not yet in time; E29's hypothesis
+52ed91ead0c38366e6df195865bd47f48a8c4e81	ee9be8b22599fdd0d9ae83a8cca0b6342c1bea13	Log: resumed after the restart; aims of the three lines; hypothesis of the top-of-proof ordering study
+5351397bc94d5b12e55bf4316ee99b6083e3f183	450dfa58cf73d3c3ddbc27e05bef0ded0b39226f	E34 hand-over: stopped for the analysis board; pieces 3-4 of hold 10 void, directory restored to piece 2
+5367853287c234f3afc3fdcd441501f1b6bcf330	49121d076b3b674ecc4df4fe35b2d6ef5e34330a	Log E29's first report: reach threats exact, nodes 0.56x, time unchanged; the agent continues
+53f9944db638e8878b783dff341563f963401e78	7394610ce7dd27132fdad2a463843e2904d66d5e	E30: cost counters, killer-cost oracle, cost-aware killer and history options (all off by default)
+56e8a87b16452f9f465f2ea6f8aa96fc00e51093	0a78a08c1512cff3be86086b0498716aea57a9d9	Threat scan: the bound of the covered clusters stops as soon as it is above what a threat needs (same nodes)
+5a06903a91c55278adb01e6a77d97933545845f8	778f04c11fb3e9f9b97c6cf38e9d0546751d4055	Log: climb base 4 on the reference's bench files (0.842x of base 3; 53.2M nodes against its 59.7M)
+5a4f0fbc10d7abf2f41b6020988a5ab3c6ba16e8	fc62e6e5c5e533915e856fddca01486c9ac82688	Log the second batch of agents
+5ac618fc2472600e6957e29357f51d29943c7d97	245d265486655ca1086dfe77c4053a732a4fb893	Log: a private page that plays red against the proof so far
+5be88463039cf5e0e7b11ce180759af8235a0f69	f4e5efc19b0b26bc9b93b74b8eb4cce0b868f955	Merge main (E23 options, proof benchmark, prefetch and table-skip options) into parallel-v9; the run lock
+60d78e9f846116c34c36124ba656f6c6d8b9698c	2768e0cd99c6c443bb36589473796a413b459388	Reach test, two pieces: when the last piece must bring in another snake, generate only placements that touch both the built snake and a snake long enough (same nodes)
+61413a707f8a2fa6bedcc9ea9462fa0ec17322e7	28262b5db194f7421e8f038858eed42149ba16c2	certificate.py: count the replies and their symmetry classes from the piece shapes; report open classes
+619573cfbf1684e66a31a330fd3a79b77106f9e9	0f0a9fcc833add93407235fca205b53300d50d1b	find_move with a touching set computes only the grow anchors (same nodes)
+62898135990978aebcbd9357725033d6ae5d0bee	0cf22bfaee67a1afb4e169ec70782ab1560c2d3e	Docs: an explainer of the prover (page source); log the table key's strength
+635754d063f5e674f16114d2a2f2358d52322f10	5abb59fe4866f54702c25ab74c26034fa584460c	Shadow build (--features shadow): changed routines also compute the f4e5efc answer and abort on a difference
+649b878c8f04fd9a40a2dd4fc66b98df50d243fa	a4974b5e356ae5f3bace398aa355a522a7cdda70	Log the ordering study: a learned order pays 0.97-1.00x; the pot is the cost of the win chosen; E30's hypothesis
+662858f3a019961ae751d778ace6ea3a52a90574	17068e22b9eab3bc8a204eddce36311596535189	E28 and E25 pass their gates (search bundle 0.916x, prefetch 0.949x); guards running
+677b7fdc37c6893bd0bbd503ba4c815c0e321060	e06992052cd9a6d1ef323b800a08cc4879c9126c	Freeze v3
+68161869d6edbbd696b3a2129267ad86fce27423	49775cc4d32cfb09cfd15cf2eb20c4bfb1360b62	Correct the table-sharing entry (the driver's workers share one table); log the memory question's measurement
+6853de04655f9594d25a874dcba8f4947c2ff6a7	260932920c8ae8e940018a00eaec713e6878d2e1	Log E24's first jobs and the move of the climb to parallel-v9 with sub-agents; run.py runs under the lock
+68da5484253baae0cf9db148f3962e33bfa12f5f	7d3f01834b130c655c1e0517c80cff25fd7d1d84	Freeze v1
+699b24aadbb589822bc5d42592beaa163395931f	fc8e0d08f05b953eeab195b5adc071d0789c387d	Lessons: research the claim, not only the code
+6b3e8240ffe27a00a1856942686d371621201b34	6ea0a5edc8afbc6c3dce4156e425628ffadfa137	Reach-threat counters, --reach-threat-max, --reach-threat-touch; study outputs of runs 4-6
+6b7a166725e9031181a51f1799d665d63bd05f17	ef60f52490eee8146ca5cd9c96bc200a442595d3	Proof driver: known results first; a command that prints a position text
+6f61ebf6c71d7db4e4726b0581405cb0076d0378	ab3bf7e9076608dab84d52a4b0e42b645b9b1853	prove --emulate W: one worker thread, W solvers taking the jobs in turn, exact node counts
+7032837373e7888ef92037821a08d584a29505b7	895536ea1bea34f049616b2063ad296edcbf3143	E33 work in progress: --tight-q-min, --tight-q-margin, study counters (G exits, reach by margin), null-window re-search in the check build, run scripts and HANDOVER.md
+712cb7ab95f209564218f4898a2e12dcdc03f094	0e20b73a43d7503e8a57a1e11c63e8214d7fbeed	A blog post on the result, first draft
+72bd303944c23c1a87181cd2765eac76d3818e41	813f7dd0946822b7fd40f6dba30b177e0dae6f52	prove --emulate W: one worker thread, W solvers taking the jobs in turn, exact node counts
+74352eaf4016e6aee5ecf469f30ee065b97e5b5b	a4e8c25c104b14272df858d4531ed52f4fbe87ad	Ordering round two (report); E31 hypothesis: two extra killer slots
+74d7160ac09e88571769a638c2feab5a882bb47d	d609ccb48d7749f69332c5305b5fbe577c8963c4	Port the parallel solve onto v9
+74eec5fa4806ebbc2ab1e1d4339ba5b3dee35ffd	af203455a4513238172cd39bfc04bd95a0813a79	run.py: the proof benchmark as a set (unit: 2 positions) and a choice of base
+75ad9c054bba6e9d19116c9d53756020b70c9e24	aea23883e04da0e1aa72f2e1f503ffaf1d3deac7	Log the window study; correct the explanation given in E18
+75f308c8a7ea015190a458aa084d2d6d21e27332	dd4c361740bdeee4de138896b50700a7948e2dea	The proof of the centre opening: results, replies and certificate
+7863ed8acb428eb0e0c1c5be70580fa4a36e678d	fd27ffffc8c2100d5bc94dae4d038da1e9836ed2	Freeze E28 + E25 as the climb's base; guards held; docs
+78d0d925c2abf717ebd68e344535c5d5f0dcf529	15a78ca7bb96ebf3f82e27c0ac2f1e4ff51e58c1	Log the ply-3 long solve
+79c119d090a13e9ccf62c95c4140ddd2a9e0b384	d0fdf4ead6049bcc4479466ccb8bbaf5153e2198	Pot sizing: a sequential solve with one table needs no fewer nodes than the driver's separate jobs
+7a01bddaafb141d014991bb348da17ffe0b7f1f0	8c791614b53bf40a47a49b1be2fff83db7ba639b	Log the independent verifier's report: reach threats exact in every variant, 0 mismatches in tree
+7bca53596863e54c66c6e90eb071a1026b357b7a	719ffd7b2d81019a3bf921c23eccf2a3d81262ec	Analysis board: a time limit of 0 means no limit
+7c0c32acde29f2766dc33b2d333589f41d86e5f3	b1ba8c4385eb424b9ebd93d5119b8958970787ed	E33 round 2 paused: cargo test passes on 895536e, exactness argument written, next jobs in e33/jobs6-7
+7cf7c0397659cafdbfa80402e3035bb5c3ed3edd	44d720c2b4118ec9265916bfbe6276bc7616ef4b	E2: threat zones (gate pass, 0.63x time at ply 7)
+7e6dac50d6363a84596f53d999b5ec9868f4b169	a787b1fc9750dcdcabbf8ad88254e35cb59343a5	Add the proof driver: a restartable top-level search over jobs on the shared table
+7ec5d1c46dd75487b8835208ec49166bef9fbda2	dc63cf37a1a4fbf0985bb85dd6d60fd874955d29	Reach threats: a reply that grows an opponent snake also prunes the moves that touch it without covering it, when they grow one of the mover's snakes (--no-reach-threat-grow turns it off)
+81bf60f50a7bef4622f665ca74b20d0b2f0bd147	36892b4c05f20102fc04f14cd808b30297f4cb0d	Prefetch on by default (--no-prefetch turns it off)
+840896ced4628879a4d94b7e0e157c131e1b7dca	822c87f51a3cdf0c7a9eb0fd675957aa2cf33cf5	Log: the board from the owner's phone; the opening's proof restarted without an owning page
+847ae4bfcab5efb20e10da7a51aaad99b679068b	09807d5c75ee2d9f553548f83d19c888e092c68e	Reach threats: a cache of "cannot reach" answers (--reach-threat-cache, off by default; same nodes)
+85c2709913dc9e5be04d3bd51fbfc04355237822	c32f357ad33b3e9980928bb8751368b74ecb581e	Docs: orientation, backlog and lessons after v9
+863fc853c6fde4899aeb6b01f822584b09fd0b14	2d9e432e91a59fe82bb3bcee955da1a0a60ab31b	Freeze v4
+8694c59360e6b0f98435d16c00adf70fd8576301	86d940a2ae72339c794bd06d90b8acbad61a8b8a	Log: correct two clock times in the explainer entry (13:40, not 14:30 and 14:40)
+886a21faf05a17972fcac4ab6d52a9cedc53e76e	bd41644fbfaf840cd6b8e3097c3772ea0302b3e7	Merge climb/search-pf: the search agent's eight same-node speed changes, prefetch on by default (E28, E25)
+88b0c8e913aad74a648fa4bd3df49003f7e062e0	1c796e88f52e46f9b9fe5cabc10961886bbcc528	Log E30 (cost-aware killers and history): the agent's report, my checks, the hypothesis before the gate
+88b9ebba907e68a6094aa16d1e00bf3923d49551	7a8f8d61c2d2bfe3172edd24cef7a5844da83100	E34 work in progress: check scripts, pairing script, HANDOVER.md (stopped for a PC restart)
+88cf186f26c2f2dd2f4814964e644e775144a8ab	4cff1e7c734c66316bd0b4bea173ff619a0b0d8a	Merge main (docs) into parallel-v9
+8a07af3de2d7ce5bcb3d072ad5fdd7c4e9825506	25c2869a65b77605712a09a6574f8539be55dfeb	Docs: reach threats round three waits for the verifier; E31 held; an ordering change needs a driver read before its gate
+8a2990147f8e61ce42ba401c11e49371138c9570	c4868d9bc22b1595c52f6142bf2795e1dfc916bf	Freeze v5 (E9)
+8cf9f804a2d3805577f554040256859aae9a592e	5dbc53021ed8175679a15508c6733a10e7bd8d30	Reach threats tested only after a failed move; study scripts and their outputs
+8db3d424b404472f49bd02ac2498e7c2c042bd09	9cc08b6d8094c372f6f7e61be516be9f3409e9df	E27: MSVC toolchain and a profiled build pass their gates; tools/build.sh; the climb's base is the profiled build
+8e8c8ee2ed0cf1337b327f72821a81b649623227	9bcf9181bd89306f2f1ac17057afe50d720c309d	The analysis board is merged and checked; build.sh's fix is tested; docs
+8efb33fe5ecb4cf75b106005fef425dc4d4a17eb	21491104c89be7e7fd1eeb3f63e253258fa358b1	E33: three orders of red's tries behind options, all off: --win-turns, --win-cap N, --win-recent K; replay: --deadline needs a root with work first; paired output for hc.py
+90ddc67f19e5cfc157d1689c04e77dd9c0fe5839	c469e62a501cda4efff19556747a2179ea7c9d1e	Log E15, E16, E17 (dropped at the screen) and the model refit
+914d5fde9337215ea1c3a6c0a052b00a3b534dbc	677723d5b18e77a63735f83256ef0fb913b00a4c	E8: a parallel solve (shared atomic table, simplified ABDADA, unwinding)
+924668091d8fb28686f07c2b6babb53a3efba59b	ce2d0af5aedb3350d1c5578f2b352f90e7cc6f8c	prove --hint: only for jobs at most two plies below the root (at depth 3 the pick of 2.4 M tiny jobs made the coordinator the bottleneck, 127 s against 15 s)
+92938c4266a880f87171cc63bb545c3b195f2bf0	6057bd7b736a1a8fc15b4f0dd6a21ebf45c751a1	Merge climb/threats into climb/cost: reach threats on top of the cost-aware order
+92a603a6c880fd5f16c50c1f18a70d824b1015bf	8f6adcebf56775b5039c3ab6b4ed31ad70157315	E30 on by default: cost-aware killers (mean cost, cheaper first, dearer evicted) and a cost history at 5+ pieces left
+92a9b05d4a4865e2077727ffc88c03a06c001d2d	639d65900887d82d1e64694f56b9af0d3d438f50	bench: --window A,B and --only LABEL, for studies of the search window
+92abd6daeeca0af1687708ca7b814c4b3356c4f7	4b2556e9c3b725bed9af66fa38b70cbaef7430cb	E30 gate passes: cost-aware killers and history, 0.796x total time on 60 fresh proof positions
+92fcd9bd0e7d43a801e64305aa7dd5c7f0e64d17	237edac939383a689dc90615d618f68ec37baacc	Log E24's hypothesis
+94f6c441ab3de5a5af426a36cdaf033b519dcdef	6f61056b791b000803b0fbb730fb4198fddfb0ae	Ordering round three: the driver gets nothing from the extra killer slots (exact emulated read); E31 held
+95bd481fcad7c3eba278fe97cdda61239a9a4599	ae6e15df9fded2da1ede37f955101d16dff411c4	Log E22 (a table lookup of every child before the first move): dropped at the screen
+98b0dcc327cfbbfe3bd9110d01f2e38ea7e2b110	4f2c47fe5521da8167f19e15165ce410638072bb	Log a pot-sizing study: proof-number search with the model order
+98c109b81ac2dfc083bb974d89a62c4e67d25f0a	4c34a0cca0e39a488df881da706c7fa781e7e955	Analysis board from outside the PC: a token gate, a polling fallback, the proof first on a phone
+9a477dfe217065b8eaad8d9ca13313749cdf48c1	22d36ad04e3176e9c7c804c7163412fe286bdfb8	Proof driver: the mirror images of moves that have won at a ply are tried early; a known cut counts as a killer
+9a96b642485a9c3012fd2640fc1b13e03edf641d	8b653df9b4f04b1f4140a0a5c47b73c498adbbab	Reach threats: the test uses can_reach_touching and witnesses (a sequence found by an earlier threat test at this ply, or by an ordinary reach test here or one ply up, answers yes)
+9d14e7db9d6d0a76a031fd2f671cb21c23132209	efa65ecbb5d17718f46df9dfe645d5b0f641acbf	Reach threats: --reach-threat-start L also tests the killer replies as reach threats at the start of nodes with at most L pieces left (default 0: never; same nodes)
+9d7bcb28117986d99f71e35904567dbbaf746ec1	6480f521d17320c96744094eb3365c6dd1a44cdb	Merge climb/verify-rt (shadow tooling) onto f24a2d2
+9e042aec39eb599a8ce804e4ff0d9ac35a4fd118	49f010bd4cbdb67eed70c35647b9145d60ea0530	E29R3: the gate's record (pass at 30 units, 0.856x total time) and the guards
+9ee1db74f70870e7704261855a769484ff7dbad3	5b06bb90d350b79f179ce34e13fd6d5918f5a85a	A page to watch the cross-check run: tools/crosscheck_watch.py
+a022d13f620c25a78a205f2ee4ecf9eaacd22663	763379668bdd8f55ce0bdc6d6f71ef58aba97797	A second proof set (proof4b, 1,184 positions, disjoint from proof4); mkproof.py --exclude
+a074c84e9f731b31b13d161e7345f6ead12575b7	0fe09ffe63910b48ff769ae0ca0615ba747b88c1	Analysis board: a short folder name for a proof store
+a1e875270b6dd234a98383d2cde395f846a705eb	bb597e7b925b9bdb289110f9b386a776a48eafd1	E30 guards (ply 5, whole proof jobs); build.sh takes the run lock for the compile
+a47ef0ae09ba1a3213f4bd314d559fadb9dfe97a	d8c48592b7b8ae69a10396ce1c2622cea2f5405e	Log: the owner asks for the proof driver behind the board; the design of the Prove mode
+a58f9ac23fbcb77bf5e59f4b4b7a28af33c2ef6d	c5e4d7456971669b0f713875f7d330743cf02013	Log the port of the parallel solve onto v9
+a6885c6259cd7b2e5ddd66f629941cd6c320c513	1443d119794f82c2c1efcbce070010c68b2a83f9	replay_sum: the seconds of a cut-off piece go to the root that was resumed (not to the first root a piece decides again from the results file); a column of pieces each root was cut off in
+a708c463ebdac723aa6a6049592abbc196003d95	b4d4015aaeb0237081fc9c0f6e7ac605009ef853	prove --hold S (E34): a coordinator node with a job under way for S seconds opens no new move while other work can be handed out (off by default; only the order of hand-outs changes)
+a85a3d927edc1b6156225634c524c0b3df085b2c	27e0694d2aebdc747c8dd56b6aeae7bb820ed451	Reach test, three pieces: the last piece is generated from the cells after the second without building the position (same nodes)
+a9d10e8fb854182c2bdb019dce886ad723aabe54	f368e7472d986b24cba027ee94dcd98f768ee029	Reach test, three or more pieces and a target above the cells in hand: the first piece touches a snake that can be the final snake's longest old one (--reach-start3; off by default, same nodes)
+aa7776c9f9937db1922c5f4d769c61aa00a8f6b2	acc9ed39d2f76af7058ca2f2a6f7518f937ddd26	Freeze E30 as the climb's base (cost-aware move order, 0.796x); docs
+ab4b10325cdd8dace9d460fb9b5873cbb279d3bf	229cf3ea365a86ea0a507dbb673dc45370109725	Merge branch 'parallel-v9' into climb/threats
+abac8d9099b27e85e22719bfa7831f242dd2b33b	f59006f86f4b9b5e970e387d73c85e8cafdfb60d	Reach threats (--reach-threat, off by default): after a failed move, the refuting reply is a threat when with it placed the mover alone can no longer reach its length
+abfb1b006e4184ecf7b31d59814c328938035c09	595a4cda8b9afbfc60992894f2764a2d3d4c4ea2	Log E8 (parallel solve, kept on branch parallel)
+acff410c1a14fed84a84a9825391762e05dfdabf	895b013b0256b9a55174699c4020c811d99cbd77	The reference solver confirms one certificate line; the cost of all 172
+adba3b0db66a7382bdfd42eaef7b251a4588deca	7578d110ceebe450a006fd4fb8df5ccd24f39bdd	Notes: the owner allows the push of the cross-check's result
+af07c8a36779651726f09ccdfb0aa9b3c9bbe7af	8f362211016d42b147e2df1d132f69ab0a51fbf0	prove: --split S (split the oldest running job when a worker is idle) and --hint (coordinator picks a job's first move)
+af8a7eb8e4ea7893cdea3dc7cb04f6fc38971659	901922c53f9a42fb6d1ed871d0c38d0c16c18036	Docs: the proof benchmark, E23 in the graveyard, the narrow question at depth
+b06158112acdc0f7eb9074746281529b089593d4	b79fd9876f92d1afeca8fed450a278ebeb96385c	proof4b: drop the sampler's scratch list of parents
+b08eb6c46c101c8d5b9939c9b85a4dc7b8a11dae	8c506805a6cd898f0093fba29ee72a54047b2208	Log the proof driver (E18): exact and restartable, not yet a speed gain
+b2d73429536a07bf7ce12942f0a85cea38106f1e	56f1b5847d3653ea492bf6aa43695f57227b262a	Shadow build for reach threats (--features shadow): every move a reach threat rules out is solved exactly with the rule off, on a table of its own
+b50ed0a8142f8f84a4ef6eb06912e0e71402f352	7041d2957003c6cba62bf7abac48a892abd7d020	Log the proof-number side experiments and the root-move study; add the study tools
+b5511b06e8ab4690be4c875e1b874a81f53f8219	ba13096d55737a9872927e5942800bbfe4a127f3	Shadow checks for start3 and the new reach-threat defaults (--features shadow only)
+b9cf757e4f2dd3e78cf965f9cc9a97ece5f663dc	1e0dafc762dda9fc194d727020c4477550a722f0	Log: paused for a restart of the PC; where each line of work stands and how to go on
+ba27956dfe76115b5c2210ebad480e972ef4d867	90d25fcc8a5b1e472945aeb4213a1bf172aacd93	locked.sh keeps the lock fresh while its command runs (a long run is not taken over; a dead holder still expires)
+ba7802da449ee313ad2eb3519ee95dc9fd9dd9b5	072ada93a3970ec05e7f8e623c129d8bc4f6c0f5	E1: value the last pieces without a search (passes its gate, +61% at ply 7)
+bb64961ea1ef3d00cd7ea55021d22c5382755105	edb321d4d98e10fe1578a0e668d9025b27e3530d	Merge parallel-v9 into gui-prove (the page's onState/onResult and the status poll)
+c06f4a7f9bd55b8daf501b1e2c94d3d3c98aaaa6	0f1a55d663e7103ae0258ce56307b9381bc47968	Merge branch 'gui-prove': the tries of the reply in work on the board; unchanged rows left out of a poll
+c1386ff685aeed6b620947ac574a94674cb2e0ea	a5a9247b288ee730e8c3b321d6b08940d03ccb9b	prove --job-log FILE: one line a job and a decided coordinator node (path with places in the order, start, end, result, stopped); tools/joblog.py reads it (E34 measurement, no effect on the search)
+c145a25c8649c8fc0dec732b4ac016a097d779a7	284dd019aac7f2b33e0ecaf71e051bceeed36b8d	E34 work in progress: the check and pairing scripts named in HANDOVER.md
+c2a86582095cc91363bda2720f6068c5455a9dfc	c183a3ca667cecbdc96d187a148f4e47415bc707	Log v9 on the reference bench files and the second ladders
+c370d1ab5a82908f04a1e459722606742daa51aa	aeccc6e20a2a39f4570dfb5f693e03e7b58de6fd	Log: the 25 tune replies replayed (a reply costs what it did at the pause; failed tries are about 70% of it); hypothesis of E34
+c3da12a5812edfaab899f9f672a4f45dcc731891	2b86d297d5ce439072863530deca9b16e8630855	E30: --hc-staged (the history picks between the killers before the list is built)
+c455a51ef4ca35c645fc26c98bb7465f71bb1234	a1000a0660fb1aadff7a8ee9f605850ff005a91d	E4: order upper moves by a fitted model (gate pass, 0.72x time at ply 6)
+c5968bbd10937e9c44d663f43af78754cc740f19	5631bdd74fe1c6168b4b7d61df29c7985213a7c5	Blog post: the designer's attempt in detail; say that ours is the second proof
+c8316ad641b46026542a1bfa07b2b0e880692384	e75f776d95e554a54001bb2c5727f1742444ee34	Reach-threat study counters (--rt-study; off by default, same nodes)
+c838d90eed925c43e3fd4f608eca2a628798e94a	79e5d8c41404287c4da5556c5f84d548ecf8e168	Killer threats: the bound stops as soon as it is above the threat's length (same nodes)
+c9625f238ddd0f2d33e5cf1a28fe3b0715cfa6aa	f24a2d2c2cd39bba178863da2f66586afd8474e5	Reach threats at every level, tested at node start too, three-piece reach tests from the longest snake: new defaults (reach_threat_max 99, reach_threat_start 99, --reach-start3 on; --no-reach-start3, --reach-threat-max 4 --reach-threat-start 4 give the old setting, --no-reach-threat the rule off)
+cdbbc6d00af93c484ea214523d8aad7b9d578633	088b666b0d0f370164df7ebdfc4b5f3a83d72dfe	A README, a tool that makes the public copy, and stale lines corrected
+d040643e2e80584290ee042ccaad3d48faf0dc86	be834df5c0abc330373c707d8ed8312775d9d9bd	E32: the model's score is a term of the evaluation (64 and the rest 0 = today's order)
+d087d71ff6028549291c976553a259b9398f2486	bafc1cc5a0e1f900b0f86796aff9c835dc82bc6e	Blog draft: the link to the public repository
+d217dd352ecb1425028dc1d90bd6f83361bdc9ad	81e6fe65c6bffe8da77e4e4a2288a6ab3c0e1b82	Merge branch 'gui-prove': the board's Prove mode (the proof driver refutes a position's replies one by one)
+d76651196a5096906d331b2b2e706acb7d0beba1	5fd3fee8514164c5f03b0cb22479ac7195443866	E11: a threat scan recomputes only the clusters a placement covers; runner refuses a gate that cannot decide
+d984887c15437dcdce50209579dcd0b5c666995f	35a8671676afa154cdc55a3d3f43dba302febdd2	Reach threats: --reach-threat-after N tests only once N moves have failed at the node (default 1: as before; same nodes)
+dac88107a3520fee7f7f54aaa1c0310ca66ed7c9	3226eafd4d66deee2bd60c628e34fbb1795ff986	The public copy: made public on the owner's word
+dad32980a7e3d57b7d82f35fadd18e1dad570490	1d857c7d0b46e206cfe4d6163193719a8e30ff6d	Reach test, two pieces: the last piece is generated from the cells after the first without building the position (same nodes)
+db5afc1b42bfdfadac7159a77d00ed7a0e790418	98e816798db5c776c859274fbbc8f7388c126690	Merge E30 (climb/cost 8f6adce): cost-aware killers and history, on by default
+dc2911eed9c84e7dbcb9820014f6847b60f9db9c	581b696e8ef4e591f75642916f10cadea63bba03	lockfair.sh: RUN_LOCK_FIRST=1 goes ahead of the queue, for what the owner is waiting on
+dd1855fd8753a8b917c2fa8ccc64054a30769ebc	ac67ec6bd74744cceae06445c7a15b1c8f12b0ee	Merge parallel-v9 (climb base 4, reach threats) into climb/replay
+dd1e0fc30e57aee4256ded16e9bdd9108541c968	2fb3672df5284754da2dbba906807d6179d951f0	Log: the centre opening is proved, all 172 replies refuted
+ddefcd9b369f7a3cc1321c5116958f759355eff7	460d15deb8243ce20fa9a023a55247be7cb89c90	Log the machine's slowdown against last night, and E28's hypothesis
+de18320313dd84227573019a2fda04b681e375da	eb3b06b9d774f8a47cf4d1a3f92c12756fb4091d	Log: reach threats round five and its test commit; three orders of red's tries built
+de63f3eefd8ffb42ba891a2c4dedb5b8fbf4e2d4	5c0945896b3d5dd8005c54d7db104292f8fdd40e	E10: ask the exact reach question first and skip the cluster bound it makes redundant
+e05735e14dffe5db4f49dd2ff1422478d657c09e	ba347dc21ebf8ebd3ccacb5038d839bc4e8cb957	verify: optional rates for three-piece hands (snek verify GAMES SEED HAND3 THREAT3; defaults 40 and 20, as before)
+e0cb8bc6c0190e660a45eca79393e92ca14895ac	5894196a7af07f4ade779fd5116ee44217e09e37	Study build: pot counters (--study) and reach threats (--reach-threat L)
+e430d9b6be4289e92a7f7a62cd41a0d15a4c63e6	41f672c619c65fd5831be867abf83deadccdcd1a	E31 (held): the checks that ran; the screen was not run
+e6973df51337c9da259b4a84759cd741f878dae5	9eae5275706f11c0a29748964d59b4897cb1a5ed	Log E13 (dropped at the screen) and the re-ranking study; rerank tool
+e6aefd316048e757a64d7a04b102bac1cad6b9c6	aa61147ae2ceff72ffbda6dd449ec548528d67ca	Log E19-E21 (dropped at the screen) and update the backlog
+e70ffa048561b09bf28ed7abd677fc4a5dff73f1	e58b19710d0dbaf9a27165f2892b33e2abfdf273	Log the hypotheses of E25-E27 (node speed); PGO is blocked on this toolchain
+e81f14b158c68ceb58d500bb94edb7b2506c7f98	07c92bdf69cdab4067a9de39c8bec19c7295b3c4	E32 work in progress: hand-over, scripts and results
+e92611051f000514b02b1c7fcf6e7ec4a9f4b2a1	e765e47ce0dfec3c3a64ef8757e1993a0a7f8b1e	Proof driver: one move of each set that a symmetry of the position maps onto each other
+e9f53eb5ae39012d8ff3af434f15463bc5bbc11a	ac011b66df451535b82e1682b991584716869932	Study counters for the driver: --cost-stats in prove sums the workers' counters; the winning move's source splits killers into handed-down, own and extra slot; node profiles printed
+ea4343d4e02b689e151daa93d45c6c0b232c6f5a	0813b568bf4cf4395e1f1ab6a9164829b35bd597	E32 draft: --eval-order L orders the listed moves by an evaluation of the child (race to free cells), off by default
+ea463fe68a83408a743f9a3dddb38d3442cd8926	b0fa80b419a37822ce7a315d19801769b3408ebc	Engine core: board, pieces, bit-parallel move generation, naive rules check
+ea7194323098d7e4a2f9ba8ea09f0f9935fa349c	4b1a6d32e9078282b06557b8af8249777629d1f6	Log the driver agent's report: --split and --hint kept apart, not gated
+eac888ec6800dbc196c46ea5bfad17608ca25536	508d81d71ea0d44bbf6df8976862326d848d4fea	Order study: red-node dump and counters in bench, ordermoves labeller, replay and fit tools; parent split
+eb6d0f417cd2debdb288282ed5dd593ff51023be	1a05a1b4a0ab5d5731ece81b0fe01cc4c7607b95	Pause the centre-opening run on the owner's word; log E23's hypothesis
+eb776252f0ffad9a57daac771a9ca522591e7666	40808972175dca8e6cdcae033a5eea7864588590	Log the ply-2 solve: red wins after 1:60 4B:16,27,28,39, checked by three runs
+ec916341772398e5776161a058f4ea1216951dc6	689ca4e2aca80b1e5958e46177eb1f5a257e6f0c	Log the centre-opening run: 31 of 172 reply classes refuted at 06:33, none holds
+ecaefac1b68975b9bd7e5281411cc954f73ead52	e0e75c05249955496faafe81e6dbac0c1069da36	Log E27's plan: toolchain and profile read apart; the owner's word on the install
+ecfc18c6631d7a45ec419c911d133791ff6a2a45	74df585944574b0c30d0fc8884e5d8224d0e20e1	verify-rt3: the remaining run scripts (faults by layer, verify, split check) and the constructed four-snake position
+ed257467b6d1e495ee861002d0e104663e671571	0d9555f06e61baec8a999e1acac164ed22bd7813	The top of the proof, first report: replies 2-5x faster than at the pause; red's order bounded at 21%; build the replay first
+ed2f20b15376c9c6e6b0ec8f4a80e6320c8e6cca	695f1c51d0bbcc2666802251616f93f2a24a7d9b	A cross-check of the first proof's answers with our solver: the tool, the controls, the start
+ed763ca69d53113f44eaeb12bc48fc3e8ff9e7f3	49f9362a9597cfe33acf238828f7a58a4907a5ee	Log the driver's A/A: sd 0.115 a job; what a driver read resolves
+eee596fbb01da2b7809aff1e3ec07aa20e15ae60	b67a0c47ae5c13438ba10358b25bc88fbb358cd4	E3: reach test near the end (gate pass, 0.75x time at ply 6); df-pn mode and ordering oracle as tools
+ef718e9a951e827ee1d7459b909e12648aa3c91b	e3fcb22e80cf15d005c497ec9aba6fc6a0bf47f8	Log: paused again for the owner's use of the board; the short round's results (our evaluation order stopped; what pushes red's winner back at a root)
+f12a6ea507931d9f2d97e75ba3e97ba59422c054	8507875821901dee6f7db3107581ec6ceee1879d	--prefetch: also ask for the likely first move's entry (table move, else first killer) before the threats are tried (same nodes)
+f2f78bb4756a78e39fd1c3dcab00bd6f902677e0	04fe453b59b3b4c8579f5613fa3d97f509c76d44	Freeze v6 (E10)
+f4ab8b517b0703920945171b6b3d78ff1acd75cb	6d08294c7fc595268e545f6fc3ad8b73b802921c	Merge reach threats at every level (E29 round three, f24a2d2) with its unit test (64d2bf4)
+f5380d8942e0e4b627abe477643c1c4baaee10fe	4cf1295dc5c3f3be6585e965fbc57908396f4d54	Freeze v8 (E12); the freeze step checks for a passed gate
+f6ac335e3f2869a5b8d4f843dfcd419f7001f9de	381560fb718de69210393745413c9c2785a6e4d9	E31: two extra killer slots on by default (--xk 0 or --no-cost-order switches them off)
+f8c3218646d8197ff62cac12c2e71698a4f1da9c	cf3cdb973af5c8b4c28628ad298c432349857175	E23: df-pn with the model order, killers and alpha-beta leaves; a proof benchmark
+fa16ef3fcfa01b4658ba6a2a12fc580837ad68df	a762d5065aaf878bae053d8af1bbff181e70b55c	replay: nodes and thread-seconds of a cut-off piece from the driver's last progress line; a STOP file in the replay's directory ends it before the next piece
+fb07d76dbcf3222b27dfb8f8a97426151535d576	ea13a7c8c86c0b987817a2d3bb9a3b2539236968	Log: the proof-order replay is built; images first costs more often than it pays
+fd52869c149f93e3c3b2cb2da5085190d99bd2b9	7a0910f713df4a507643382c3ff0fbf749bc53f0	IDEAS: the owner's GPU question, assessed; the pot is in a learned order, not in the search
+fe216ddb8c0c9a3547307c874ce80106f738893e	b531c89e8a15a6791161800bec34ecb9090ca500	Analysis board: the page's runs take a priority lock ticket; Cancel then run again works
