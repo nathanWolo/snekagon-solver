@@ -51,8 +51,10 @@ Update this section in the same change that freezes a version.
   `worktree-agent-*` leftovers; this machine's folders in file contents. The copy's hashes
   differ from the ones cited here (its branch `commit-map` maps them). The same options give
   the old commits the same hashes, so a later push is a fast-forward: keep the options, or
-  the copy's history changes. **State (2026-11-21): pushed as a private repository; it
-  becomes public on the owner's word, and each later push needs the owner's word too.** LOG,
+  the copy's history changes. **State: public since 2026-11-21, about 21:30** (it was pushed as a
+  private repository first; the owner, asked "Make the repository public as it is staged?"
+  with the list of what it shows and leaves out: "Yes"). **Each later push needs the owner's
+  word.** Still the owner's to decide: the blog draft, the play page, a licence. LOG,
   "A public copy of the repository".
 - **The result is not new (found 2026-11-21): a proof that red wins with `1:60` was published
   on 2026-10-19**, a month before ours, by the GitHub user K0tovsk1y: issue #3 on

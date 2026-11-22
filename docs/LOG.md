@@ -3619,3 +3619,10 @@ through its own script under `tools/locked.sh` because the check build needs a f
 - Not done: no build from a fresh clone was tried (the cross-check run has the machine), and
   the README's commands other than `info`, `text`, `verify` and the certificate were read
   from the source, not run today.
+- **Made public, about 21:30.** The owner was told what the staged copy holds, what it leaves
+  out and what it still shows (the owner's quoted messages and the plan to write to the
+  designer first, the uncorrected lines on the older branches, no licence), and asked "Make
+  the repository public as it is staged?". Owner: "Yes". This note was pushed to the staged
+  repository first, as an ordinary fast-forward, and the visibility changed after it. The
+  blog draft, the play page and a licence stay out until the owner says otherwise, and a
+  later push (the cross-check's result, for one) needs the owner's word.
